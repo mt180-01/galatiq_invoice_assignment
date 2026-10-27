@@ -90,7 +90,8 @@ def main() -> None:
     ap.add_argument("--llm-policy", choices=("gated", "always"), default="gated",
                     help="gated (default): ask the model only where it can change the result; always: ask on every invoice (costly)")
     ap.add_argument("--offline", action="store_true", help="no model at all: rules only")
-    ap.add_argument("--simulate", action="store_true", help="use the local stand-in model even if XAI_API_KEY is set")
+    ap.add_argument("--simulate", action="store_true", help="use the local stand-in model (this is already the default)")
+    ap.add_argument("--grok", action="store_true", help="use the real Grok API: billed per token by xAI, capped per run by XAI_BUDGET_USD (default $0.10)")
     ap.add_argument("--json", metavar="FILE", help="write full results as JSON")
     ap.add_argument("--bench", type=int, metavar="N", help="throughput benchmark over N generated documents, serial vs parallel")
     ap.add_argument("-v", "--verbose", action="store_true", help="show per-stage structured logs")
@@ -103,7 +104,7 @@ def main() -> None:
         logging.getLogger(name).setLevel(logging.INFO)
     paths = collect(args.invoice_path)
     ncpu = os.cpu_count() or 1
-    llm_label = make_llm(args.offline, simulate=args.simulate).label
+    llm_label = make_llm(args.offline, simulate=args.simulate, live=args.grok).label
     console.print(f"[bold]{f'{args.bench:,} generated documents (from {len(paths)} samples)' if args.bench else f'{len(paths)} document(s)'}[/], {ncpu} CPU cores, LLM: "
                   f"{llm_label + (' (' + os.environ.get('XAI_MODEL', 'grok-3') + ')' if llm_label == 'Grok' else '')}")
 

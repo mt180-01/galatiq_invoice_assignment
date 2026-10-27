@@ -29,11 +29,15 @@ class Kpis:
 
 def llm_usage(outcomes: list[Outcome]) -> dict:
     """Model use across a batch, from the per-invoice records: what was called, cached, and deliberately not called."""
-    use = {"calls": 0, "cached": 0, "tools": 0, "tokens_in": 0, "tokens_out": 0, "skipped": Counter(), "cost": None}
+    use = {"calls": 0, "cached": 0, "tools": 0, "tokens_in": 0, "tokens_out": 0, "ticks": 0, "skipped": Counter(), "cost": None}
     for o in outcomes:
         for k in ("calls", "cached", "tools", "tokens_in", "tokens_out"):
             use[k] += o.llm.get(k, 0)
         use["skipped"].update(o.llm.get("skipped", []))
+        use["ticks"] += o.llm.get("cost_ticks", 0)
+    if use["ticks"]:
+        use["cost"] = use["ticks"] / 10_000_000_000  # exact: reported by the API call by call
+        return use
     try:
         p_in, p_out = float(os.environ["XAI_PRICE_IN"]), float(os.environ["XAI_PRICE_OUT"])
         use["cost"] = (use["tokens_in"] * p_in + use["tokens_out"] * p_out) / 1_000_000

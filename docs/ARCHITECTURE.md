@@ -241,6 +241,20 @@ trail is recorded and shown. The "first read" is deliberately simpler than the f
 
 The client degrades safely: any failure falls back to the rules, and a rejected API key switches the model off for the rest of the run.
 
+## 4j. Cost: free by default, capped when live
+
+| Mode | Cost | How |
+|---|---|---|
+| default (local stand-in model) and `--offline` | $0 | nothing leaves the machine |
+| `--grok` (real xAI API) | pay per token | opt-in only; a saved key is ignored otherwise |
+
+When live, each response carries `cost_in_usd_ticks` (1 USD = 10,000,000,000 ticks); the client sums these, shows the exact spend, and stops asking the
+model once the per-run cap (`XAI_BUDGET_USD`, default $0.10) is reached, so the rest of the run uses the free rules. Measured on the account used here:
+one 187-token call cost $0.0001; the full live pass over the 17 sample invoices (10 model calls) cost about a cent; all of the live testing during
+development came to a few cents. xAI's published rates for the model used are about $1.25 per million input tokens and $2.50 per million output
+tokens (third-party pricing guides; not confirmed from an official page). Whether free promotional credits cover usage depends on the account and cannot
+be read with an API key; check the xAI console. Tests and `make e2e` never use a key.
+
 ## 4i. Verified against the live Grok API
 
 Run on 2026-10-27 with a real xAI key (kept in a private file outside the repo; `scripts/live_smoke.py` reads it and never prints it).

@@ -89,10 +89,13 @@ def ai_usage(outcomes: list[Outcome], label: str) -> None:
         return
     skipped = ", ".join(f"{a} {n}" for a, n in sorted(u["skipped"].items())) or "none"
     would = u["calls"] + u["cached"] + sum(u["skipped"].values())
-    console.print(f"[bold]AI usage[/]  model: {label}" + ("" if label == "Grok" else "  [dim](set XAI_API_KEY to use Grok)[/]"))
+    console.print(f"[bold]AI usage[/]  model: {label}" + ("" if label == "Grok" else "  [dim](free; add --grok to use the real, billed Grok)[/]"))
     console.print(f"  model calls : {u['calls']} made, {u['tools']} tool calls run for the model, {u['cached']} answered from cache, {sum(u['skipped'].values())} avoided by gates ({skipped})"
                   f"  [dim](asking on every invoice would be about {would})[/]")
-    price = f"est. cost ${u['cost']:.4f}" if u["cost"] is not None else "set XAI_PRICE_IN / XAI_PRICE_OUT (USD per 1M tokens) to price it"
+    if label == "Grok":
+        price = f"spent ${u['cost']:.4f} (reported by xAI)" if u["cost"] is not None else "cost not reported"
+    else:
+        price = "cost $0.00 (runs locally)"
     console.print(f"  tokens      : {u['tokens_in']:,} in / {u['tokens_out']:,} out; {price}")
 
 

@@ -3,7 +3,7 @@
     python scripts/live_smoke.py
 
 The key comes from XAI_API_KEY or the private file ~/.config/acme_ap/xai_key (see acme_ap/llm.py). It is never printed: error text is
-scrubbed of it before display. Costs a few thousand tokens.
+scrubbed of it before display. This BILLS your xAI account (about a cent); a $0.05 cap stops it.
 """
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ async def main() -> int:
     if not KEY:
         print("No key: set XAI_API_KEY or put it in ~/.config/acme_ap/xai_key")
         return 2
-    llm = GrokClient(KEY, model=MODEL)
+    llm = GrokClient(KEY, model=MODEL, budget_usd=0.05)  # a hard stop: this check costs about a cent
     results: list[tuple[str, bool, str]] = []
 
     async def check(name, coro):
@@ -88,7 +88,7 @@ async def main() -> int:
     await check("5. reviewer agent end to end with tools", reviewer_end_to_end())
 
     m = llm.meter
-    print(f"\nUsed {sum(m.calls.values())} calls, {sum(m.tokens_in.values()):,} tokens in / {sum(m.tokens_out.values()):,} out, {sum(m.tool_calls.values())} tool calls")
+    print(f"\nSpent ${m.spent_usd:.4f} (as reported by xAI). Used {sum(m.calls.values())} calls, {sum(m.tokens_in.values()):,} tokens in / {sum(m.tokens_out.values()):,} out, {sum(m.tool_calls.values())} tool calls")
     if not results[0][1]:
         try:
             async with httpx.AsyncClient(base_url="https://api.x.ai/v1", headers={"Authorization": f"Bearer {KEY}"}, timeout=15) as c:

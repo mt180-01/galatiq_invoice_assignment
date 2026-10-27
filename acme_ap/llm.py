@@ -91,33 +91,41 @@ class Meter:
         self.price_out = price_out if price_out is not None else _env_float("XAI_PRICE_OUT")
         self.calls, self.cached, self.skipped, self.tool_calls = Counter(), Counter(), Counter(), Counter()
         self.tokens_in, self.tokens_out = Counter(), Counter()
+        self.reported_ticks = 0  # cost as reported by the API itself (1 USD = 10,000,000,000 ticks), the exact figure
 
-    def record(self, agent: str, tin: int, tout: int, cached: bool = False) -> None:
+    def record(self, agent: str, tin: int, tout: int, cached: bool = False, ticks: int = 0) -> None:
         if (sink := invoice_ledger.get()) is not None:
-            sink.append(("cached" if cached else "call", agent, tin, tout))
+            sink.append(("cached" if cached else "call", agent, tin, tout, ticks))
         if cached:
             self.cached[agent] += 1
             return
         self.calls[agent] += 1
         self.tokens_in[agent] += tin
         self.tokens_out[agent] += tout
+        self.reported_ticks += ticks
 
     def tool(self, agent: str, name: str) -> None:
         self.tool_calls[agent] += 1
         if (sink := invoice_ledger.get()) is not None:
-            sink.append(("tool", agent, 0, 0))
+            sink.append(("tool", agent, 0, 0, 0))
 
     def skip(self, agent: str, n: int = 1) -> None:
         """A call this agent could have made and chose not to (the gate found it could not change the result)."""
         self.skipped[agent] += n
         if (sink := invoice_ledger.get()) is not None:
-            sink.append(("skip", agent, 0, 0))
+            sink.append(("skip", agent, 0, 0, 0))
 
     @property
     def total_calls(self) -> int:
         return sum(self.calls.values())
 
+    @property
+    def spent_usd(self) -> float:
+        return self.reported_ticks / 10_000_000_000
+
     def cost(self) -> float | None:
+        if self.reported_ticks:
+            return self.spent_usd  # the API's own number beats any tariff we could configure
         if self.price_in is None or self.price_out is None:
             return None
         return (sum(self.tokens_in.values()) * self.price_in + sum(self.tokens_out.values()) * self.price_out) / 1_000_000
@@ -174,8 +182,9 @@ class GrokClient(LLM):
 
     def __init__(self, api_key: str, model: str = "grok-3", base_url: str = "https://api.x.ai/v1",
                  transport: httpx.AsyncBaseTransport | None = None, timeout: float = 30.0,
-                 cache: LLMCache | None = None, meter: Meter | None = None):
+                 cache: LLMCache | None = None, meter: Meter | None = None, budget_usd: float | None = None):
         self.model, self.cache, self.meter = model, cache, meter or Meter()
+        self.budget_usd = budget_usd  # hard cap on what this client may spend; None = unlimited (only for the key-free stand-in)
         self._key = api_key
         self._client = httpx.AsyncClient(
             base_url=base_url, timeout=timeout, transport=transport,
@@ -192,7 +201,11 @@ class GrokClient(LLM):
     async def _post(self, payload: dict, agent: str) -> dict:
         """One API call with usage metering. Raises LLMUnavailable on any transport or protocol failure."""
         if not self.available:
-            raise LLMUnavailable("Grok disabled for this run: the API key was rejected")
+            raise LLMUnavailable("Grok disabled for this run: the API key was rejected or the budget was reached")
+        if self.budget_usd is not None and self.meter.spent_usd >= self.budget_usd:
+            self.available = False
+            log_model.warning("spending cap of $%.2f reached ($%.4f spent): the rest of this run uses the free rules", self.budget_usd, self.meter.spent_usd)
+            raise LLMUnavailable(f"budget of ${self.budget_usd:.2f} reached")
         try:
             resp = await self._client.post("/chat/completions", json=payload)
             if resp.status_code in (401, 403) or (resp.status_code == 400 and "api key" in resp.text.lower()):
@@ -223,7 +236,8 @@ class GrokClient(LLM):
         usage = body.get("usage") or {}
         sent = sum(len(json.dumps(m)) for m in payload["messages"])
         got = len(json.dumps(body["choices"][0]["message"]))
-        self.meter.record(agent, int(usage.get("prompt_tokens") or sent // 4), int(usage.get("completion_tokens") or got // 4))
+        self.meter.record(agent, int(usage.get("prompt_tokens") or sent // 4), int(usage.get("completion_tokens") or got // 4),
+                          ticks=int(usage.get("cost_in_usd_ticks") or 0))
         return body
 
     async def _discover_model(self) -> str | None:
@@ -304,14 +318,23 @@ def read_api_key() -> str | None:
         return None
 
 
-def make_llm(offline: bool = False, cache_path: str | Path | None = None, simulate: bool = False) -> LLM:
-    """offline: no model at all (rules only). XAI_API_KEY set: Grok. Otherwise (or simulate=True): the local stand-in, so the full
-    agent protocol still runs with no internet."""
-    key = read_api_key()
+DEFAULT_BUDGET_USD = 0.10  # per run; XAI_BUDGET_USD overrides. A full pass over the 17 sample invoices costs about a cent or two.
+
+
+def make_llm(offline: bool = False, cache_path: str | Path | None = None, simulate: bool = False, live: bool = False) -> LLM:
+    """Which model answers:
+      offline        no model at all (rules only), free
+      default        the local stand-in, free
+      live=True      Grok, billed per token by xAI, capped by a per-run budget. Never chosen unless asked for (--grok or ACME_USE_GROK=1),
+                     so a saved key cannot cost money by accident."""
+    live = live or os.environ.get("ACME_USE_GROK") == "1"
+    key = read_api_key() if live else None
     if offline:
         return OfflineLLM()
     if key and not simulate:
-        return GrokClient(key, model=os.environ.get("XAI_MODEL", "grok-3"), cache=LLMCache(cache_path) if cache_path else None)
+        budget = _env_float("XAI_BUDGET_USD")
+        return GrokClient(key, model=os.environ.get("XAI_MODEL", "grok-3"), cache=LLMCache(cache_path) if cache_path else None,
+                          budget_usd=DEFAULT_BUDGET_USD if budget is None else budget)
     from . import sim_llm
     client = GrokClient("local-simulation", transport=sim_llm.transport())
     client.label = sim_llm.LABEL

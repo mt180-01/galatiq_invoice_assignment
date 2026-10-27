@@ -175,5 +175,6 @@ class Pipeline:
             log.exception("unhandled error", extra={"trace": trace, "stage": "pipeline", "detail": out.error})
         out.llm = {"calls": sum(e[0] == "call" for e in ledger), "cached": sum(e[0] == "cached" for e in ledger),
                    "skipped": [e[1] for e in ledger if e[0] == "skip"], "tools": sum(e[0] == "tool" for e in ledger),
-                   "tokens_in": sum(e[2] for e in ledger), "tokens_out": sum(e[3] for e in ledger)} if ledger else {}
+                   "tokens_in": sum(e[2] for e in ledger), "tokens_out": sum(e[3] for e in ledger),
+                   "cost_ticks": sum(e[4] for e in ledger)} if ledger else {}
         return out
