@@ -56,6 +56,9 @@ class MockNetSuite:
             c.executemany("INSERT INTO vendors VALUES (?,?,?)", SEED_VENDORS)
             c.commit()
         self._items = {norm(n): n for n, _, _ in SEED_ITEMS}
+        # The vendor master is read on every invoice and nothing in this mock changes it, so it is loaded once.
+        self._vendors = {norm(n): VendorRecord(vname, status)
+                         for vname, status, aliases in SEED_VENDORS for n in [vname, *[a for a in aliases.split(";") if a]]}
 
     def _conn(self) -> sqlite3.Connection:
         conn = getattr(self._local, "conn", None)
@@ -79,12 +82,7 @@ class MockNetSuite:
         return ItemRecord(row[0], row[1], Decimal(row[2]), fuzzy) if row else None
 
     def lookup_vendor(self, name: str) -> VendorRecord | None:
-        want = norm(name)
-        for vname, status, aliases in self._conn().execute("SELECT name, status, aliases FROM vendors"):
-            names = [vname] + [a for a in aliases.split(";") if a]
-            if want in {norm(n) for n in names}:
-                return VendorRecord(vname, status)
-        return None
+        return self._vendors.get(norm(name))
 
     # ---- writes ------------------------------------------------------------------------
     def claim_bill(self, key: str, source: str, vendor: str | None, total: Decimal | None) -> str | None:
@@ -96,6 +94,14 @@ class MockNetSuite:
             if cur.rowcount:
                 return None
             return c.execute("SELECT source FROM vendor_bills WHERE bill_key=?", (key,)).fetchone()[0]
+
+    def vendor_history(self, vendor: str) -> dict:
+        rows = self._conn().execute("SELECT total FROM vendor_bills WHERE bill_key LIKE ? AND status IN ('paid','scheduled') AND total IS NOT NULL",
+                                    (norm(vendor) + "|%",)).fetchall()
+        totals = [Decimal(r[0]) for r in rows]
+        if not totals:
+            return {"bills": 0}
+        return {"bills": len(totals), "avg_total": str((sum(totals) / len(totals)).quantize(Decimal("0.01"))), "max_total": str(max(totals))}
 
     def bill_status(self, key: str) -> str | None:
         row = self._conn().execute("SELECT status FROM vendor_bills WHERE bill_key=?", (key,)).fetchone()

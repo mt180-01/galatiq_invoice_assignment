@@ -29,9 +29,9 @@ class Kpis:
 
 def llm_usage(outcomes: list[Outcome]) -> dict:
     """Model use across a batch, from the per-invoice records: what was called, cached, and deliberately not called."""
-    use = {"calls": 0, "cached": 0, "tokens_in": 0, "tokens_out": 0, "skipped": Counter(), "cost": None}
+    use = {"calls": 0, "cached": 0, "tools": 0, "tokens_in": 0, "tokens_out": 0, "skipped": Counter(), "cost": None}
     for o in outcomes:
-        for k in ("calls", "cached", "tokens_in", "tokens_out"):
+        for k in ("calls", "cached", "tools", "tokens_in", "tokens_out"):
             use[k] += o.llm.get(k, 0)
         use["skipped"].update(o.llm.get("skipped", []))
     try:

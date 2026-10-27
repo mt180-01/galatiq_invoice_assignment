@@ -16,10 +16,12 @@ import asyncio
 import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from decimal import Decimal
 
 from ..erp import ErpAdapter
 from ..ingestion import llm_extract
 from ..llm import LLM
+from .tools import reviewer_tools
 from ..models import Approval, Finding, Invoice, Outcome
 from ..outreach import draft_followup
 from . import approval, validation
@@ -41,8 +43,8 @@ CHARTERS = [
     Charter("Validation", "Check the Invoice against the ERP and policy: vendor, items, stock, arithmetic, dates, fraud signals, bank account.",
             "ERP lookups, rule engine", "Never.", "Reviewer"),
     Charter("Reviewer", "Make the approve / escalate / reject call. Policy sets the floor; the model may only make it stricter.",
-            "policy engine, rule-based critic, Grok draft + challenger", "Only when policy would approve AND there is a reason for a second "
-            "opinion (warning, half the sign-off limit, or an AI-read document). Challenger only if the draft departs from policy.", "Desk or Payment"),
+            "policy engine, rule-based critic, Grok draft + challenger; Grok may call read-only tools (inventory, vendor master, vendor payment history, limits)", "Only when policy would approve AND there is a reason for a second "
+            "opinion (warning, half the sign-off limit, an AI-read document, or an amount far above the vendor's history). Challenger only if the draft departs from policy.", "Desk or Payment"),
     Charter("Desk", "When a person must decide: pick the right approver, send a one-click signed card, remind, escalate, expire.",
             "routing table, signed tokens, approval ledger", "Never.", "Payment (on approval)"),
     Charter("Payment", "Schedule to the due date or capture a discount, check the payee's bank account, send idempotently, reconcile.",
@@ -87,11 +89,21 @@ class ValidationAgent:
 class ReviewerAgent:
     name = "Reviewer"
 
-    def __init__(self, llm: LLM, gated: bool = True):
-        self.llm, self.gated = llm, gated
+    def __init__(self, llm: LLM, erp: ErpAdapter, gated: bool = True):
+        self.llm, self.erp, self.gated = llm, erp, gated
+        self.tools = reviewer_tools(erp)
+
+    def _usual_amount(self, inv: Invoice) -> str | None:
+        """A cheap local look at the vendor's history; an amount far above anything they have billed earns a second opinion."""
+        if not (self.llm.available and inv.vendor):  # only worth a query if a model could act on it
+            return None
+        hist = self.erp.vendor_history(inv.vendor)
+        if hist["bills"] >= 3 and inv.total and inv.total > 2 * Decimal(hist["max_total"]):
+            return f"total {inv.total} is more than twice the largest of this vendor's {hist['bills']} earlier invoices ({hist['max_total']})"
+        return None
 
     async def decide(self, inv: Invoice, findings: list[Finding]) -> Approval:
-        return await approval.decide(inv, findings, self.llm, gate=self.gated)
+        return await approval.decide(inv, findings, self.llm, gate=self.gated, tools=self.tools, risk_hint=self._usual_amount(inv))
 
 
 class DeskAgent:

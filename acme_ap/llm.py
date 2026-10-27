@@ -17,9 +17,12 @@ import sqlite3
 import threading
 from collections import Counter
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Callable, TypeVar
 
 import httpx
+from pydantic import BaseModel, ValidationError
 
 _agent = contextvars.ContextVar("agent", default="unassigned")
 invoice_ledger: contextvars.ContextVar[list | None] = contextvars.ContextVar("invoice_ledger", default=None)  # per-invoice usage sink
@@ -40,6 +43,36 @@ class LLMUnavailable(RuntimeError):
     pass
 
 
+@dataclass(frozen=True)
+class Tool:
+    """A function the model may ask us to run (OpenAI-style function calling, which xAI's API follows).
+    `fn` runs locally and must be read-only; its JSON-serialisable result goes back to the model."""
+    name: str
+    description: str
+    parameters: dict
+    fn: Callable[..., Any]
+
+    def spec(self) -> dict:
+        return {"type": "function", "function": {"name": self.name, "description": self.description, "parameters": self.parameters}}
+
+
+def run_tool(tools: dict[str, Tool], name: str, raw_args: str | dict) -> dict:
+    """Execute one model-requested call. Never raises: a bad call becomes an error message the model can correct itself from."""
+    tool = tools.get(name)
+    if tool is None:
+        return {"error": f"unknown tool {name!r}; available: {sorted(tools)}"}
+    try:
+        args = json.loads(raw_args) if isinstance(raw_args, str) and raw_args.strip() else (raw_args or {})
+        if not isinstance(args, dict):
+            raise ValueError("arguments must be a JSON object")
+        return {"result": tool.fn(**args)}
+    except Exception as exc:  # noqa: BLE001 - the model gets the message, the run continues
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
+M = TypeVar("M", bound=BaseModel)
+
+
 class Meter:
     """What the model cost. Prices are USD per million tokens from XAI_PRICE_IN / XAI_PRICE_OUT; with none set, only
     tokens are reported (this repo does not guess a tariff)."""
@@ -47,7 +80,7 @@ class Meter:
     def __init__(self, price_in: float | None = None, price_out: float | None = None):
         self.price_in = price_in if price_in is not None else _env_float("XAI_PRICE_IN")
         self.price_out = price_out if price_out is not None else _env_float("XAI_PRICE_OUT")
-        self.calls, self.cached, self.skipped = Counter(), Counter(), Counter()
+        self.calls, self.cached, self.skipped, self.tool_calls = Counter(), Counter(), Counter(), Counter()
         self.tokens_in, self.tokens_out = Counter(), Counter()
 
     def record(self, agent: str, tin: int, tout: int, cached: bool = False) -> None:
@@ -59,6 +92,11 @@ class Meter:
         self.calls[agent] += 1
         self.tokens_in[agent] += tin
         self.tokens_out[agent] += tout
+
+    def tool(self, agent: str, name: str) -> None:
+        self.tool_calls[agent] += 1
+        if (sink := invoice_ledger.get()) is not None:
+            sink.append(("tool", agent, 0, 0))
 
     def skip(self, agent: str, n: int = 1) -> None:
         """A call this agent could have made and chose not to (the gate found it could not change the result)."""
@@ -108,8 +146,14 @@ class LLM:
     available = False
     meter: Meter | None = None
 
+    label = "none"
+
     async def chat_json(self, system: str, user: str) -> dict:  # pragma: no cover - interface
         raise LLMUnavailable("no LLM configured")
+
+    async def run_tools(self, system: str, user: str, tools: list[Tool], max_steps: int = 4) -> dict:
+        """Let the model call `tools` until it answers. Models without tool support just answer."""
+        return await self.chat_json(system, user)
 
 
 class OfflineLLM(LLM):
@@ -131,6 +175,41 @@ class GrokClient(LLM):
     def model_for(self, agent: str) -> str:
         return os.environ.get(f"XAI_MODEL_{agent.upper()}") or self.model
 
+    label = "Grok"
+    _json_mode = True  # ask the API for a JSON object; switched off for good if the endpoint rejects the parameter
+
+    async def _post(self, payload: dict, agent: str) -> dict:
+        """One API call with usage metering. Raises LLMUnavailable on any transport or protocol failure."""
+        try:
+            resp = await self._client.post("/chat/completions", json=payload)
+            if resp.status_code in (400, 422) and "response_format" in payload and "response_format" in resp.text:
+                type(self)._json_mode = False  # this endpoint does not take it: carry on without
+                payload = {k: v for k, v in payload.items() if k != "response_format"}
+                resp = await self._client.post("/chat/completions", json=payload)
+            resp.raise_for_status()
+            body = resp.json()
+            body["choices"][0]["message"]
+        except (httpx.HTTPError, KeyError, IndexError, ValueError, TypeError) as exc:
+            raise LLMUnavailable(f"Grok call failed: {exc}") from exc
+        usage = body.get("usage") or {}
+        sent = sum(len(json.dumps(m)) for m in payload["messages"])
+        got = len(json.dumps(body["choices"][0]["message"]))
+        self.meter.record(agent, int(usage.get("prompt_tokens") or sent // 4), int(usage.get("completion_tokens") or got // 4))
+        return body
+
+    @staticmethod
+    def _json_from(content: str) -> dict:
+        match = re.search(r"\{.*\}", content or "", re.S)
+        if not match:
+            raise LLMUnavailable("Grok returned no JSON object")
+        try:
+            data = json.loads(match.group(0))
+        except json.JSONDecodeError as exc:
+            raise LLMUnavailable(f"Grok returned invalid JSON: {exc}") from exc
+        if not isinstance(data, dict):
+            raise LLMUnavailable("Grok returned JSON that is not an object")
+        return data
+
     async def chat_json(self, system: str, user: str) -> dict:
         agent = _agent.get()
         model = self.model_for(agent)
@@ -141,33 +220,60 @@ class GrokClient(LLM):
             return hit
         payload = {"model": model, "temperature": 0, "max_tokens": MAX_OUT.get(agent, 600),
                    "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
-        try:
-            resp = await self._client.post("/chat/completions", json=payload)
-            resp.raise_for_status()
-            body = resp.json()
-            content = body["choices"][0]["message"]["content"]
-        except (httpx.HTTPError, KeyError, ValueError) as exc:
-            raise LLMUnavailable(f"Grok call failed: {exc}") from exc
-        usage = body.get("usage") or {}
-        self.meter.record(agent, int(usage.get("prompt_tokens") or (len(system) + len(user)) // 4),
-                          int(usage.get("completion_tokens") or len(content) // 4))
-        match = re.search(r"\{.*\}", content, re.S)
-        if not match:
-            raise LLMUnavailable("Grok returned no JSON object")
-        try:
-            data = json.loads(match.group(0))
-        except json.JSONDecodeError as exc:
-            raise LLMUnavailable(f"Grok returned invalid JSON: {exc}") from exc
+        if self._json_mode:
+            payload["response_format"] = {"type": "json_object"}
+        data = self._json_from((await self._post(payload, agent))["choices"][0]["message"].get("content"))
         if self.cache:
             self.cache.put(key, data)
         return data
+
+    async def run_tools(self, system: str, user: str, tools: list[Tool], max_steps: int = 4) -> dict:
+        """Function-calling loop: the model asks for tools, we run them, it sees the results, and finally answers in JSON."""
+        agent, by_name = _agent.get(), {t.name: t for t in tools}
+        messages: list[dict] = [{"role": "system", "content": system + "\nWhen you have what you need, answer with a single JSON object only."},
+                                {"role": "user", "content": user}]
+        for step in range(max_steps + 1):
+            payload = {"model": self.model_for(agent), "temperature": 0, "max_tokens": MAX_OUT.get(agent, 600), "messages": messages,
+                       "tools": [t.spec() for t in tools], "tool_choice": "auto" if step < max_steps else "none"}
+            message = (await self._post(payload, agent))["choices"][0]["message"]
+            calls = message.get("tool_calls") or []
+            if not calls:
+                return self._json_from(message.get("content"))
+            messages.append({"role": "assistant", "content": message.get("content"), "tool_calls": calls})
+            for call in calls:
+                fn = call.get("function") or {}
+                self.meter.tool(agent, fn.get("name", "?"))
+                messages.append({"role": "tool", "tool_call_id": call.get("id", ""),
+                                 "content": json.dumps(run_tool(by_name, fn.get("name", ""), fn.get("arguments", "")), default=str)[:2000]})
+        raise LLMUnavailable("tool loop did not reach an answer")
 
     async def aclose(self) -> None:
         await self._client.aclose()
 
 
-def make_llm(offline: bool = False, cache_path: str | Path | None = None) -> LLM:
+def make_llm(offline: bool = False, cache_path: str | Path | None = None, simulate: bool = False) -> LLM:
+    """offline: no model at all (rules only). XAI_API_KEY set: Grok. Otherwise (or simulate=True): the local stand-in, so the full
+    agent protocol still runs with no internet."""
     key = os.environ.get("XAI_API_KEY")
-    if offline or not key:
+    if offline:
         return OfflineLLM()
-    return GrokClient(key, model=os.environ.get("XAI_MODEL", "grok-3"), cache=LLMCache(cache_path) if cache_path else None)
+    if key and not simulate:
+        return GrokClient(key, model=os.environ.get("XAI_MODEL", "grok-3"), cache=LLMCache(cache_path) if cache_path else None)
+    from . import sim_llm
+    client = GrokClient("local-simulation", transport=sim_llm.transport())
+    client.label = sim_llm.LABEL
+    return client
+
+
+async def structured(llm: LLM, system: str, user: str, schema: type[M], tools: list[Tool] | None = None, repairs: int = 1) -> M:
+    """Ask for an answer that must fit `schema`. If it does not, tell the model exactly what is wrong and ask again (self-correction),
+    then give up with LLMUnavailable so the caller falls back to the deterministic path."""
+    prompt, last = user, None
+    for _ in range(repairs + 1):
+        data = await (llm.run_tools(system, prompt, tools) if tools else llm.chat_json(system, prompt))
+        try:
+            return schema.model_validate(data)
+        except ValidationError as exc:
+            last = "; ".join(f"{'.'.join(map(str, e['loc'])) or 'reply'}: {e['msg']}" for e in exc.errors()[:4])
+            prompt = f"{user}\nYour previous reply did not match the required schema ({last}). Reply again with a valid JSON object."
+    raise LLMUnavailable(f"reply did not match the schema after {repairs + 1} attempts: {last}")

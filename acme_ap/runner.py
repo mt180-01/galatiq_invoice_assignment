@@ -20,7 +20,7 @@ async def run_batch(paths: list[str], args: argparse.Namespace, workers: int | N
     erp = MockNetSuite(args.db, keep_ledger=args.keep_ledger)
     payments = PaymentService(args.db, erp, MockBank(args.db + ".bank", reset=not args.keep_ledger), reset=not args.keep_ledger)
     approvals = ApprovalService(args.db, erp, reset=not args.keep_ledger, payments=payments)
-    llm = make_llm(args.offline, cache_path=None if args.offline else args.db + ".llmcache")
+    llm = make_llm(args.offline, cache_path=None if args.offline else args.db + ".llmcache", simulate=getattr(args, "simulate", False))
     before = resource.getrusage(resource.RUSAGE_SELF).ru_utime + resource.getrusage(resource.RUSAGE_SELF).ru_stime
     k = resource.getrusage(resource.RUSAGE_CHILDREN)
     kids_before = k.ru_utime + k.ru_stime

@@ -28,6 +28,8 @@ class ErpAdapter(Protocol):
     def claim_bill(self, key: str, source: str, vendor: str | None, total: Decimal | None) -> str | None:
         """Atomically register a vendor bill. Returns None if new, else the source that claimed it first."""
     def bill_status(self, key: str) -> str | None: ...
+    def vendor_history(self, vendor: str) -> dict:
+        """{'bills': n, 'avg_total': str, 'max_total': str} over this vendor's paid or scheduled bills."""
     def settle_bill(self, key: str, status: str, reasoning: str,
                     payment: tuple[str, Decimal, str] | None = None) -> None:
         """One transaction: final bill status + audit entry (+ vendor payment (vendor, amount, ref) if paid)."""

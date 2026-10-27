@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
+from functools import lru_cache
 from decimal import Decimal, InvalidOperation
 
 _DATE_FORMATS = ("%Y-%m-%d", "%b %d %Y", "%B %d %Y", "%b %d, %Y", "%B %d, %Y", "%m/%d/%Y", "%d-%b-%Y", "%d %b %Y")
@@ -30,12 +31,25 @@ def parse_money(value: object) -> Decimal | None:
         return None
 
 
+_ISO = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+
 def parse_date(value: object) -> str | None:
     """Return an ISO date or None (e.g. 'yesterday' is deliberately not guessed)."""
     if not value:
         return None
-    text = fix_ocr_digits(str(value).strip())
+    return _parse_date(str(value))
+
+
+@lru_cache(maxsize=4096)
+def _parse_date(raw: str) -> str | None:
+    text = fix_ocr_digits(raw.strip())
     text = re.sub(r"\s+", " ", text)
+    if _ISO.fullmatch(text):  # the common case: skip trying seven other formats
+        try:
+            return datetime.strptime(text, "%Y-%m-%d").date().isoformat()
+        except ValueError:
+            return None
     for fmt in _DATE_FORMATS:
         try:
             return datetime.strptime(text, fmt).date().isoformat()

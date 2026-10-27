@@ -26,6 +26,7 @@ from .payments import default_payments
 from .models import Approval, Decision, Finding, Invoice, Outcome, Severity
 
 log = logging.getLogger("acme.pipeline")
+decision_log = logging.getLogger("acme.decision")  # one line per invoice: shown by default, the rest only with -v
 PDFS_PER_WORKER = 100
 
 
@@ -62,7 +63,7 @@ class Pipeline:
         self.payments = payments or getattr(approvals, "payments", None) or default_payments(erp)
         gated = llm_policy == "gated"  # "always" = ask the model on every invoice (the pre-optimisation behaviour, kept for comparison)
         self.intake, self.validator = IntakeAgent(llm, gated), ValidationAgent(erp, self.payments)
-        self.reviewer, self.desk = ReviewerAgent(llm, gated), DeskAgent(approvals)
+        self.reviewer, self.desk = ReviewerAgent(llm, erp, gated), DeskAgent(approvals)
         self.payer, self.comms = PaymentAgent(self.payments, bank_concurrency), CommsAgent()
         self.workers = workers if workers is not None else (os.cpu_count() or 1)
         self.llm_sem = asyncio.Semaphore(llm_concurrency)
@@ -150,7 +151,7 @@ class Pipeline:
                 async with self.llm_sem:
                     out.approval = await self.reviewer.decide(inv, out.findings)
             lap("approve")
-            log.info("decision", extra={"trace": trace, "stage": "approve",
+            decision_log.info("decision", extra={"trace": trace, "stage": "approve",
                                         "detail": f"{out.approval.decision.value} after {out.approval.rounds} round(s): {out.approval.reasoning}"})
 
             payment_row, pay_status = None, None
@@ -173,6 +174,6 @@ class Pipeline:
             out.error = f"{type(exc).__name__}: {exc}"
             log.exception("unhandled error", extra={"trace": trace, "stage": "pipeline", "detail": out.error})
         out.llm = {"calls": sum(e[0] == "call" for e in ledger), "cached": sum(e[0] == "cached" for e in ledger),
-                   "skipped": [e[1] for e in ledger if e[0] == "skip"],
+                   "skipped": [e[1] for e in ledger if e[0] == "skip"], "tools": sum(e[0] == "tool" for e in ledger),
                    "tokens_in": sum(e[2] for e in ledger), "tokens_out": sum(e[3] for e in ledger)} if ledger else {}
         return out

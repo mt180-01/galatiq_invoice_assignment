@@ -81,16 +81,16 @@ def impact(outcomes: list[Outcome], waiting: list[dict]) -> None:
         console.print("  waiting on a person       : 0")
 
 
-def ai_usage(outcomes: list[Outcome], live: bool) -> None:
+def ai_usage(outcomes: list[Outcome], label: str) -> None:
     """What the model cost and what the agents saved by not asking it."""
     u = llm_usage(outcomes)
-    if not live:
-        console.print("[bold]AI usage[/]  none: offline mode, every agent used its deterministic path (add XAI_API_KEY to use Grok)")
+    if label == "none":
+        console.print("[bold]AI usage[/]  none: --offline, every agent used its deterministic rules")
         return
     skipped = ", ".join(f"{a} {n}" for a, n in sorted(u["skipped"].items())) or "none"
     would = u["calls"] + u["cached"] + sum(u["skipped"].values())
-    console.print("[bold]AI usage[/]")
-    console.print(f"  model calls : {u['calls']} made, {u['cached']} answered from cache, {sum(u['skipped'].values())} avoided by gates ({skipped})"
+    console.print(f"[bold]AI usage[/]  model: {label}" + ("" if label == "Grok" else "  [dim](set XAI_API_KEY to use Grok)[/]"))
+    console.print(f"  model calls : {u['calls']} made, {u['tools']} tool calls run for the model, {u['cached']} answered from cache, {sum(u['skipped'].values())} avoided by gates ({skipped})"
                   f"  [dim](asking on every invoice would be about {would})[/]")
     price = f"est. cost ${u['cost']:.4f}" if u["cost"] is not None else "set XAI_PRICE_IN / XAI_PRICE_OUT (USD per 1M tokens) to price it"
     console.print(f"  tokens      : {u['tokens_in']:,} in / {u['tokens_out']:,} out; {price}")

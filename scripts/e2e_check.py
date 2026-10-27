@@ -67,6 +67,19 @@ out_dir = Path(outbox)
 check("outbox: follow-ups, approval cards, notices, digest",
       len(list(out_dir.glob("*.txt"))) >= 4 and len(list((out_dir / "approvals").glob("*.txt"))) == 2 and (out_dir / "daily_digest.txt").exists() and list((out_dir / "notices").glob("*.txt")))
 
+# 4b. the default run (no flags): local stand-in model with real tool calls, same outcomes, structured logs
+dbs = str(tmp / "sim.db")
+rc, out = py("main.py", "--db", dbs, "--outbox", outbox + "S", "--json", str(tmp / "s.json"), "--invoice_path", "data/invoices")
+sres = json.loads((tmp / "s.json").read_text())
+sstatus = {}
+for o in sres:
+    if o["status"] != "DUPLICATE":
+        sstatus[o["invoice"]["invoice_number"] + (f"-{o['invoice']['revision']}" if o["invoice"].get("revision") else "")] = o["status"]
+check("default run uses the local stand-in model and reaches the same 17 outcomes", "local simulation (not Grok)" in out and sstatus == expected, f"{sum(sstatus[k] == v for k, v in expected.items())}/17")
+check("the stand-in model called tools (function calling exercised)", sum(o["llm"].get("tools", 0) for o in sres) > 0 and "tool calls run for the model" in out,
+      f"{sum(o['llm'].get('tools', 0) for o in sres)} tool calls")
+check("structured logs: a decision line per invoice and a 'Paid X to Y' line per payment", out.count("acme.decision") == 17 and out.count("acme.payment Paid") == 7, f"{out.count('acme.decision')} decisions, {out.count('acme.payment Paid')} payments")
+
 # 5. human-in-the-loop: second run on the approval demo (adds the over-limit and changed-bank-account invoices)
 db2 = str(tmp / "hitl.db")
 rc, out = py("main.py", "--offline", "--db", db2, "--outbox", outbox + "2", "--invoice_path", "data/approvals_demo")

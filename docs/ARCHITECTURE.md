@@ -226,6 +226,22 @@ the model-facing tests use scripted models, not live Grok; authorization is by m
 showed `rounds=1`. It now always runs; the *final decisions did not change* (all 17 sample outcomes are identical), what changed is that the draft-critique-revise
 trail is recorded and shown. The "first read" is deliberately simpler than the full policy, so the loop is real work, but it is rule-based, not reasoning by a model.
 
+## 4h. Technical requirements, one by one
+
+| Requirement | How it is met | Evidence |
+|---|---|---|
+| **Grok as the reasoning engine** (xAI API) | `GrokClient` speaks the OpenAI-compatible chat-completions protocol xAI uses (`https://api.x.ai/v1`, `grok-3`, `XAI_API_KEY`). Grok does the judgement work: reading documents the rules cannot, and a second opinion on invoices policy would approve. Routine, exact work (checks, routing, payment) stays in rules on purpose, to keep tokens and risk down. | `tests/test_pipeline.py`, `tests/test_tooluse.py`. **Never run against the live API** (no key). |
+| **Multi-agent orchestration** | A custom orchestrator (`acme_ap/pipeline.py`) runs six agents (`python main.py agents`), each with a charter, tools and a trace entry per invoice. Chosen over a framework so that scheduling across CPU cores and I/O stays under our control. | `tests/test_agents_cost.py::test_trace_shows_which_agent_did_what` |
+| **Function calling / tool use** | The Reviewer's model chooses and calls read-only tools (`lookup_item`, `lookup_vendor`, `vendor_history`, `policy_limits`) in a bounded loop; bad calls come back as error messages it can correct. | `tests/test_tooluse.py` (tool loop, unknown tool, step limit, real ERP tools) |
+| **Structured outputs** | Replies must fit Pydantic schemas (`ReviewDecision`, `AuditIssues`); the request asks for a JSON object (dropped automatically if an endpoint rejects the parameter). | `test_malformed_reply_is_sent_back...`, `test_json_mode_is_dropped...` |
+| **Self-correction loops** | Four: arithmetic self-check with retry (Intake); schema repair (a malformed reply is returned to the model with the reason); the auditor challenging the reviewer's draft; and the always-on draft-critique-revise reflection. | `test_malformed_reply...`, `test_reviewer_reflects_and_revises...`, `test_llm_extract_*` |
+| **No internet; simulate locally** | With no key, a local stand-in speaks the *same protocol* as the HTTP transport of the real client (`acme_ap/sim_llm.py`), so prompts, tool calls and schema checks all run for real; the bank, ERP, email and approvers are local mocks. It is labelled "local simulation (not Grok)" wherever it appears and cannot show how well Grok reasons. `--offline` removes the model entirely. | `test_stand_in_model_reproduces_every_outcome_and_really_uses_tools` |
+| **Python, PyMuPDF, local** | Python 3.13, PyMuPDF for PDFs, Tesseract for scans, SQLite, no cloud. | `requirements.txt`, `make e2e` |
+| **`python main.py --invoice_path=...`, structured logs and results** | Decisions and payments log one structured line each by default; `-v` shows every stage. | `tests/test_brief.py`, `make e2e` |
+
+The one thing that would change the picture is a live Grok run: tool-call format details, `response_format` support and real token counts are
+unverified. The client degrades safely (any failure falls back to the rules), but "works with the live API" is not claimed.
+
 ## 4f. The agent team and what each one costs
 
 `python main.py agents` prints this roster; the code is `acme_ap/agents/team.py`. Every invoice carries a trace of who did what (`--json`).

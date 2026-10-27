@@ -86,7 +86,7 @@ def test_mock_payment_is_called_only_for_approved_invoices(run, monkeypatch):
 
 
 def test_rejection_is_logged_with_its_reasoning(run, caplog):
-    with caplog.at_level(logging.INFO, logger="acme.pipeline"):
+    with caplog.at_level(logging.INFO, logger="acme.decision"):
         outs, db = run("invoice_1002.txt")
     assert any("reject" in r.detail and "GadgetX: 20 billed but only 5 in stock" in r.detail for r in caplog.records if hasattr(r, "detail"))
     row = sqlite3.connect(db).execute("SELECT stage, detail FROM audit_log WHERE detail LIKE 'reject%'").fetchone()

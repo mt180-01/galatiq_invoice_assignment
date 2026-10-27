@@ -89,7 +89,8 @@ def main() -> None:
     ap.add_argument("--llm-concurrency", type=int, default=8)
     ap.add_argument("--llm-policy", choices=("gated", "always"), default="gated",
                     help="gated (default): ask the model only where it can change the result; always: ask on every invoice (costly)")
-    ap.add_argument("--offline", action="store_true", help="ignore XAI_API_KEY and use the deterministic paths")
+    ap.add_argument("--offline", action="store_true", help="no model at all: rules only")
+    ap.add_argument("--simulate", action="store_true", help="use the local stand-in model even if XAI_API_KEY is set")
     ap.add_argument("--json", metavar="FILE", help="write full results as JSON")
     ap.add_argument("--bench", type=int, metavar="N", help="throughput benchmark over N generated documents, serial vs parallel")
     ap.add_argument("-v", "--verbose", action="store_true", help="show per-stage structured logs")
@@ -98,14 +99,19 @@ def main() -> None:
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(KeyValueFormatter())
     logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING, handlers=[handler])
+    for name in ("acme.decision", "acme.payment"):  # the brief asks for structured logs: decisions and payments always show
+        logging.getLogger(name).setLevel(logging.INFO)
     paths = collect(args.invoice_path)
     ncpu = os.cpu_count() or 1
+    llm_label = make_llm(args.offline, simulate=args.simulate).label
     console.print(f"[bold]{f'{args.bench:,} generated documents (from {len(paths)} samples)' if args.bench else f'{len(paths)} document(s)'}[/], {ncpu} CPU cores, LLM: "
-                  f"{'Grok (' + os.environ.get('XAI_MODEL', 'grok-3') + ')' if make_llm(args.offline).available else 'offline (deterministic agents)'}")
+                  f"{llm_label + (' (' + os.environ.get('XAI_MODEL', 'grok-3') + ')' if llm_label == 'Grok' else '')}")
 
     if args.bench:
         corpus, tmp = make_bench_corpus(paths, args.bench, args.pdf_share)
         logging.getLogger().setLevel(logging.ERROR)
+        for name in ("acme.decision", "acme.payment"):
+            logging.getLogger(name).setLevel(logging.ERROR)
         try:
             import io, contextlib
             rows = []
@@ -138,7 +144,7 @@ def main() -> None:
     waiting, pay_rows = ledger_view(args.db)
     notices = write_notices(outcomes, Path(args.outbox), waiting, pay_rows)
     impact(outcomes, waiting)
-    ai_usage(outcomes, make_llm(args.offline).available)
+    ai_usage(outcomes, llm_label)
     scorecard(outcomes)
     payment_summary(args.db)
     if cards:
