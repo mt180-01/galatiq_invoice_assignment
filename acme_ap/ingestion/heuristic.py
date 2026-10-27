@@ -18,13 +18,13 @@ _INV_NO = re.compile(r"\b(?:invoice|inv)\b[ \t]*(?:number|no\.?|#)?[ \t]*[:#]?[ 
 _VENDOR = re.compile(r"^[ \t]*(?:vendor|vndr|supplier|seller)[ \t]*:[ \t]*(.+)$", re.I | re.M)
 _FROM = re.compile(r"^[ \t]*from[ \t]*:[ \t]*(.+)$", re.I | re.M)
 _DATE = re.compile(r"(?<![A-Za-z])(?<!due )(?:date|dt)[ \t]*:[ \t]*(.+)", re.I)
-_DUE = re.compile(r"\bdue(?:[ \t]*(?:date|dt))?[ \t]*:[ \t]*(.+)", re.I)
+_DUE = re.compile(r"(?<!balance )(?<!amount )(?<!total )\bdue(?:[ \t]*(?:date|dt))?[ \t]*:[ \t]*(.+)", re.I)
 _TERMS = re.compile(r"(?:payment|pymnt)[ \t]+terms[ \t]*:[ \t]*(.+)|^[ \t]*terms[ \t]*:[ \t]*(.+)", re.I | re.M)
 _ACCOUNT = re.compile(r"^[ \t]*(?:bank[ \t]+)?(?:account|acct|a/c|iban)[ \t]*(?:no\.?|number|#)?[ \t]*[:#][ \t]*([A-Za-z0-9][A-Za-z0-9 \-]{3,33})[ \t]*$", re.I | re.M)
 _NOTES = re.compile(r"^[ \t]*notes?[ \t]*:[ \t]*(.+)$", re.I | re.M)
 _FORMERLY = re.compile(r"\(\s*formerly[^)]*\)", re.I)
 
-_TOTAL = re.compile(rf"^[ \t]*(?:grand[ \t]+total|total[ \t]+amount|total[ \t]+due|total|amt|amount)[ \t]*:?[ \t]*\$?[ \t]*({_NUM})[ \t]*$", re.I | re.M)
+_TOTAL = re.compile(rf"^[ \t]*(?:grand[ \t]+total|total[ \t]+amount|total[ \t]+due|balance[ \t]+due|amount[ \t]+due|total|amt|amount)[ \t]*:?[ \t]*\$?[ \t]*({_NUM})[ \t]*$", re.I | re.M)
 _SUBTOTAL = re.compile(rf"^[ \t]*sub[ \t-]*total[ \t]*:?[ \t]*\$?[ \t]*({_NUM})[ \t]*$", re.I | re.M)
 _TAX = re.compile(rf"^[ \t]*(?:sales[ \t]+)?tax(?:[ \t]*\([^)]*\))?[ \t]*:?[ \t]*\$?[ \t]*({_NUM})[ \t]*$", re.I | re.M)
 _SHIPPING = re.compile(rf"^[ \t]*shipping[ \t]*:?[ \t]*\$?[ \t]*({_NUM})[ \t]*$", re.I | re.M)
@@ -33,6 +33,12 @@ _SHIPPING = re.compile(rf"^[ \t]*shipping[ \t]*:?[ \t]*\$?[ \t]*({_NUM})[ \t]*$"
 _ITEM_QTY = re.compile(r"^[ \t]*(?:[-•*][ \t]*)?(?P<name>[A-Za-z][\w .\-/]*?)[ \t]+(?:qty:?[ \t]*|x(?=\d))(?P<qty>-?\d+)\b(?P<rest>.*)$", re.I)
 # "WidgetA (rush order)   4   $300.00   $1,200.00 note"
 _ITEM_ROW = re.compile(rf"^[ \t]*(?P<name>[A-Za-z][^\d$]*?)[ \t]+(?P<qty>-?\d+)[ \t]+\$?(?P<price>{_NUM})[ \t]+\$?(?P<amt>{_NUM})(?P<note>.*)$", re.I)
+# "5 x WidgetA @ $250.00", "WidgetB - 3 units @ $500", "2  WidgetA  at $250.00 each"
+_ITEM_AT = [
+    re.compile(rf"^[ \t]*(?:[-•*][ \t]*)?(?P<qty>\d+)[ \t]*x[ \t]+(?P<name>[A-Za-z][\w .\-/]*?)[ \t]*(?:@|at)[ \t]*\$?(?P<price>{_NUM})(?:[ \t]*(?:ea|each))?[ \t]*$", re.I),
+    re.compile(rf"^[ \t]*(?:[-•*][ \t]*)?(?P<name>[A-Za-z][\w .\-/]*?)[ \t]*[-–][ \t]*(?P<qty>\d+)[ \t]*(?:units?|pcs|pieces)[ \t]*(?:@|at)[ \t]*\$?(?P<price>{_NUM})(?:[ \t]*(?:ea|each))?[ \t]*$", re.I),
+    re.compile(rf"^[ \t]*(?P<qty>\d+)[ \t]+(?P<name>[A-Za-z][\w .\-/]*?)[ \t]+at[ \t]+\$?(?P<price>{_NUM})(?:[ \t]*(?:ea|each))?[ \t]*$", re.I),
+]
 _MONEY = re.compile(rf"\$[ \t]*({_NUM})")
 
 
@@ -111,6 +117,11 @@ def extract(text: str, fmt: str = "text") -> Invoice:
             name, note = _clean_name(m.group("name"))
             items.append(LineItem(item=name, quantity=int(m.group("qty")),
                                   unit_price=prices[0] if prices else None, note=note))
+            continue
+        m = next((hit for pat in _ITEM_AT if (hit := pat.match(line))), None)
+        if m:
+            name, note = _clean_name(m.group("name"))
+            items.append(LineItem(item=name, quantity=int(m.group("qty")), unit_price=parse_money(m.group("price")), note=note))
             continue
         m = _ITEM_ROW.match(line)
         if m and m.group("name").strip().lower() not in _LABEL_WORDS:

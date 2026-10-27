@@ -61,7 +61,7 @@ def date_text(rng: random.Random, y: int, m: int, d: int) -> str:
 
 def render(rng: random.Random, t: Truth) -> str:
     y, m, d = t.day
-    style = rng.choice(["table", "typo", "email", "bullets"])
+    style = rng.choice(["table", "typo", "email", "bullets", "alt"])
     due = date_text(rng, y, m, min(d + 5, 28))
     on = date_text(rng, y, m, d)
     ocr = rng.random() < 0.3
@@ -71,6 +71,9 @@ def render(rng: random.Random, t: Truth) -> str:
         return "\n".join(["INVOICE", "", f"Invoice Number: {t.number}", f"Vendor: {t.vendor}", f"Date: {on}", f"Due Date: {due}", "",
                           "Item  Qty  Unit Price  Amount", "-" * 40, *rows, "-" * 40, f"Subtotal: {money(rng, t.subtotal)}",
                           "Tax (0%): $0.00", f"Total: {money(rng, t.total, ocr=ocr)}", "", f"Payment Terms: {t.terms}"])
+    if style == "alt":
+        rows = [rng.choice(ALT_ITEM).format(q=q, n=name(n), p=money(rng, p)) for n, q, p in t.items]
+        return "\n".join([f"Invoice {t.number}", f"Vendor: {t.vendor}", f"Date: {on}", f"Due Date: {due}", *rows, f"Balance Due: {money(rng, t.total)}", f"Terms: {t.terms}"])
     if style == "typo":
         rows = [f"{name(n)}   qty: {q}   unit price: {money(rng, p)}" for n, q, p in t.items]
         return "\n".join([f"INV {t.number}", f"Vndr: {t.vendor}", f"Dt: {on}", f"Due Dt: {due}", *rows, f"Amt: {money(rng, t.total, ocr=ocr)}", f"Pymnt Terms: {t.terms}"])

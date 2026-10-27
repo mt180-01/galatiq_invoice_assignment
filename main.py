@@ -100,7 +100,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO if args.verbose else logging.WARNING, handlers=[handler])
     paths = collect(args.invoice_path)
     ncpu = os.cpu_count() or 1
-    console.print(f"[bold]{len(paths)} document(s)[/], {ncpu} CPU cores, LLM: "
+    console.print(f"[bold]{f'{args.bench:,} generated documents (from {len(paths)} samples)' if args.bench else f'{len(paths)} document(s)'}[/], {ncpu} CPU cores, LLM: "
                   f"{'Grok (' + os.environ.get('XAI_MODEL', 'grok-3') + ')' if make_llm(args.offline).available else 'offline (deterministic agents)'}")
 
     if args.bench:

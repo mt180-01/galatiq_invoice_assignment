@@ -64,9 +64,10 @@ def demo() -> None:
         step(5, "Payments are timed, not instant: INV-3003 took its 2% early-pay discount now, INV-3002 waits for its due date.")
         payment_summary(db)
 
-        later = today + timedelta(days=44)
+        scheduled = [date.fromisoformat(r["release_on"]) for r in ledger_view(db)[1] if r["state"] == "scheduled"]
+        later = min(scheduled) if scheduled else today + timedelta(days=44)
         step(6, f"Time passes to {later}: due payments are released, then reconciled with the bank a few days after.")
-        for day, label in ((later, "release"), (later + timedelta(days=3), "reconcile")):
+        for day, label in ((later, "release"), (later + timedelta(days=5), "reconcile")):
             svc = PaymentService(db, erp, MockBank(db + ".bank"), reset=False, today=lambda d=day: d)
             if label == "release":
                 sent = [r for r in svc.release_due() if r.submitted]

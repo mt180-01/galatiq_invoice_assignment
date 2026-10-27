@@ -49,11 +49,11 @@ def test_same_bill_is_never_paid_twice_and_refs_are_unique(tmp_path):
 def test_payment_waits_for_due_date_then_releases(tmp_path):
     db, erp, bank, svc, clock = make(tmp_path)
     r = svc.pay(inv(due="2026-12-01"), "k")
-    assert r.state == "scheduled" and r.release_on == "2026-11-29" and not bank.payments()   # due minus 2-day ACH lead
-    clock["d"] = date(2026, 11, 28)
+    assert r.state == "scheduled" and r.release_on == "2026-11-27" and not bank.payments()   # Tue 12-01 minus 2 business days (Thanksgiving is a holiday)
+    clock["d"] = date(2026, 11, 25)
     svc.release_due()
     assert not bank.payments()                                   # a day early: still nothing sent
-    clock["d"] = date(2026, 11, 29)
+    clock["d"] = date(2026, 11, 27)
     (res,) = svc.release_due()
     assert res.submitted and len(bank.payments()) == 1
     assert sqlite3.connect(db).execute("SELECT COUNT(*) FROM vendor_payments").fetchone()[0] == 1
@@ -183,3 +183,29 @@ def test_daily_limit_headroom_is_returned_when_the_bank_refuses(tmp_path):
     svc = PaymentService(db, erp, bank, reset=False, today=lambda: clock["d"], sleep=lambda s: None, daily_limit=Decimal("1000"))
     assert svc.pay(inv("900", due="2026-10-01"), "a").state == "scheduled"      # bank down: nothing left
     assert svc.pay(inv("900", due="2026-10-01"), "b").submitted                 # so the limit is still free
+
+
+def test_business_day_calendar():
+    from acme_ap.payments.calendar import add_business_days, holidays, is_business_day, next_business_day, sub_business_days
+    assert not is_business_day(date(2026, 11, 28)) and not is_business_day(date(2026, 11, 26))      # Saturday; Thanksgiving
+    assert not is_business_day(date(2026, 12, 25)) and not is_business_day(date(2026, 7, 3))         # Christmas; Jul 4 is a Saturday: observed Friday
+    assert date(2026, 5, 25) in holidays(2026) and date(2026, 9, 7) in holidays(2026)                # Memorial Day, Labor Day
+    assert next_business_day(date(2026, 11, 28)) == date(2026, 11, 30)
+    assert add_business_days(date(2026, 11, 25), 2) == date(2026, 11, 30)                            # skips Thanksgiving and the weekend
+    assert sub_business_days(date(2026, 12, 1), 2) == date(2026, 11, 27)
+
+
+def test_nothing_is_sent_on_a_day_the_banks_are_closed(tmp_path):
+    _, _, bank, svc, clock = make(tmp_path, today=date(2026, 11, 28))                                # a Saturday
+    r = svc.pay(inv(due="2026-10-01"), "k")                                                           # overdue: would be "pay now"
+    assert r.state == "scheduled" and r.release_on == "2026-11-30" and not bank.payments()
+    clock["d"] = date(2026, 11, 30)
+    assert svc.release_due()[0].submitted
+
+
+def test_a_due_date_on_a_weekend_is_met_by_paying_before_it(tmp_path):
+    from acme_ap.payments.calendar import add_business_days
+    _, _, _, svc, _ = make(tmp_path)
+    plan = svc.plan(inv(due="2026-12-26"), date(2026, 10, 27))                                       # due Saturday; Christmas Friday
+    assert plan.release_on == date(2026, 12, 22)                                                      # must arrive Thu 12-24; ACH takes 2 business days
+    assert add_business_days(plan.release_on, 2) == date(2026, 12, 24)

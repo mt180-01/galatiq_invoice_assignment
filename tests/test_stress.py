@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 import pytest
 
 from acme_ap.agents import validation
@@ -29,3 +31,15 @@ def test_two_equally_plausible_invoice_numbers_are_a_hold_not_a_guess(tmp_path):
 def test_conflicting_totals_are_a_hold_not_a_guess():
     inv = heuristic.extract("Invoice INV-8101\n" + BASE + "Total: $400.00\n")
     assert any("several different totals" in w for w in inv.parse_warnings)
+
+
+@pytest.mark.parametrize("line,qty,price", [("5 x WidgetA @ $250.00", 5, "250.00"), ("- 5 x WidgetA @ 250 each", 5, "250"),
+                                            ("WidgetA - 5 units @ $250.00", 5, "250.00"), ("5  WidgetA  at $250.00 each", 5, "250.00")])
+def test_alternative_item_layouts_are_read(line, qty, price):
+    inv = heuristic.extract("Invoice INV-8200\nVendor: Widgets Inc.\n" + line + "\nTotal: $1,250.00\n")
+    assert [(li.item, li.quantity, li.unit_price) for li in inv.line_items] == [("WidgetA", qty, Decimal(price))]
+
+
+def test_balance_due_is_a_total_not_a_due_date():
+    inv = heuristic.extract("Invoice INV-8201\nVendor: Widgets Inc.\nWidgetA qty: 2 unit price: $250.00\nBalance Due: $500.00\n")
+    assert inv.total == Decimal("500.00") and inv.due_date is None and not inv.parse_warnings

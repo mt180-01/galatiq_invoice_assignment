@@ -17,9 +17,10 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Protocol
 
+from .calendar import add_business_days
 from .mock import mock_payment
 
-SETTLE_DAYS = {"ach": 2, "wire": 0}  # business-day effects ignored in the mock
+SETTLE_DAYS = {"ach": 2, "wire": 0}  # business days
 
 
 class BankError(Exception):
@@ -91,7 +92,7 @@ class MockBank:
             if mock_payment(vendor, amount).get("status") != "success":
                 raise BankRejected("bank declined the payment")
             ref = f"{rail.upper()}-{hashlib.sha1(idem.encode()).hexdigest()[:10].upper()}"
-            settles = on + timedelta(days=SETTLE_DAYS[rail])
+            settles = add_business_days(on, SETTLE_DAYS[rail])
             self._db.execute("INSERT INTO bank_payments VALUES (?,?,?,?,?,?,?,?,?)",
                              (idem, ref, vendor, account, str(amount), currency, rail, on.isoformat(), settles.isoformat()))
             self._db.commit()

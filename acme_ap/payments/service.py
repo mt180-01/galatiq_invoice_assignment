@@ -29,6 +29,7 @@ from ..erp.mock_netsuite import SEED_VENDORS, norm
 from ..ingestion.parsing import normalize_account
 from ..models import Invoice
 from .bank import BankAdapter, BankError, BankRejected, SETTLE_DAYS
+from .calendar import is_business_day, next_business_day, prev_business_day, sub_business_days
 from .terms import parse_terms
 
 WIRE_MIN = Decimal("25000")            # at or above this, a wire (same-day, irrevocable-ish) instead of ACH
@@ -120,14 +121,16 @@ class PaymentService:
         total = inv.total or Decimal(0)
         rail = "wire" if total >= WIRE_MIN else "ach"
         terms, dated = parse_terms(inv.payment_terms), _day(inv.date)
-        if TAKE_DISCOUNTS and terms.discount_pct and dated and today <= dated + timedelta(days=terms.discount_days):
+        pay_day = next_business_day(today)  # the earliest day the bank will actually take it
+        if TAKE_DISCOUNTS and terms.discount_pct and dated and pay_day <= dated + timedelta(days=terms.discount_days):
             discount = (total * terms.discount_pct / 100).quantize(Decimal("0.01"))
-            return Plan(total - discount, discount, rail, today, f"early-payment discount {terms.discount_pct}% captured ({discount})")
+            return Plan(total - discount, discount, rail, pay_day, f"early-payment discount {terms.discount_pct}% captured ({discount})")
         due = _day(inv.due_date) or (dated + timedelta(days=terms.net_days) if dated and terms.net_days is not None else None)
         if due is None:
             return Plan(total, Decimal(0), rail, today, "no due date or terms: paid now")
-        release = max(today, due - timedelta(days=SETTLE_DAYS[rail]))
-        note = "overdue: paid now" if due < today else f"released {SETTLE_DAYS[rail]}d before due {due} ({rail.upper()} lead time)"
+        release = max(pay_day, sub_business_days(prev_business_day(due), SETTLE_DAYS[rail]))
+        note = "overdue: paid now" if due < today else (
+            f"released {SETTLE_DAYS[rail]} business day(s) before due {due} ({rail.upper()} lead time)" if SETTLE_DAYS[rail] else f"released on due date {due}")
         return Plan(total, Decimal(0), rail, release, note)
 
     # ---- pay (called by the pipeline and by the approval service) ---------------------------------
@@ -162,6 +165,11 @@ class PaymentService:
             row = self._row(key)
             if not row or row["state"] != "scheduled":
                 return  # someone else has it, or it is held/cancelled
+            if not is_business_day(today):
+                self._db.execute("UPDATE payments SET release_on=?, note=? WHERE bill_key=?",
+                                 (next_business_day(today).isoformat(), "bank closed today: deferred to the next business day", key))
+                self._db.commit()
+                return
             cents = int(Decimal(row["amount"]) * 100)
             done = self._db.execute("SELECT cents FROM daily_totals WHERE day=?", (today.isoformat(),)).fetchone()
             if (done[0] if done else 0) + cents > int(self.daily_limit * 100):
