@@ -65,8 +65,13 @@ class MockBank:
         with self._lock:
             self._db.execute("PRAGMA journal_mode=WAL")
             self._db.executescript(_SCHEMA)
-            if reset:
-                self._db.execute("DELETE FROM bank_payments")
+            self._db.commit()
+        if reset:
+            self.reset()
+
+    def reset(self) -> None:
+        with self._lock:
+            self._db.execute("DELETE FROM bank_payments")
             self._db.commit()
 
     def submit(self, idem, vendor, account, amount, currency, rail, on):

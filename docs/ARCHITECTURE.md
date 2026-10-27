@@ -87,8 +87,13 @@ Measured with `python main.py --bench N` (50% PDFs, offline mode, 14 cores):
 
 | Docs | Serial | Parallel | Speedup | Core utilisation (parallel) |
 |---|---|---|---|---|
-| 2,000 | 1,192 docs/s | 1,643 docs/s | 1.4x | 90% (mostly worker start-up) |
-| 20,000 | 1,240 docs/s | 3,142 docs/s | 2.5x | 41% |
+| 20,000 (current: with approvals + payments) | 1,032 docs/s | 2,318 docs/s (auto mode: 2,436) | 2.2x | 34% |
+| 20,000 (earlier, before approvals/payments existed) | 1,240 docs/s | 3,142 docs/s | 2.5x | 41% |
+
+The current run is about 17-26% slower than the earlier one: every approved invoice now also writes a payment instruction and
+calls the bank adapter, and escalated ones open an approval request. Re-measuring found two real bugs that this benchmark exposed and
+that are fixed and covered by regression tests: the daily-limit check re-read every payment sent that day (quadratic: the run did not finish in
+13 minutes), and the approval service shared one SQLite connection across threads and corrupted reads under parallel load (hundreds of failed invoices).
 
 **This is not linear scaling, and cores are not fully busy.** The ceiling is the single orchestrating process (result pickling,
 validation, SQLite commits): Amdahl's law. The next step is horizontal: a durable queue (SQS/Kafka) with N independent worker processes,
@@ -159,17 +164,35 @@ blocking call per invoice with no retry; no lifecycle after "paid".
 | No retry / outage handling | 3 attempts with backoff per release; transient errors leave it `scheduled` and the next `release` finishes it; permanent rejections stop at once and go to a person. |
 | Pays on day 0 | Released on due date minus the rail's lead time (ACH 2d, wire same day). Overdue or no terms: now. |
 | Early-pay discounts ignored | "2/10 Net 30" is parsed; the discount is taken while the window is open (about 36% annualised, so worth it). |
+| Invoice asks for a different bank account | Parsed from JSON/XML/CSV/UBL/CII/text. A mismatch with the account on file is a HOLD (`bank_account_changed`): routed to the AP Manager, the vendor is **not** emailed to confirm (the sender may be the fraudster), account numbers are masked in messages, and an approver's click cannot waive it. The fix is the dual-control account change below. Invoices that show no account are paid to the one on file. |
 | Unknown payee account | Each vendor needs a *verified* account. A changed account needs a second person and holds that vendor's payments meanwhile. |
 | One rail | Wire at/above 25,000, ACH below. |
 | Uncontrolled outflow | Daily outbound limit enforced under the ledger lock; overflow rolls to the next day. |
+| ERP and bank disagree after a crash | `reconcile` also repairs a bill the bank has paid but the ERP never marked paid (and says so). |
+| Zero or negative amounts | Validation errors (`zero_total`, `negative_total`); the payment layer refuses them again on its own. |
 | "Paid" is a guess | States: scheduled, submitted, settled, returned, held, failed. `reconcile` compares ledger and bank: settles, flags returns, flags bank items we have no record of and amount mismatches. |
 | CPU / latency | Bank calls run off the event loop under a semaphore and outside the ledger lock, so submissions overlap. No SIMD: this stage is network- and DB-bound. |
 
 Files: `acme_ap/payments/` (`service.py` policy and ledger, `bank.py` adapter + simulated bank, `terms.py`), CLI `pay.py`.
 Policy numbers (25,000 wire threshold, 250,000 daily limit, 0.30 / 25.00 rail costs) are assumptions.
+**Deliberately not done:** stock is not reduced when an invoice is paid. These are purchase invoices, so paying one does not consume inventory (receiving goods would add to it), and a decrement would make results depend on processing order.
 **Not done:** no real bank (the adapter is the seam; a real one adds credentials, request signing, webhooks instead of polling);
 weekends/bank holidays ignored; no sanctions screening; no remittance-advice email to the vendor; FX not supported;
 the verification "callback" is a second person's name in a CLI, not a phone call.
+
+## 4d. The three pain points, and how each is addressed and measured
+
+| Pain point (from the brief) | What causes it | What the system does | How it is measured here |
+|---|---|---|---|
+| **30% error rate** | Hand-keying from PDFs; nobody checks stock, math, duplicates or the vendor | Structured formats are parsed, not re-typed; PDFs/text are read by Grok with a regex cross-check (disagreement = hold); every invoice is checked against items, stock, vendor master, arithmetic, duplicates, fraud signals and (new) the vendor's bank account; uncertain cases go to a person instead of being guessed | `python scripts/measure_quality.py`: 17/17 provided invoices end as labelled, 0 wrongly paid; 25/25 printed fields on the three PDF/text twins match their structured copy |
+| **5-day delays** | Invoices wait in someone's inbox; approvals are email chains nobody chases | Clean invoices take no human time (median tens of ms in the system); approvals go to the right person as a one-click card with a 24h reminder, 48h escalation and 5-day expiry; payment is timed to the due date, not to a backlog | `Impact` block after each run; `approvals.waiting()` gives age, owner and next step for everything pending |
+| **Frustrated stakeholders** | Vendors chase for status, approvers get unclear emails, AP does not know what is stuck | Vendor notices (remittance advice with the real amount, scheduled date, or "with X for sign-off, decision within 2 business days"), one question per invoice at most, and an AP digest of what is stuck, with whom, for how long, and what happens next | `outbox/notices/`, `outbox/daily_digest.txt` |
+
+**What this does not prove.** The 30% and 5-day baselines are the brief's, not measured here, so no "reduced by X%" claim is made. The
+outcome labels were written by the developer who tuned the rules, so 17/17 is a regression guard, not an independent accuracy test; the PDF/text
+twins are the only independent ground truth in the repo and there are three of them. "Median tens of ms" is time inside the system, not waiting
+for a person; the only waits left are approvals, and those are bounded by the escalation clock rather than by luck. Vendor notices are drafts
+and the SLA text ("within 2 business days") is the escalation policy restated, not a commitment anyone has agreed.
 
 ## 5. Known limitations
 - Duplicate detection is by (vendor, invoice number, revision); which of two identical copies is called the duplicate depends on timing.

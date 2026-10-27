@@ -97,6 +97,10 @@ class MockNetSuite:
                 return None
             return c.execute("SELECT source FROM vendor_bills WHERE bill_key=?", (key,)).fetchone()[0]
 
+    def bill_status(self, key: str) -> str | None:
+        row = self._conn().execute("SELECT status FROM vendor_bills WHERE bill_key=?", (key,)).fetchone()
+        return row[0] if row else None
+
     def settle_bill(self, key, status, reasoning, payment=None):
         with self._write:
             c = self._conn()

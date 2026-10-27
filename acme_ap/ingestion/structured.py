@@ -12,7 +12,7 @@ import defusedxml.ElementTree as ET  # vendor-supplied XML is untrusted: blocks 
 from decimal import Decimal
 
 from ..models import Invoice, LineItem
-from .parsing import normalize_invoice_number, parse_date, parse_money
+from .parsing import normalize_account, normalize_invoice_number, parse_date, parse_money
 
 
 def _qty(raw: object, warnings: list[str]) -> int:
@@ -59,6 +59,7 @@ def from_json(text: str) -> Invoice:
         tax_amount=parse_money(data.get("tax_amount")),
         total=parse_money(data.get("total")),
         payment_terms=_clean(data.get("payment_terms")),
+        bank_account=normalize_account(data.get("bank_account") or (data.get("payment_details") or {}).get("account")),
         notes=_clean(data.get("notes")),
         channel="structured",
         extractor="json",
@@ -116,6 +117,7 @@ def from_xml(text: str) -> Invoice:
         tax_amount=parse_money(find("./totals/tax_amount")),
         total=parse_money(find("./totals/total")),
         payment_terms=find("./payment_terms"),
+        bank_account=normalize_account(find("./bank_account") or find("./header/bank_account")),
         channel="structured",
         extractor="xml",
         parse_warnings=warnings,
@@ -165,6 +167,7 @@ def _csv_key_value(rows: list[list[str]], warnings: list[str]) -> Invoice:
         tax_amount=parse_money(header.get("tax")),
         total=parse_money(header.get("total")),
         payment_terms=_clean(header.get("payment_terms")),
+        bank_account=normalize_account(header.get("bank_account")),
         channel="structured", extractor="csv", parse_warnings=warnings,
     )
 
@@ -221,6 +224,7 @@ def _from_ubl(root) -> Invoice:
         currency=_text(root, "DocumentCurrencyCode") or "USD", line_items=items,
         subtotal=parse_money(_text(root, "TaxExclusiveAmount")), tax_amount=parse_money(_text(root, "TaxTotal", "TaxAmount")),
         total=parse_money(_text(root, "PayableAmount")), payment_terms=_text(root, "PaymentTerms", "Note"),
+        bank_account=normalize_account(_text(root, "PayeeFinancialAccount", "ID")),
         channel="structured", extractor="ubl", parse_warnings=warnings)
 
 
@@ -245,4 +249,6 @@ def _from_cii(root) -> Invoice:
         subtotal=parse_money(_text(root, "LineTotalAmount")) if not items else parse_money(_text(root, "TaxBasisTotalAmount")),
         tax_amount=parse_money(_text(root, "TaxTotalAmount")), total=parse_money(_text(root, "GrandTotalAmount")),
         payment_terms=_text(root, "SpecifiedTradePaymentTerms", "Description"),
+        bank_account=normalize_account(_text(root, "PayeePartyCreditorFinancialAccount", "IBANID")
+                                       or _text(root, "PayeePartyCreditorFinancialAccount", "ProprietaryID")),
         channel="structured", extractor="cii", parse_warnings=warnings)

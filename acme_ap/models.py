@@ -28,6 +28,7 @@ class Invoice(BaseModel):
     shipping: Decimal | None = None
     total: Decimal | None = None
     payment_terms: str | None = None
+    bank_account: str | None = None  # where the vendor asks to be paid, if the invoice says
     notes: str | None = None
     # provenance
     source_path: str = ""
@@ -76,6 +77,7 @@ class Outcome(BaseModel):
     approval: Approval | None = None
     paid: bool = False
     payment_ref: str | None = None
+    payment_amount: Decimal | None = None  # what the bank was asked to send (after any discount)
     payment_state: str | None = None  # scheduled | held | failed | submitted
     release_on: str | None = None
     error: str | None = None

@@ -20,7 +20,8 @@ def _f(code: str, sev: Severity, msg: str) -> Finding:
     return Finding(code=code, severity=sev, message=msg)
 
 
-def validate(inv: Invoice, erp: ErpAdapter) -> list[Finding]:
+def validate(inv: Invoice, erp: ErpAdapter, accounts=None) -> list[Finding]:
+    """`accounts` (optional) knows each vendor's verified bank account, so a changed account is caught before approval."""
     out: list[Finding] = []
     E, H, W = Severity.ERROR, Severity.HOLD, Severity.WARN
 
@@ -40,6 +41,8 @@ def validate(inv: Invoice, erp: ErpAdapter) -> list[Finding]:
         out.append(_f("missing_total", E, "no invoice total"))
     elif inv.total < 0:
         out.append(_f("negative_total", E, f"total is negative ({inv.total})"))
+    elif inv.total == 0:
+        out.append(_f("zero_total", E, "invoice total is zero"))
     if inv.revision:
         out.append(_f("revision", H, f"revision {inv.revision}: may supersede an earlier bill; confirm before paying"))
     if inv.currency != "USD":
@@ -55,6 +58,9 @@ def validate(inv: Invoice, erp: ErpAdapter) -> list[Finding]:
         elif vendor.status != "approved":
             out.append(_f("vendor_blocked", E, f"vendor {vendor.name!r} is {vendor.status}"))
 
+    if accounts and inv.vendor and inv.bank_account:
+        if problem := accounts.check_account(inv.vendor, inv.bank_account):
+            out.append(_f("bank_account_changed", H, problem))
     _check_dates(inv, out)
     _check_items(inv, erp, out)
     _check_math(inv, out)

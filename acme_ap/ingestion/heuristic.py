@@ -9,7 +9,7 @@ import re
 from decimal import Decimal
 
 from ..models import Invoice, LineItem
-from .parsing import detect_currency, fix_ocr_digits, normalize_invoice_number, parse_date, parse_money
+from .parsing import detect_currency, fix_ocr_digits, normalize_account, normalize_invoice_number, parse_date, parse_money
 
 _NUM = r"[\dOo][\dOo,]*(?:\.[\dOo]+)?"
 _LABEL_WORDS = {"date", "due", "tax", "total", "invoice", "subtotal", "terms", "shipping", "amt", "ref", "po"}
@@ -20,6 +20,7 @@ _FROM = re.compile(r"^[ \t]*from[ \t]*:[ \t]*(.+)$", re.I | re.M)
 _DATE = re.compile(r"(?<![A-Za-z])(?<!due )(?:date|dt)[ \t]*:[ \t]*(.+)", re.I)
 _DUE = re.compile(r"\bdue(?:[ \t]*(?:date|dt))?[ \t]*:[ \t]*(.+)", re.I)
 _TERMS = re.compile(r"(?:payment|pymnt)[ \t]+terms[ \t]*:[ \t]*(.+)|^[ \t]*terms[ \t]*:[ \t]*(.+)", re.I | re.M)
+_ACCOUNT = re.compile(r"^[ \t]*(?:bank[ \t]+)?(?:account|acct|a/c|iban)[ \t]*(?:no\.?|number|#)?[ \t]*[:#][ \t]*([A-Za-z0-9][A-Za-z0-9 \-]{3,33})[ \t]*$", re.I | re.M)
 _NOTES = re.compile(r"^[ \t]*notes?[ \t]*:[ \t]*(.+)$", re.I | re.M)
 _FORMERLY = re.compile(r"\(\s*formerly[^)]*\)", re.I)
 
@@ -122,6 +123,7 @@ def extract(text: str, fmt: str = "text") -> Invoice:
         shipping=_dec(_first(_SHIPPING, text)),
         total=_dec(_first(_TOTAL, text)),
         payment_terms=terms_raw.strip() if terms_raw else None,
+        bank_account=normalize_account(_first(_ACCOUNT, text)),
         notes=notes,
         channel="unstructured",
         extractor=f"heuristic:{fmt}",

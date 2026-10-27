@@ -8,6 +8,11 @@ from decimal import Decimal, InvalidOperation
 _DATE_FORMATS = ("%Y-%m-%d", "%b %d %Y", "%B %d %Y", "%b %d, %Y", "%B %d, %Y", "%m/%d/%Y", "%d-%b-%Y", "%d %b %Y")
 
 
+def normalize_account(raw: object) -> str | None:
+    text = re.sub(r"\s+", "", str(raw)).upper() if raw else ""
+    return text or None
+
+
 def fix_ocr_digits(token: str) -> str:
     """'3,500.O0' -> '3,500.00'; only touches O/o that sit next to a digit or separator."""
     return re.sub(r"(?<=[\d.,])[Oo]|[Oo](?=[\d.,])", "0", token)

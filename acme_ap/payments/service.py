@@ -26,6 +26,7 @@ from typing import Callable
 
 from ..erp import ErpAdapter
 from ..erp.mock_netsuite import SEED_VENDORS, norm
+from ..ingestion.parsing import normalize_account
 from ..models import Invoice
 from .bank import BankAdapter, BankError, BankRejected, SETTLE_DAYS
 from .terms import parse_terms
@@ -42,6 +43,7 @@ CREATE TABLE IF NOT EXISTS payments (
     bill_key TEXT PRIMARY KEY, vendor TEXT, account TEXT, amount TEXT, discount TEXT DEFAULT '0', rail TEXT,
     release_on TEXT, state TEXT, bank_ref TEXT, attempts INTEGER DEFAULT 0, last_error TEXT, note TEXT,
     submitted_on TEXT, settled_on TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS daily_totals (day TEXT PRIMARY KEY, cents INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS vendor_accounts (
     vendor TEXT PRIMARY KEY, account TEXT, status TEXT, set_by TEXT, verified_by TEXT);
 """
@@ -102,9 +104,11 @@ class PaymentService:
         self._db.row_factory = sqlite3.Row
         with self._lock:
             self._db.execute("PRAGMA journal_mode=WAL")
+            self._db.execute("PRAGMA synchronous=NORMAL")  # as the ERP mock; a production ledger would be a real database
             self._db.executescript(_SCHEMA)
             if reset:
                 self._db.execute("DELETE FROM payments")
+                self._db.execute("DELETE FROM daily_totals")
                 self._db.execute("DELETE FROM vendor_accounts")
             for name, _, _ in SEED_VENDORS:  # demo master data: every approved vendor starts verified
                 self._db.execute("INSERT OR IGNORE INTO vendor_accounts VALUES (?,?,?,?,?)",
@@ -138,7 +142,10 @@ class PaymentService:
                 return self._result(self._row(key))  # idempotent: same bill, same payment
             acct = self._db.execute("SELECT account, status FROM vendor_accounts WHERE vendor=?", (norm(canonical),)).fetchone()
             plan = self.plan(inv, today)
-            held = None if acct and acct["status"] == "verified" else "no verified bank account on file for this vendor"
+            if plan.amount <= 0:
+                raise ValueError(f"refusing to pay a non-positive amount ({plan.amount})")
+            held = (self.check_account(canonical, inv.bank_account) if inv.bank_account else None) or (
+                None if acct and acct["status"] == "verified" else "no verified bank account on file for this vendor")
             self._db.execute(
                 "INSERT INTO payments (bill_key, vendor, account, amount, discount, rail, release_on, state, note, last_error) VALUES (?,?,?,?,?,?,?,?,?,?)",
                 (key, canonical, acct["account"] if acct else None, str(plan.amount), str(plan.discount), plan.rail,
@@ -155,16 +162,16 @@ class PaymentService:
             row = self._row(key)
             if not row or row["state"] != "scheduled":
                 return  # someone else has it, or it is held/cancelled
-            committed = sum(Decimal(r[0]) for r in self._db.execute(
-                "SELECT amount FROM payments WHERE submitted_on=? AND state IN ('submitting','submitted','settled','returned')",
-                (today.isoformat(),)))
-            if committed + Decimal(row["amount"]) > self.daily_limit:
+            cents = int(Decimal(row["amount"]) * 100)
+            done = self._db.execute("SELECT cents FROM daily_totals WHERE day=?", (today.isoformat(),)).fetchone()
+            if (done[0] if done else 0) + cents > int(self.daily_limit * 100):
                 self._db.execute("UPDATE payments SET release_on=?, note=? WHERE bill_key=?",
                                  ((today + timedelta(days=1)).isoformat(), "daily outbound limit reached: deferred a day", key))
                 self._db.commit()
                 return
             self._db.execute("UPDATE payments SET state='submitting', submitted_on=?, attempts=attempts+1 WHERE bill_key=?",
                              (today.isoformat(), key))
+            self._add_to_day(today, cents)  # O(1): a running total, not a re-scan of everything sent today
             self._db.commit()
         receipt, error, permanent = None, None, False
         try:
@@ -185,8 +192,13 @@ class PaymentService:
                 self._db.execute("UPDATE payments SET state='submitted', bank_ref=?, last_error=NULL WHERE bill_key=?", (receipt.ref, key))
             else:
                 state = "failed" if permanent or self._row(key)["attempts"] >= GIVE_UP_AFTER else "scheduled"
+                self._add_to_day(today, -cents)  # nothing left the bank: give the headroom back
                 self._db.execute("UPDATE payments SET state=?, last_error=? WHERE bill_key=?", (state, error, key))
             self._db.commit()
+
+    def _add_to_day(self, day: date, cents: int) -> None:
+        self._db.execute("INSERT INTO daily_totals VALUES (?,?) ON CONFLICT(day) DO UPDATE SET cents = cents + excluded.cents",
+                         (day.isoformat(), cents))
 
     def release_due(self, concurrency: int = 8) -> list[PayResult]:
         """Submit everything whose release date has come. Safe to run repeatedly (cron, or after an outage)."""
@@ -219,6 +231,8 @@ class PaymentService:
                     self._db.execute("UPDATE payments SET state='submitted', bank_ref=? WHERE bill_key=?", (receipt.ref, key))
                 else:
                     self._db.execute("UPDATE payments SET state='scheduled' WHERE bill_key=?", (key,))
+                    if row["submitted_on"]:
+                        self._add_to_day(date.fromisoformat(row["submitted_on"]), -int(Decimal(row["amount"]) * 100))
                 self._db.commit()
             if receipt:
                 self.erp.settle_bill(key, "paid", f"payment recovered after interruption: bank holds {receipt.ref}",
@@ -228,27 +242,33 @@ class PaymentService:
 
     # ---- reconciliation -----------------------------------------------------------------------
     def reconcile(self) -> Reconciliation:
+        """Bank vs ledger vs ERP. Fixes what is safe to fix (ERP bill not marked paid), reports the rest."""
         today, rec = self.today(), Reconciliation()
         with self._lock:
             rows = [dict(r) for r in self._db.execute("SELECT * FROM payments WHERE state IN ('submitted','settled','returned')")]
         ours = {r["bill_key"]: r for r in rows}
         for row in rows:
-            if row["state"] != "submitted":
-                continue
-            state = self.bank.status(row["bank_ref"], today)
-            if state == "pending":
-                rec.pending += 1
-                continue
-            with self._lock:
-                self._db.execute("UPDATE payments SET state=?, settled_on=? WHERE bill_key=?",
-                                 ("settled" if state == "settled" else "returned", today.isoformat(), row["bill_key"]))
-                self._db.commit()
-            if state == "settled":
-                rec.settled += 1
-            else:
-                rec.returned += 1
-                self.erp.settle_bill(row["bill_key"], "payment_returned", f"bank returned {row['bank_ref']}: needs a person")
-                rec.issues.append(f"RETURNED {row['bank_ref']} {row['vendor']} {row['amount']}")
+            state = row["state"]
+            if state == "submitted":
+                bank_state = self.bank.status(row["bank_ref"], today)
+                if bank_state == "pending":
+                    rec.pending += 1
+                else:
+                    state = "settled" if bank_state == "settled" else "returned"
+                    with self._lock:
+                        self._db.execute("UPDATE payments SET state=?, settled_on=? WHERE bill_key=?", (state, today.isoformat(), row["bill_key"]))
+                        self._db.commit()
+                    rec.settled += state == "settled"
+                    rec.returned += state == "returned"
+            if state == "returned":
+                if row["state"] == "submitted":
+                    self.erp.settle_bill(row["bill_key"], "payment_returned", f"bank returned {row['bank_ref']}: needs a person")
+                    rec.issues.append(f"RETURNED {row['bank_ref']} {row['vendor']} {row['amount']}")
+            elif self.erp.bill_status(row["bill_key"]) not in (None, "paid"):
+                # The bank has the money but the ERP never learned of it (crash between the two): make the books true.
+                self.erp.settle_bill(row["bill_key"], "paid", f"repaired by reconciliation: bank holds {row['bank_ref']}",
+                                     (row["vendor"], Decimal(row["amount"]), row["bank_ref"]))
+                rec.issues.append(f"REPAIRED {row['bank_ref']}: ERP bill was not marked paid")
         for bp in self.bank.payments():
             mine = ours.get(bp["idem"])
             if mine is None:
@@ -258,6 +278,17 @@ class PaymentService:
         return rec
 
     # ---- vendor bank accounts (dual control) -------------------------------------------------
+    def check_account(self, vendor: str, claimed: str) -> str | None:
+        """None if the account an invoice asks for matches the one on file; otherwise why it must not be paid yet."""
+        name = self._canonical(vendor)
+        with self._lock:
+            row = self._db.execute("SELECT account FROM vendor_accounts WHERE vendor=?", (norm(name),)).fetchone()
+        if row is None or normalize_account(claimed) == normalize_account(row["account"]):
+            return None
+        mask = lambda a: "…" + a[-4:]  # noqa: E731 - never print a full account number
+        return (f"invoice asks to be paid to account {mask(claimed)} but the account on file for {name} is "
+                f"{mask(row['account'])}; confirm with the vendor on a known phone number before paying")
+
     def set_account(self, vendor: str, account: str, by: str) -> str:
         name = self._canonical(vendor)
         with self._lock:

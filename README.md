@@ -24,6 +24,8 @@ scorecard and a payments summary. Side effects go to files, never to the outside
 | Output | Where | What it is |
 |---|---|---|
 | Vendor follow-up questions | `outbox/*.txt` | Drafted, never sent automatically |
+| Vendor status notices | `outbox/notices/` | Payment sent / approved and scheduled / with an approver |
+| AP digest | `outbox/daily_digest.txt` | What is stuck, with whom, for how long |
 | Approval decision cards | `outbox/approvals/` | One per invoice that needs a person |
 | Ledger, payments, audit log | `inventory.db` (+ `.bank`) | Mock NetSuite and mock bank |
 
@@ -37,13 +39,15 @@ scorecard and a payments summary. Side effects go to files, never to the outside
 .venv/bin/python approve.py list                                       # approver side: list, card, respond, tick
 .venv/bin/python pay.py status                                         # treasury side: status, release, reconcile
 .venv/bin/python main.py --bench 20000                                 # CPU benchmark
+.venv/bin/python scripts/measure_quality.py                            # accuracy against the repo's labelled data
 ```
 
 ## Where things live
 
 | Path | Responsibility |
 |---|---|
-| `main.py` | Command line: runs a batch, prints results, writes the outbox |
+| `main.py` | Command line (`demo`, a batch, `--bench`) |
+| `acme_ap/runner.py`, `report.py`, `demo.py` | Run a batch and write the outbox; terminal tables; the guided demo |
 | `approve.py`, `pay.py` | Approver and treasury command lines (act on the database a run leaves behind) |
 | `acme_ap/pipeline.py` | The flow per invoice: ingest, deduplicate, validate, approve, pay; CPU/IO scheduling |
 | `acme_ap/ingestion/` | Turn any file into an `Invoice`: PDF/OCR, JSON/XML/UBL/CSV, regex and Grok extraction |
@@ -51,7 +55,8 @@ scorecard and a payments summary. Side effects go to files, never to the outside
 | `acme_ap/approvals/` | Routing by amount and reason, signed one-click tokens, reminders, escalation, expiry |
 | `acme_ap/payments/` | Scheduling, discounts, bank adapter (mock bank), account verification, reconciliation |
 | `acme_ap/erp/` | `ErpAdapter` interface and the SQLite mock of NetSuite; swap in a real connector here |
-| `acme_ap/intake.py`, `outreach.py` | Read `.eml` files; draft follow-up questions to vendors |
+| `acme_ap/intake.py`, `outreach.py`, `notices.py` | Read `.eml` files; draft follow-up questions, status notices and the AP digest |
+| `acme_ap/metrics.py` | The numbers behind the `Impact` block |
 | `acme_ap/models.py`, `llm.py` | Shared data types; Grok client and offline fallback |
 | `data/` | Provided sample invoices, plus added sample emails, scans and an approval demo |
 | `scripts/` | Sample generators and benchmarks |

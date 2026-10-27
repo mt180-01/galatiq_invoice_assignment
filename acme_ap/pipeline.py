@@ -135,7 +135,7 @@ class Pipeline:
                 return out
 
             # Local ERP reads take microseconds; a real (network) ERP adapter would be awaited here instead.
-            out.findings = validation.validate(inv, self.erp)
+            out.findings = validation.validate(inv, self.erp, self.payments)
             lap("validate")
             for f in out.findings:
                 log.info("finding", extra={"trace": trace, "stage": "validate", "detail": f"{f.severity.value}:{f.code} {f.message}"})
@@ -152,7 +152,7 @@ class Pipeline:
                     res = await asyncio.to_thread(self.payments.pay, inv, key)
                 out.payment_state, out.release_on, pay_status = res.state, res.release_on, res.erp_status
                 if res.submitted:
-                    out.paid, out.payment_ref = True, res.ref
+                    out.paid, out.payment_ref, out.payment_amount = True, res.ref, res.amount
                     payment_row = (inv.vendor or "", res.amount, res.ref)
             request = None
             if out.approval.decision is Decision.ESCALATE and self.approvals is not None:

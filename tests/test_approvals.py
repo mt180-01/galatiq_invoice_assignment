@@ -130,3 +130,19 @@ def test_card_is_short_and_explains_why(env):
     card = o.approval_card
     assert "WHY YOU" in card and "SYSTEM RECOMMENDATION" in card and "APPROVE:" in card and "REJECT:" in card
     assert len(card.splitlines()) < 30
+
+
+def test_many_escalations_at_once_do_not_corrupt_each_other(tmp_path, env):
+    """Regression: the shared connection's row type was flipped per call, so parallel escalations crashed (found by the 20,000-doc benchmark)."""
+    import json
+    db, erp, svc = env
+    base = json.loads(DEMO.read_text())
+    paths = []
+    for i in range(300):
+        f = tmp_path / f"invoice_{4000 + i}.json"
+        f.write_text(json.dumps(base | {"invoice_number": f"INV-{4000 + i}"}))
+        paths.append(f)
+    outs = run(erp, svc, paths)
+    assert not [o.error for o in outs if o.error]
+    assert sorted(o.approval_request for o in outs) == list(range(1, 301))
+    assert all(o.approval_card and o.awaiting == "VP Finance" for o in outs)

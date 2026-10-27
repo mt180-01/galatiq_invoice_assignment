@@ -157,3 +157,29 @@ def test_pipeline_schedules_future_due_invoice(tmp_path):
     clock["d"] = date(2027, 1, 13)
     svc.release_due()
     assert erp._conn().execute("SELECT status FROM vendor_bills").fetchone()[0] == "paid"
+
+
+def test_cost_per_payment_does_not_grow_with_volume(tmp_path):
+    """Regression: the daily-limit check once re-read every payment sent that day, so 20,000 invoices took minutes."""
+    import time
+    db, erp, bank, _, clock = make(tmp_path)
+    svc = PaymentService(db, erp, bank, reset=False, today=lambda: clock["d"], sleep=lambda s: None, daily_limit=Decimal("1e12"))
+
+    def batch(start, n):
+        t = time.perf_counter()
+        for i in range(start, start + n):
+            svc.pay(inv("10", due="2026-10-01"), f"k{i}")
+        return (time.perf_counter() - t) / n
+
+    small = batch(0, 200)
+    batch(200, 1500)
+    large = batch(1700, 200)          # same batch size, 1,700 payments already sent today
+    assert large < small * 4, f"{small * 1000:.2f} ms/payment at the start vs {large * 1000:.2f} ms after 1,700"
+    assert len(bank.payments()) == 1900
+
+
+def test_daily_limit_headroom_is_returned_when_the_bank_refuses(tmp_path):
+    db, erp, bank, _, clock = make(tmp_path, fail_first=3)
+    svc = PaymentService(db, erp, bank, reset=False, today=lambda: clock["d"], sleep=lambda s: None, daily_limit=Decimal("1000"))
+    assert svc.pay(inv("900", due="2026-10-01"), "a").state == "scheduled"      # bank down: nothing left
+    assert svc.pay(inv("900", due="2026-10-01"), "b").submitted                 # so the limit is still free

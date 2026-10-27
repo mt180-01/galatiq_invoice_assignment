@@ -26,7 +26,7 @@ REMINDER_AFTER = timedelta(hours=24)
 ESCALATE_AFTER = timedelta(hours=48)
 EXPIRE_AFTER = timedelta(days=5)
 # Facts a person cannot waive by clicking approve, even when validation downgraded them (e.g. OCR-sourced invoices).
-HARD_FACTS = {"unknown_item", "out_of_stock", "insufficient_stock", "vendor_blocked", "invalid_quantity", "negative_total", "fraud_indicators"}
+HARD_FACTS = {"unknown_item", "out_of_stock", "insufficient_stock", "vendor_blocked", "invalid_quantity", "negative_total", "zero_total", "fraud_indicators", "bank_account_changed"}
 LINK_BASE = "https://ap.acmecorp.example/decide?t="  # fictional: no server exists in this prototype
 
 _SCHEMA = """
@@ -45,6 +45,7 @@ class Result:
     message: str
     paid: bool = False
     payment_ref: str | None = None
+    amount: Decimal | None = None
 
 
 class ApprovalService:
@@ -69,12 +70,17 @@ class ApprovalService:
     def _event(self, rid: int, at: datetime, event: str, detail: str = "") -> None:
         self._db.execute("INSERT INTO approval_events (request_id, at, event, detail) VALUES (?,?,?,?)", (rid, at.isoformat(), event, detail))
 
+    def _fetch(self, sql: str, params: tuple = ()) -> list[sqlite3.Row]:
+        """One connection is shared by every thread, so reads take the lock too, and the row type is set on a private
+        cursor (flipping it on the shared connection let one thread's reads come back in another's shape)."""
+        with self._lock:
+            cur = self._db.cursor()
+            cur.row_factory = sqlite3.Row
+            return cur.execute(sql, params).fetchall()
+
     def _row(self, rid: int) -> sqlite3.Row | None:
-        self._db.row_factory = sqlite3.Row
-        try:
-            return self._db.execute("SELECT * FROM approval_requests WHERE id=?", (rid,)).fetchone()
-        finally:
-            self._db.row_factory = None
+        rows = self._fetch("SELECT * FROM approval_requests WHERE id=?", (rid,))
+        return rows[0] if rows else None
 
     def _token(self, rid: int, action: str, ev_hash: str, now: datetime) -> str:
         return make_token(self._secret, rid, action, ev_hash, now + EXPIRE_AFTER)
@@ -150,7 +156,7 @@ class ApprovalService:
                 self.erp.settle_bill(row["bill_key"], "rejected", f"rejected by {who}: {comment or 'no comment'}")
                 return Result(True, f"rejected by {who}")
             # Approve: the world may have moved since the request went out. Re-run the checks before any money moves.
-            errors = [f for f in validation.validate(inv, self.erp) if f.severity is Severity.ERROR or f.code in HARD_FACTS]
+            errors = [f for f in validation.validate(inv, self.erp, self.payments) if f.severity is Severity.ERROR or f.code in HARD_FACTS]
             if errors:
                 self._close(rid, "blocked", who, comment, now)
                 self._event(rid, now, "blocked", "; ".join(f.message for f in errors))
@@ -161,7 +167,7 @@ class ApprovalService:
             self._close(rid, "approved", who, comment, now, res.ref)
             self.erp.settle_bill(row["bill_key"], res.erp_status, f"approved by {who}: {comment or 'no comment'}",
                                  (inv.vendor or "", res.amount, res.ref) if res.submitted else None)
-            return Result(True, f"approved by {who}; " + ("paid" if res.submitted else res.message), res.submitted, res.ref)
+            return Result(True, f"approved by {who}; " + ("paid" if res.submitted else res.message), res.submitted, res.ref, res.amount)
 
     def _close(self, rid: int, status: str, who: str, comment: str, now: datetime, ref: str | None = None) -> None:
         self._db.execute("UPDATE approval_requests SET status=?, decided_by=?, decided_at=?, comment=?, payment_ref=? WHERE id=?",
@@ -175,9 +181,7 @@ class ApprovalService:
         now = now or utcnow()
         actions: list[str] = []
         with self._lock:
-            self._db.row_factory = sqlite3.Row
-            rows = self._db.execute("SELECT * FROM approval_requests WHERE status='pending'").fetchall()
-            self._db.row_factory = None
+            rows = self._fetch("SELECT * FROM approval_requests WHERE status='pending'")
             for row in rows:
                 age = now - datetime.fromisoformat(row["created_at"])
                 rid, role = row["id"], row["role"]
@@ -200,16 +204,33 @@ class ApprovalService:
 
     # ---- views -----------------------------------------------------------------------------
     def pending(self) -> list[dict]:
-        self._db.row_factory = sqlite3.Row
-        try:
-            rows = self._db.execute("SELECT id, bill_key, role, reasons, status, created_at FROM approval_requests ORDER BY id").fetchall()
-            return [dict(r) for r in rows]
-        finally:
-            self._db.row_factory = None
+        rows = self._fetch("SELECT id, bill_key, role, reasons, status, created_at FROM approval_requests ORDER BY id")
+        return [dict(r) for r in rows]
+
+    def waiting(self, now: datetime | None = None) -> list[dict]:
+        """Requests still waiting for a person: how long, who has it, what happens next if nobody acts."""
+        now, out = now or utcnow(), []
+        rows = self._fetch("SELECT * FROM approval_requests WHERE status='pending' ORDER BY id")
+        for row in rows:
+            age = now - datetime.fromisoformat(row["created_at"])
+            inv = Invoice.model_validate_json(row["invoice_json"])
+            if age >= ESCALATE_AFTER and not row["escalated_from"]:
+                nxt = ("expires unpaid", EXPIRE_AFTER - age) if not DIRECTORY[row["role"]]["delegate"] else ("escalates", ESCALATE_AFTER - age)
+            elif age < REMINDER_AFTER and not row["reminded_at"]:
+                nxt = ("reminder", REMINDER_AFTER - age)
+            elif age < ESCALATE_AFTER and not row["escalated_from"]:
+                nxt = ("escalates to " + (DIRECTORY[row["role"]]["delegate"] or "nobody (expires)"), ESCALATE_AFTER - age)
+            else:
+                nxt = ("expires unpaid", EXPIRE_AFTER - age)
+            out.append({"id": row["id"], "role": row["role"], "invoice": inv.invoice_number, "vendor": inv.vendor,
+                        "amount": inv.total, "age_hours": age.total_seconds() / 3600, "reasons": json.loads(row["reasons"]),
+                        "next": nxt[0], "next_in_hours": max(0.0, nxt[1].total_seconds() / 3600),
+                        "escalated_from": row["escalated_from"]})
+        return out
 
     def tokens_for(self, rid: int, now: datetime | None = None) -> dict[str, str]:
         row = self._row(rid)
         return {a: self._token(rid, a, row["ev_hash"], now or utcnow()) for a in ("approve", "reject")}
 
     def events(self, rid: int) -> list[tuple[str, str, str]]:
-        return self._db.execute("SELECT at, event, detail FROM approval_events WHERE request_id=? ORDER BY id", (rid,)).fetchall()
+        return [tuple(r) for r in self._fetch("SELECT at, event, detail FROM approval_events WHERE request_id=? ORDER BY id", (rid,))]
