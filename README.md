@@ -11,7 +11,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt     # 1. set 
 .venv/bin/python -m pytest                                             # 3. run the tests
 ```
 
-`make setup`, `make test`, `make demo` and `make bench` do the same.
+`make setup`, `make test`, `make demo` and `make bench` do the same; `make e2e` runs the whole workflow through the command-line tools and checks every step.
 A single file works too (`--invoice_path=data/invoices/invoice_1001.txt`). Add `-v` for per-stage logs and `--json out.json`
 to save results. Set `XAI_API_KEY` to use Grok; without it everything runs offline with deterministic rules.
 Scanned PDFs need `tesseract` installed.

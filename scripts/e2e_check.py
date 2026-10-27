@@ -1,0 +1,131 @@
+"""End-to-end check of the whole system: every step is a real command run in a scratch folder, each prints PASS/FAIL with its evidence.
+
+    python scripts/e2e_check.py            # this checkout
+    python scripts/e2e_check.py /path/to/other/checkout     (e.g. a fresh clone with its own .venv)
+Nothing in the checkout is modified (databases and outboxes go to a temp folder). Needs `tesseract` for the scanned-PDF step."""
+import json, os, re, subprocess, sys, tempfile
+from pathlib import Path
+
+REPO = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent.parent
+PY = str(REPO / ".venv/bin/python") if (REPO / ".venv/bin/python").exists() else sys.executable
+ENV = {**os.environ, "PYTHONWARNINGS": "ignore", "COLUMNS": "220"}
+results = []
+
+
+def sh(*args, ok=True, timeout=300):
+    p = subprocess.run(list(args), cwd=REPO, capture_output=True, text=True, timeout=timeout, env=ENV)
+    out = p.stdout + p.stderr
+    return p.returncode, out
+
+
+def check(name, cond, evidence=""):
+    results.append((name, bool(cond)))
+    print(("PASS " if cond else "FAIL ") + name + (f"   [{evidence}]" if evidence else ""))
+
+
+def py(*a, **k):
+    return sh(PY, *a, **k)
+
+
+tmp = Path(tempfile.mkdtemp(prefix="e2e_"))
+db, outbox = str(tmp / "e2e.db"), str(tmp / "outbox")
+
+# 1. unit/integration tests in the clean clone
+rc, out = py("-m", "pytest", "-q")
+m = re.search(r"(\d+) passed", out)
+check("test suite in a fresh clone", rc == 0 and m and "failed" not in out, m.group(0) if m else out[-200:])
+
+# 2. the guided demo
+rc, out = py("main.py", "demo")
+check("main.py demo runs all 7 steps", rc == 0 and all(f"Step {i}." in out for i in range(1, 8)) and "Traceback" not in out)
+check("demo: VP approval paid, payments reconciled with no issues", "approved by vp-finance@acmecorp.example; paid" in out and re.search(r"returned 0, still in flight 0; issues: none", out))
+
+# 3. agents roster
+rc, out = py("main.py", "agents")
+check("main.py agents lists the six agents", rc == 0 and all(a in out for a in ("Intake", "Validation", "Reviewer", "Desk", "Payment", "Comms")))
+
+# 4. provided invoices end to end (offline), JSON result
+rc, out = py("main.py", "--offline", "--db", db, "--outbox", outbox, "--json", str(tmp / "r.json"), "--invoice_path", "data/invoices")
+res = json.loads((tmp / "r.json").read_text())
+status = {}
+for o in res:
+    if o["status"] != "DUPLICATE":
+        inv = o["invoice"]
+        status[inv["invoice_number"] + (f"-{inv['revision']}" if inv.get("revision") else "")] = o["status"]
+expected = {"INV-1001": "PAID", "INV-1002": "REJECT", "INV-1003": "REJECT", "INV-1004": "PAID", "INV-1004-R1": "AWAITING", "INV-1005": "REJECT",
+            "INV-1006": "PAID", "INV-1007": "REJECT", "INV-1008": "REJECT", "INV-1009": "REJECT", "INV-1010": "PAID", "INV-1011": "PAID",
+            "INV-1012": "PAID", "INV-1013": "REJECT", "INV-1014": "AWAITING", "INV-1015": "PAID", "INV-1016": "REJECT"}
+check("17 provided invoices: every outcome as labelled", rc == 0 and status == expected, f"{sum(status[k] == v for k, v in expected.items())}/17")
+check("3 cross-format duplicates blocked, none errored", sum(o["status"] == "DUPLICATE" for o in res) == 3 and not any(o.get("error") for o in res))
+check("every invoice carries an agent trace", all(o["trace"] for o in res if o["status"] != "DUPLICATE"))
+check("stdout shows results, impact, payments, AI usage", all(s in out for s in ("Invoice results", "Impact", "Payments", "AI usage")) and "Traceback" not in out)
+paid_refs = [o["payment_ref"] for o in res if o["status"] == "PAID"]
+check("7 paid with unique bank references", len(paid_refs) == 7 == len(set(paid_refs)), ", ".join(paid_refs[:2]) + " ...")
+check("rejections carry reasons in the audit log",
+      all(r for r in [subprocess.run([PY, "-c", f"import sqlite3;print(sqlite3.connect('{db}').execute(\"select count(*) from audit_log where detail like 'reject:%'\").fetchone()[0])"], capture_output=True, text=True).stdout.strip() == "8"]))
+out_dir = Path(outbox)
+check("outbox: follow-ups, approval cards, notices, digest",
+      len(list(out_dir.glob("*.txt"))) >= 4 and len(list((out_dir / "approvals").glob("*.txt"))) == 2 and (out_dir / "daily_digest.txt").exists() and list((out_dir / "notices").glob("*.txt")))
+
+# 5. human-in-the-loop: second run on the approval demo (adds the over-limit and changed-bank-account invoices)
+db2 = str(tmp / "hitl.db")
+rc, out = py("main.py", "--offline", "--db", db2, "--outbox", outbox + "2", "--invoice_path", "data/approvals_demo")
+check("approval demo: 2 invoices waiting for people, nothing paid yet", rc == 0 and "AWAITING=2" in out and "Payments" not in out and py("pay.py", "--db", db2, "status")[1].strip() == "", "AWAITING=2, payment ledger empty")
+rc, out = py("approve.py", "--db", db2, "list")
+check("approve.py list shows VP Finance and AP Manager queues", "VP Finance" in out and "AP Manager" in out, out.strip().splitlines()[0][:70])
+cards = sorted((Path(outbox + "2") / "approvals").glob("request_*.txt"))
+vp_card = next(c for c in cards if "INV-3001" in c.name)
+bank_card = next(c for c in cards if "INV-3004" in c.name)
+tok = lambda card, kind: re.search(rf"{kind}: \S*\?t=(\S+)", card.read_text()).group(1)
+rc, out = py("approve.py", "--db", db2, "respond", tok(vp_card, "APPROVE"), "--as", "attacker@evil.example")
+check("a stranger cannot use the VP's link", "not authorized" in out)
+rc, out = py("approve.py", "--db", db2, "respond", tok(vp_card, "APPROVE"), "--as", "vp-finance@acmecorp.example", "--comment", "ok")
+check("VP approves INV-3001 via the signed link -> paid", "approved by vp-finance@acmecorp.example; paid" in out, out.strip())
+rc, out = py("approve.py", "--db", db2, "respond", tok(vp_card, "APPROVE"), "--as", "vp-finance@acmecorp.example")
+check("replaying the same link is refused", "refused" in out and "already approved" in out)
+rc, out = py("approve.py", "--db", db2, "respond", tok(bank_card, "APPROVE"), "--as", "ap-manager@acmecorp.example")
+check("changed bank account cannot be approved through (re-check blocks it)", "re-check failed" in out and "account" in out, out.strip()[:90])
+db3 = str(tmp / "clock.db")
+py("main.py", "--offline", "--db", db3, "--outbox", outbox + "5", "--invoice_path", "data/approvals_demo")
+rc, out = py("approve.py", "--db", db3, "tick", "--hours", "25")
+check("24h clock sends a reminder to each approver", out.count("reminder") == 2, out.strip().replace("\n", " | "))
+rc, out = py("approve.py", "--db", db3, "tick", "--hours", "50")
+check("48h clock escalates both unanswered requests up the chain", "VP Finance -> CFO" in out and "AP Manager -> VP Finance" in out, out.strip().replace("\n", " | "))
+rc, out = py("approve.py", "--db", db3, "tick", "--hours", "130")
+check("5-day clock expires them unpaid", out.count("expired unpaid") == 2, out.strip().replace("\n", " | "))
+rc, out = py("pay.py", "--db", db3, "status")
+check("nothing was paid for expired requests", out.strip() == "")
+
+# 6. treasury
+rc, out = py("pay.py", "--db", db2, "status")
+check("pay.py status: INV-3001 submitted via bank", "INV-3001" in out and "submitted" in out, out.strip().splitlines()[0][:100])
+rc, out = py("pay.py", "--db", db2, "reconcile", "--on", "2099-01-05")
+check("pay.py reconcile: settled, no issues", re.search(r"settled \d+, returned 0, still in flight 0", out) and "!" not in out, out.strip())
+rc, out = py("pay.py", "--db", db2, "account", "set", "Widgets Inc.", "acct-NEW9", "--by", "a@acmecorp.example")
+rc2, out2 = py("pay.py", "--db", db2, "account", "verify", "Widgets Inc.", "--by", "a@acmecorp.example")
+rc3, out3 = py("pay.py", "--db", db2, "account", "verify", "Widgets Inc.", "--by", "b@acmecorp.example")
+check("bank account change needs a second person", "NOT usable" in out and "refused" in out2 and "verified by b@acmecorp.example" in out3)
+
+# 7. other input channels
+rc, out = py("main.py", "--offline", "--db", str(tmp / "em.db"), "--outbox", outbox + "3", "--invoice_path", "data/emails")
+check("emails (attachments, body-only, e-invoice) processed without errors", rc == 0 and "Traceback" not in out and "FAILED" not in out, re.search(r"(\d+) document", out).group(0))
+rc, out = py("main.py", "--offline", "--db", str(tmp / "sc.db"), "--outbox", outbox + "4", "--invoice_path", "data/scanned")
+check("scanned PDFs: OCR'd and never auto-paid", rc == 0 and "PAID" not in out and "Traceback" not in out, "tesseract present")
+
+# 8. benchmarks and quality scripts
+rc, out = py("main.py", "--offline", "--bench", "2000")
+check("benchmark runs (serial/parallel/auto)", rc == 0 and "serial" in out and "parallel" in out and "Traceback" not in out)
+rc, out = py("scripts/measure_quality.py")
+check("measure_quality: 17/17 and 0 wrongly paid", "17/17" in out and "Wrongly paid            : 0" in out)
+rc, out = py("scripts/stress_extraction.py", "400", "7")
+check("stress: 0 approved with a wrong value", "silent wrong" not in out and "exact" in out, out.strip().splitlines()[0])
+rc, out = py("scripts/measure_llm_cost.py")
+check("LLM cost: same outcomes, far fewer calls", "Outcomes identical across all three: True" in out, [l for l in out.splitlines() if l.startswith("gated")][0].split())
+rc, out = py("main.py", "--help")
+check("--help works", rc == 0 and "--invoice_path" in out)
+rc, out = py("main.py", "--invoice_path", "no/such/path")
+check("bad path fails cleanly", rc != 0 and "does not exist" in out and "Traceback" not in out)
+
+bad = [n for n, ok in results if not ok]
+print(f"\n{len(results) - len(bad)}/{len(results)} checks passed" + (f"; FAILED: {bad}" if bad else ""))
+sys.exit(1 if bad else 0)
