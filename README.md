@@ -40,6 +40,7 @@ scorecard and a payments summary. Side effects go to files, never to the outside
 .venv/bin/python pay.py status                                         # treasury side: status, release, reconcile
 .venv/bin/python main.py --bench 20000                                 # CPU benchmark
 .venv/bin/python scripts/measure_quality.py                            # accuracy against the repo's labelled data
+.venv/bin/python scripts/stress_extraction.py 500                      # thousands of corrupted invoices: any approved with a wrong value?
 ```
 
 ## Where things live

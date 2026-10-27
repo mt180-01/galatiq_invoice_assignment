@@ -19,7 +19,7 @@ from ..agents import validation
 from ..erp import ErpAdapter
 from ..models import Invoice, Outcome, Severity
 from ..payments import default_payments
-from .routing import DIRECTORY, Route, route
+from .routing import DIRECTORY, Route, authorized, route
 from .tokens import TokenError, evidence_hash, make_token, read_token, utcnow
 
 REMINDER_AFTER = timedelta(hours=24)
@@ -146,6 +146,10 @@ class ApprovalService:
                 return Result(False, "refused: unknown request")
             if row["status"] != "pending":
                 return Result(False, f"refused: request already {row['status']}")
+            if who.strip().lower() not in authorized(row["role"], row["escalated_from"]):
+                self._event(rid, now, "refused", f"{who} is not authorized to decide for {row['role']}")
+                self._db.commit()
+                return Result(False, f"refused: {who} is not authorized to decide for {row['role']}")
             inv = Invoice.model_validate_json(row["invoice_json"])
             if evidence_hash(inv) != data["h"] or data["h"] != row["ev_hash"]:
                 self._event(rid, now, "refused", "invoice content changed since the request was issued")

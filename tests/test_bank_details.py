@@ -53,7 +53,7 @@ def test_changed_account_holds_the_invoice_for_a_person(tmp_path):
 def test_approver_cannot_click_through_a_changed_account(tmp_path):
     db, erp, svc, approvals = world(tmp_path)
     (o,) = run(erp, svc, approvals, CHANGED)
-    res = approvals.respond(approvals.tokens_for(o.approval_request)["approve"], "ap-manager@x")
+    res = approvals.respond(approvals.tokens_for(o.approval_request)["approve"], "ap-manager@acmecorp.example")
     assert not res.ok and "re-check failed" in res.message and not svc.bank.payments()
 
 

@@ -19,6 +19,18 @@ DIRECTORY = {
     "AP Manager":  {"email": "ap-manager@acmecorp.example",  "delegate": "VP Finance"},
 }
 
+def authorized(role: str, escalated_from: str | None = None) -> set[str]:
+    """Mailboxes allowed to decide a request: whoever it is with now, anyone senior to them (the delegate chain),
+    and the original owner if it was escalated. A forwarded or leaked token is useless to anyone else."""
+    allowed, current = set(), role
+    while current:
+        allowed.add(DIRECTORY[current]["email"])
+        current = DIRECTORY[current]["delegate"]
+    if escalated_from:
+        allowed.add(DIRECTORY[escalated_from]["email"])
+    return allowed
+
+
 # Which finding needs whose eyes (first match wins, in this order).
 _DOMAIN = [("fraud_indicators", "AP Manager"), ("bank_account_changed", "AP Manager"), ("pressure_language", "AP Manager"), ("extractor_disagreement", "AP Manager"),
            ("ocr_source", "AP Manager"), ("revision", "AP Manager"), ("foreign_currency", "Treasury"), ("unknown_vendor", "Procurement")]

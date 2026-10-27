@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 
 from .approvals import ApprovalService
+from .approvals.routing import DIRECTORY
 from .erp import MockNetSuite
 from .llm import make_llm
 from .models import Outcome
@@ -89,7 +90,7 @@ def auto_vp(args: argparse.Namespace, outcomes: list[Outcome]) -> list[str]:
     log = []
     for o in outcomes:
         if o.approval_request and o.awaiting == "VP Finance" and not any(f.severity.value == "hold" for f in o.findings):
-            res = svc.respond(svc.tokens_for(o.approval_request)["approve"], "simulated-vp", "demo auto-approval")
+            res = svc.respond(svc.tokens_for(o.approval_request)["approve"], DIRECTORY["VP Finance"]["email"], "demo auto-approval (simulated)")
             log.append(f"request #{o.approval_request} ({o.invoice.invoice_number}): {res.message}")
             if res.paid:
                 o.paid, o.payment_ref, o.payment_amount, o.awaiting = True, res.payment_ref, res.amount, None

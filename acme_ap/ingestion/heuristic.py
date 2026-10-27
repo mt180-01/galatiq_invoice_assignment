@@ -52,6 +52,22 @@ def _field(pattern: re.Pattern[str], text: str) -> str | None:
     return None
 
 
+def _invoice_number(text: str, warnings: list[str]) -> str | None:
+    """Several things on a page look like invoice numbers ("see also invoice 31337"). Prefer the canonical INV-... form,
+    then labelled ones; if the best candidates still disagree, say so rather than silently picking one."""
+    found = []
+    for m in _INV_NO.finditer(text):
+        label, token = text[m.start():m.start(1)], m.group(1)
+        found.append((2 if token.upper().startswith("INV") else 1 if re.search(r"[:#]|number|no\b", label, re.I) else 0, token))
+    if not found:
+        return None
+    best = max(score for score, _ in found)
+    tops = list(dict.fromkeys(normalize_invoice_number(tok) for score, tok in found if score == best))
+    if len(tops) > 1:
+        warnings.append(f"extractor disagreement (regex): several possible invoice numbers {', '.join(map(str, tops))}")
+    return next(tok for score, tok in found if score == best)
+
+
 def _clean_name(raw: str) -> tuple[str, str | None]:
     name, note = raw.strip(), None
     m = re.search(r"\s*\(([^)]*)\)\s*$", name)
@@ -108,9 +124,12 @@ def extract(text: str, fmt: str = "text") -> Invoice:
     if alias_note:
         notes = f"{notes + '; ' if notes else ''}{alias_note}"
     terms_raw = _first(_TERMS, text)
-    number = _first(_INV_NO, text)
+    number = _invoice_number(text, warnings)
     if number is None:
         warnings.append("invoice number not found")
+    totals = list(dict.fromkeys(_dec(m.group(1)) for m in _TOTAL.finditer(text)))
+    if len(totals) > 1:
+        warnings.append(f"extractor disagreement (regex): several different totals {', '.join(map(str, totals))}")
     return Invoice(
         invoice_number=normalize_invoice_number(number),
         vendor=vendor,

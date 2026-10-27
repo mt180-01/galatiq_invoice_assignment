@@ -77,15 +77,15 @@ def test_over_limit_invoice_waits_then_pays_exactly_once(env):
     assert o.status == "AWAITING" and o.awaiting == "VP Finance" and not o.paid
     assert payments(db) == 0                                   # nothing moves before a person decides
     tok = svc.tokens_for(o.approval_request)["approve"]
-    assert svc.respond(tok, "vp@x").paid and payments(db) == 1
-    again = svc.respond(tok, "vp@x")                           # double-click / replay
+    assert svc.respond(tok, "vp-finance@acmecorp.example").paid and payments(db) == 1
+    again = svc.respond(tok, "vp-finance@acmecorp.example")                           # double-click / replay
     assert not again.ok and "already approved" in again.message and payments(db) == 1
 
 
 def test_reject_pays_nothing_and_is_recorded(env):
     db, erp, svc = env
     (o,) = run(erp, svc, [DEMO])
-    res = svc.respond(svc.tokens_for(o.approval_request)["reject"], "vp@x", "wrong PO")
+    res = svc.respond(svc.tokens_for(o.approval_request)["reject"], "vp-finance@acmecorp.example", "wrong PO")
     assert res.ok and not res.paid and payments(db) == 0
     assert sqlite3.connect(db).execute("SELECT status FROM vendor_bills").fetchone()[0] == "rejected"
     assert any(e[1] == "rejected" for e in svc.events(o.approval_request))
@@ -99,7 +99,7 @@ def test_approve_is_refused_if_invoice_changed_after_request(env):
     inv = Invoice.model_validate_json(con.execute("SELECT invoice_json FROM approval_requests").fetchone()[0])
     inv.total = Decimal("99999")
     con.execute("UPDATE approval_requests SET invoice_json=?", (inv.model_dump_json(),)); con.commit()
-    res = svc.respond(tok, "vp@x")
+    res = svc.respond(tok, "vp-finance@acmecorp.example")
     assert not res.ok and "changed" in res.message and payments(db) == 0
 
 
@@ -107,7 +107,7 @@ def test_approval_is_rechecked_so_stale_stock_cannot_release_money(env):
     db, erp, svc = env
     (o,) = run(erp, svc, [DEMO])
     con = sqlite3.connect(db); con.execute("UPDATE inventory SET stock=0 WHERE item='WidgetA'"); con.commit()
-    res = svc.respond(svc.tokens_for(o.approval_request)["approve"], "vp@x")
+    res = svc.respond(svc.tokens_for(o.approval_request)["approve"], "vp-finance@acmecorp.example")
     assert not res.ok and "re-check failed" in res.message and payments(db) == 0
 
 
@@ -120,7 +120,7 @@ def test_reminder_escalation_and_expiry_never_pay(env):
     assert "escalated VP Finance -> CFO" in svc.tick(t0 + timedelta(hours=49))[0]
     assert "expired" in svc.tick(t0 + timedelta(days=6))[0]
     assert payments(db) == 0
-    res = svc.respond(svc.tokens_for(o.approval_request)["approve"], "cfo@x", now=t0 + timedelta(days=6))
+    res = svc.respond(svc.tokens_for(o.approval_request)["approve"], "cfo@acmecorp.example", now=t0 + timedelta(days=6))
     assert not res.ok  # token and request are both dead
 
 
@@ -146,3 +146,32 @@ def test_many_escalations_at_once_do_not_corrupt_each_other(tmp_path, env):
     assert not [o.error for o in outs if o.error]
     assert sorted(o.approval_request for o in outs) == list(range(1, 301))
     assert all(o.approval_card and o.awaiting == "VP Finance" for o in outs)
+
+
+def test_only_the_right_people_can_use_a_token(env):
+    db, erp, svc = env
+    (o,) = run(erp, svc, [DEMO])                                          # VP Finance request
+    tok = svc.tokens_for(o.approval_request)["approve"]
+    for stranger in ("attacker@evil.example", "procurement@acmecorp.example", "", "vp-finance@acmecorp.example.evil.com"):
+        res = svc.respond(tok, stranger)
+        assert not res.ok and "not authorized" in res.message, stranger
+    assert payments(db) == 0
+    assert svc.respond(tok, "  CFO@AcmeCorp.example ").paid                # a more senior person may decide, case/spacing ignored
+    assert any(e[1] == "refused" for e in svc.events(o.approval_request))   # and the attempts are on the audit trail
+
+
+def test_after_escalation_the_delegate_and_anyone_senior_may_decide(env):
+    db, erp, svc = env
+    (o,) = run(erp, svc, [DEMO])
+    t0 = utcnow()
+    svc.tick(t0 + timedelta(hours=50))                                    # VP Finance -> CFO
+    tok = svc.tokens_for(o.approval_request, t0)["approve"]
+    assert svc.respond(tok, "ceo@acmecorp.example", now=t0 + timedelta(hours=51)).paid
+
+
+def test_authorization_sets():
+    from acme_ap.approvals.routing import authorized
+    assert authorized("VP Finance") == {"vp-finance@acmecorp.example", "cfo@acmecorp.example", "ceo@acmecorp.example"}
+    assert "vp-finance@acmecorp.example" in authorized("CFO", "VP Finance")        # the original owner keeps the right
+    assert "vp-finance@acmecorp.example" not in authorized("CFO")
+    assert authorized("CEO") == {"ceo@acmecorp.example"}
