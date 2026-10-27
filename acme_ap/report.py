@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.table import Table
 
 from .erp import MockNetSuite
-from .metrics import kpis
+from .metrics import kpis, llm_usage
 from .models import Outcome
 from .payments import MockBank, PaymentService
 
@@ -77,6 +77,21 @@ def impact(outcomes: list[Outcome], waiting: list[dict]) -> None:
                       f"{oldest['next']} in {oldest['next_in_hours']:.0f}h  [dim](never silent: reminder 24h, escalation 48h, expiry 5d)[/]")
     else:
         console.print("  waiting on a person       : 0")
+
+
+def ai_usage(outcomes: list[Outcome], live: bool) -> None:
+    """What the model cost and what the agents saved by not asking it."""
+    u = llm_usage(outcomes)
+    if not live:
+        console.print("[bold]AI usage[/]  none: offline mode, every agent used its deterministic path (add XAI_API_KEY to use Grok)")
+        return
+    skipped = ", ".join(f"{a} {n}" for a, n in sorted(u["skipped"].items())) or "none"
+    would = u["calls"] + u["cached"] + sum(u["skipped"].values())
+    console.print("[bold]AI usage[/]")
+    console.print(f"  model calls : {u['calls']} made, {u['cached']} answered from cache, {sum(u['skipped'].values())} avoided by gates ({skipped})"
+                  f"  [dim](asking on every invoice would be about {would})[/]")
+    price = f"est. cost ${u['cost']:.4f}" if u["cost"] is not None else "set XAI_PRICE_IN / XAI_PRICE_OUT (USD per 1M tokens) to price it"
+    console.print(f"  tokens      : {u['tokens_in']:,} in / {u['tokens_out']:,} out; {price}")
 
 
 def scorecard(outcomes: list[Outcome]) -> None:

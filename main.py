@@ -20,7 +20,7 @@ from acme_ap.demo import demo
 from acme_ap.ingestion import SUPPORTED
 from acme_ap.intake import expand
 from acme_ap.llm import make_llm
-from acme_ap.report import console, impact, payment_summary, scorecard, show
+from acme_ap.report import ai_usage, console, impact, payment_summary, scorecard, show
 from acme_ap.runner import auto_vp, ledger_view, run_batch, write_cards, write_notices, write_outbox
 
 warnings.filterwarnings("ignore")
@@ -61,9 +61,23 @@ def make_bench_corpus(src: list[str], n: int, pdf_share: float) -> tuple[list[st
     return out, tmp
 
 
+def agents() -> None:
+    """`python main.py agents`: who does what, and when each may spend model tokens."""
+    from acme_ap.agents.team import CHARTERS
+
+    t = Table(title="The agent team", show_lines=True)
+    for col in ("Agent", "Job", "Tools", "May call the model", "Hands to"):
+        t.add_column(col, overflow="fold")
+    for c in CHARTERS:
+        t.add_row(f"[bold]{c.name}[/]", c.job, c.tools, c.model_use, c.hands_to)
+    console.print(t)
+
+
 def main() -> None:
     if len(sys.argv) > 1 and sys.argv[1] == "demo":
         return demo()
+    if len(sys.argv) > 1 and sys.argv[1] == "agents":
+        return agents()
     ap = argparse.ArgumentParser(description="Acme AP invoice automation")
     ap.add_argument("--invoice_path", default="data/invoices", help="invoice file or directory")
     ap.add_argument("--db", default="inventory.db")
@@ -73,6 +87,8 @@ def main() -> None:
     ap.add_argument("--auto-vp", action="store_true", help="DEMO: simulate a VP approving requests that are only over the amount limit")
     ap.add_argument("--outbox", default="outbox", help="where drafted vendor follow-up emails are written")
     ap.add_argument("--llm-concurrency", type=int, default=8)
+    ap.add_argument("--llm-policy", choices=("gated", "always"), default="gated",
+                    help="gated (default): ask the model only where it can change the result; always: ask on every invoice (costly)")
     ap.add_argument("--offline", action="store_true", help="ignore XAI_API_KEY and use the deterministic paths")
     ap.add_argument("--json", metavar="FILE", help="write full results as JSON")
     ap.add_argument("--bench", type=int, metavar="N", help="throughput benchmark over N generated documents, serial vs parallel")
@@ -122,6 +138,7 @@ def main() -> None:
     waiting, pay_rows = ledger_view(args.db)
     notices = write_notices(outcomes, Path(args.outbox), waiting, pay_rows)
     impact(outcomes, waiting)
+    ai_usage(outcomes, make_llm(args.offline).available)
     scorecard(outcomes)
     payment_summary(args.db)
     if cards:

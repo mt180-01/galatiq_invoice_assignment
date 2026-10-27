@@ -38,6 +38,8 @@ scorecard and a payments summary. Side effects go to files, never to the outside
 .venv/bin/python main.py --invoice_path=data/approvals_demo --auto-vp  # over-limit invoice, simulated VP approves
 .venv/bin/python approve.py list                                       # approver side: list, card, respond, tick
 .venv/bin/python pay.py status                                         # treasury side: status, release, reconcile
+.venv/bin/python main.py agents                                        # who does what, and when each may use the model
+.venv/bin/python scripts/measure_llm_cost.py                           # model calls and tokens: ask-everything vs the gated team
 .venv/bin/python main.py --bench 20000                                 # CPU benchmark
 .venv/bin/python scripts/measure_quality.py                            # accuracy against the repo's labelled data
 .venv/bin/python scripts/stress_extraction.py 500                      # thousands of corrupted invoices: any approved with a wrong value?
@@ -50,7 +52,8 @@ scorecard and a payments summary. Side effects go to files, never to the outside
 | `main.py` | Command line (`demo`, a batch, `--bench`) |
 | `acme_ap/runner.py`, `report.py`, `demo.py` | Run a batch and write the outbox; terminal tables; the guided demo |
 | `approve.py`, `pay.py` | Approver and treasury command lines (act on the database a run leaves behind) |
-| `acme_ap/pipeline.py` | The flow per invoice: ingest, deduplicate, validate, approve, pay; CPU/IO scheduling |
+| `acme_ap/agents/team.py` | The six agents and their charters (`python main.py agents`) |
+| `acme_ap/pipeline.py` | The flow per invoice through the agents: ingest, deduplicate, validate, review, pay; CPU/IO scheduling |
 | `acme_ap/ingestion/` | Turn any file into an `Invoice`: PDF/OCR, JSON/XML/UBL/CSV, regex and Grok extraction |
 | `acme_ap/agents/` | `validation` (checks and findings) and `approval` (policy plus Grok draft/critique loop) |
 | `acme_ap/approvals/` | Routing by amount and reason, signed one-click tokens, reminders, escalation, expiry |

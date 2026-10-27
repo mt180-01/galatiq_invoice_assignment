@@ -9,7 +9,7 @@ import json
 import logging
 from decimal import Decimal
 
-from ..llm import LLM, LLMUnavailable
+from ..llm import LLM, LLMUnavailable, as_agent
 from ..models import Approval, Decision, Finding, Invoice, Severity
 from .validation import APPROVAL_THRESHOLD
 
@@ -49,20 +49,41 @@ def critique(inv: Invoice, findings: list[Finding], draft: Approval) -> list[str
     return issues
 
 
-async def decide(inv: Invoice, findings: list[Finding], llm: LLM) -> Approval:
+def second_opinion_worth_paying_for(inv: Invoice, findings: list[Finding], floor: Approval) -> bool:
+    """The model can only make a decision stricter, so it can matter in exactly one case: policy would approve.
+    Even then, a small, clean invoice read from a structured file has nothing a second opinion could catch."""
+    if floor.decision is not Decision.APPROVE:
+        return False  # already rejected or with a person: nothing to tighten, and a person will look anyway
+    return (any(f.severity is Severity.WARN for f in findings) or (inv.total or Decimal(0)) >= APPROVAL_THRESHOLD / 2
+            or inv.lane == "ai-extracted" or bool(inv.parse_warnings))
+
+
+async def decide(inv: Invoice, findings: list[Finding], llm: LLM, gate: bool = False) -> Approval:
+    """gate=True spends model calls only where they can change the outcome (see second_opinion_worth_paying_for), and
+    runs the critic only when the draft departs from policy: one call for the common case, three at most."""
     floor = policy_decision(inv, findings)
     draft = floor
     critiques: list[str] = []
-    if llm.available:
+    if llm.available and gate and not second_opinion_worth_paying_for(inv, findings, floor):
+        if llm.meter:
+            llm.meter.skip("reviewer")
+            llm.meter.skip("critic")
+    elif llm.available:
         try:
-            draft = await _llm_draft(inv, findings, llm, None) or floor
+            with as_agent("reviewer"):
+                draft = await _llm_draft(inv, findings, llm, None) or floor
             for _ in range(MAX_ROUNDS - 1):
                 issues = critique(inv, findings, draft)
-                issues += await _llm_critic(inv, findings, draft, llm)
+                if not (gate and not issues and draft.decision == floor.decision):  # agreeing with policy needs no challenger
+                    with as_agent("critic"):
+                        issues += await _llm_critic(inv, findings, draft, llm)
+                elif llm.meter:
+                    llm.meter.skip("critic")
                 if not issues:
                     break
                 critiques.extend(issues)
-                draft = await _llm_draft(inv, findings, llm, issues) or floor
+                with as_agent("reviewer"):
+                    draft = await _llm_draft(inv, findings, llm, issues) or floor
         except LLMUnavailable as exc:
             log.warning("approval LLM unavailable, using policy engine: %s", exc)
             draft = floor
@@ -77,12 +98,13 @@ async def decide(inv: Invoice, findings: list[Finding], llm: LLM) -> Approval:
 
 
 def _brief(inv: Invoice, findings: list[Finding]) -> str:
+    """The least the model needs: no free text from the invoice beyond names, findings as code + message."""
     return json.dumps({
         "invoice": {"number": inv.invoice_number, "vendor": inv.vendor, "total": str(inv.total), "currency": inv.currency,
                     "items": [(li.item, li.quantity) for li in inv.line_items]},
-        "findings": [f.model_dump(mode="json") for f in findings],
+        "findings": [[f.severity.value, f.code, f.message] for f in findings],
         "policy": f"auto-approve <= {APPROVAL_THRESHOLD} USD when clean; any error -> reject; any hold -> escalate to human",
-    })
+    }, separators=(",", ":"))
 
 
 async def _llm_draft(inv, findings, llm: LLM, issues: list[str] | None) -> Approval | None:
@@ -100,6 +122,6 @@ async def _llm_critic(inv, findings, draft: Approval, llm: LLM) -> list[str]:
     data = await llm.chat_json(
         "You are an internal auditor challenging an AP approval. Find policy violations or unsupported reasoning. "
         'JSON: {"issues": ["..."]} (empty list if the decision is sound).',
-        _brief(inv, findings) + f"\nDecision under review: {draft.model_dump(mode='json')}")
+        _brief(inv, findings) + f"\nDecision under review: {draft.decision.value}: {draft.reasoning}")
     issues = data.get("issues", [])
     return [str(i) for i in issues] if isinstance(issues, list) else []

@@ -17,12 +17,11 @@ import time
 from concurrent.futures import ProcessPoolExecutor
 from decimal import Decimal
 
-from .agents import approval, validation
+from .agents.team import CommsAgent, DeskAgent, IntakeAgent, PaymentAgent, ReviewerAgent, ValidationAgent, step
 from .erp import ErpAdapter
-from .ingestion import llm_extract, parse_file
+from .ingestion import parse_file
 from .intake import Origin
-from .llm import LLM
-from .outreach import draft_followup
+from .llm import LLM, invoice_ledger
 from .payments import default_payments
 from .models import Approval, Decision, Finding, Invoice, Outcome, Severity
 
@@ -55,12 +54,16 @@ def bill_key(inv: Invoice) -> str:
 
 class Pipeline:
     def __init__(self, erp: ErpAdapter, llm: LLM, workers: int | None = None, llm_concurrency: int = 8,
-                 origins: dict[str, Origin] | None = None, approvals=None, payments=None, bank_concurrency: int = 8):
+                 origins: dict[str, Origin] | None = None, approvals=None, payments=None, bank_concurrency: int = 8,
+                 llm_policy: str = "gated"):
         self.erp, self.llm = erp, llm
         self.origins = origins or {}
         self.approvals = approvals
         self.payments = payments or getattr(approvals, "payments", None) or default_payments(erp)
-        self.bank_sem = asyncio.Semaphore(bank_concurrency)
+        gated = llm_policy == "gated"  # "always" = ask the model on every invoice (the pre-optimisation behaviour, kept for comparison)
+        self.intake, self.validator = IntakeAgent(llm, gated), ValidationAgent(erp, self.payments)
+        self.reviewer, self.desk = ReviewerAgent(llm, gated), DeskAgent(approvals)
+        self.payer, self.comms = PaymentAgent(self.payments, bank_concurrency), CommsAgent()
         self.workers = workers if workers is not None else (os.cpu_count() or 1)
         self.llm_sem = asyncio.Semaphore(llm_concurrency)
 
@@ -110,6 +113,8 @@ class Pipeline:
             out.timings_ms[stage] = round((now - t) * 1000, 2)
             t = now
 
+        ledger: list = []
+        invoice_ledger.set(ledger)  # this task's model use, summed into out.llm at the end
         try:
             kind, payload = (await parse_future)[idx]
             if kind == "err":
@@ -118,10 +123,10 @@ class Pipeline:
                 return out
             inv, text = payload
             lap("parse")
-            if self.llm.available and inv.channel == "unstructured":
+            async with step(out, "Intake", f"read {inv.source_format or 'document'} via {inv.extractor}"):
                 async with self.llm_sem:
-                    inv = await llm_extract.extract(text, inv, self.llm)
-                lap("llm_extract")
+                    inv = await self.intake.refine(inv, text)
+            lap("llm_extract")
             out.invoice = inv
             log.info("ingested", extra={"trace": trace, "stage": "ingest",
                                         "detail": f"{inv.invoice_number} via {inv.extractor} ({inv.channel} lane)"})
@@ -135,36 +140,39 @@ class Pipeline:
                 return out
 
             # Local ERP reads take microseconds; a real (network) ERP adapter would be awaited here instead.
-            out.findings = validation.validate(inv, self.erp, self.payments)
+            async with step(out, "Validation", "checked against ERP and policy"):
+                out.findings = self.validator.check(inv)
             lap("validate")
             for f in out.findings:
                 log.info("finding", extra={"trace": trace, "stage": "validate", "detail": f"{f.severity.value}:{f.code} {f.message}"})
 
-            async with self.llm_sem:
-                out.approval = await approval.decide(inv, out.findings, self.llm)
+            async with step(out, "Reviewer", "decided"):
+                async with self.llm_sem:
+                    out.approval = await self.reviewer.decide(inv, out.findings)
             lap("approve")
             log.info("decision", extra={"trace": trace, "stage": "approve",
                                         "detail": f"{out.approval.decision.value} after {out.approval.rounds} round(s)"})
 
             payment_row, pay_status = None, None
             if out.approval.decision is Decision.APPROVE:
-                async with self.bank_sem:  # banks rate-limit; many submissions still overlap
-                    res = await asyncio.to_thread(self.payments.pay, inv, key)
+                async with step(out, "Payment", "scheduled / sent"):
+                    res = await self.payer.pay(inv, key)
                 out.payment_state, out.release_on, pay_status = res.state, res.release_on, res.erp_status
                 if res.submitted:
                     out.paid, out.payment_ref, out.payment_amount = True, res.ref, res.amount
                     payment_row = (inv.vendor or "", res.amount, res.ref)
             request = None
             if out.approval.decision is Decision.ESCALATE and self.approvals is not None:
-                request = await asyncio.to_thread(self.approvals.open_request, out, key)
-                if request:
-                    out.approval_request, out.awaiting = request[0], request[1].role
-                    out.approval_card = await asyncio.to_thread(self.approvals.render_card, request[0])
+                async with step(out, "Desk", "routed to a person"):
+                    request = await self.desk.request(out, key)
             status = pay_status or ("pending_approval" if request else out.approval.decision.value)
             await asyncio.to_thread(self.erp.settle_bill, key, status, out.approval.reasoning, payment_row)
             lap("settle")
-            out.followup = draft_followup(out)
+            out.followup = self.comms.followup(out)
         except Exception as exc:  # noqa: BLE001 - one bad invoice never stops the batch
             out.error = f"{type(exc).__name__}: {exc}"
             log.exception("unhandled error", extra={"trace": trace, "stage": "pipeline", "detail": out.error})
+        out.llm = {"calls": sum(e[0] == "call" for e in ledger), "cached": sum(e[0] == "cached" for e in ledger),
+                   "skipped": [e[1] for e in ledger if e[0] == "skip"],
+                   "tokens_in": sum(e[2] for e in ledger), "tokens_out": sum(e[3] for e in ledger)} if ledger else {}
         return out

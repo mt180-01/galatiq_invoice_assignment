@@ -82,6 +82,8 @@ class Outcome(BaseModel):
     release_on: str | None = None
     error: str | None = None
     timings_ms: dict[str, float] = Field(default_factory=dict)
+    trace: list[dict] = Field(default_factory=list)   # which agent did what, in order
+    llm: dict = Field(default_factory=dict)           # model use for this invoice: calls, tokens, calls avoided
     sender: str | None = None
     subject: str | None = None
     followup: str | None = None  # drafted vendor question (never sent automatically)

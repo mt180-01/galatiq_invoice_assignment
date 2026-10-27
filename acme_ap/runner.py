@@ -20,13 +20,14 @@ async def run_batch(paths: list[str], args: argparse.Namespace, workers: int | N
     erp = MockNetSuite(args.db, keep_ledger=args.keep_ledger)
     payments = PaymentService(args.db, erp, MockBank(args.db + ".bank", reset=not args.keep_ledger), reset=not args.keep_ledger)
     approvals = ApprovalService(args.db, erp, reset=not args.keep_ledger, payments=payments)
-    llm = make_llm(args.offline)
+    llm = make_llm(args.offline, cache_path=None if args.offline else args.db + ".llmcache")
     before = resource.getrusage(resource.RUSAGE_SELF).ru_utime + resource.getrusage(resource.RUSAGE_SELF).ru_stime
     k = resource.getrusage(resource.RUSAGE_CHILDREN)
     kids_before = k.ru_utime + k.ru_stime
     t0 = time.perf_counter()
     outcomes = await Pipeline(erp, llm, workers=workers, llm_concurrency=args.llm_concurrency, origins=origins,
-                                approvals=approvals, payments=payments).run(paths)
+                                approvals=approvals, payments=payments,
+                              llm_policy=getattr(args, "llm_policy", "gated")).run(paths)
     wall = time.perf_counter() - t0
     own = resource.getrusage(resource.RUSAGE_SELF)
     kids = resource.getrusage(resource.RUSAGE_CHILDREN)

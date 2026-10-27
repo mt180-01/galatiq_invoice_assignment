@@ -2,6 +2,7 @@
 before it reached the bank and why, how long things spent in the system, and what is waiting on a person."""
 from __future__ import annotations
 
+import os
 import statistics
 from collections import Counter
 from dataclasses import dataclass, field
@@ -24,6 +25,21 @@ class Kpis:
     @property
     def hands_off_rate(self) -> float:
         return self.hands_off / self.invoices if self.invoices else 0.0
+
+
+def llm_usage(outcomes: list[Outcome]) -> dict:
+    """Model use across a batch, from the per-invoice records: what was called, cached, and deliberately not called."""
+    use = {"calls": 0, "cached": 0, "tokens_in": 0, "tokens_out": 0, "skipped": Counter(), "cost": None}
+    for o in outcomes:
+        for k in ("calls", "cached", "tokens_in", "tokens_out"):
+            use[k] += o.llm.get(k, 0)
+        use["skipped"].update(o.llm.get("skipped", []))
+    try:
+        p_in, p_out = float(os.environ["XAI_PRICE_IN"]), float(os.environ["XAI_PRICE_OUT"])
+        use["cost"] = (use["tokens_in"] * p_in + use["tokens_out"] * p_out) / 1_000_000
+    except (KeyError, ValueError):
+        pass
+    return use
 
 
 def kpis(outcomes: list[Outcome]) -> Kpis:

@@ -6,3 +6,4 @@ inventory.db*
 runs/
 .env
 outbox/
+*.llmcache

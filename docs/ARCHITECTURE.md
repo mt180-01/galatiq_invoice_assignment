@@ -211,6 +211,49 @@ Limits of this evidence: the generator and the extractor have the same author, s
 the model-facing tests use scripted models, not live Grok; authorization is by mailbox name, and a real deployment needs the identity provider
 (SSO) behind it, since anyone who can send mail as `vp-finance@...` is still that person here.
 
+## 4f. The agent team and what each one costs
+
+`python main.py agents` prints this roster; the code is `acme_ap/agents/team.py`. Every invoice carries a trace of who did what (`--json`).
+
+```
+document ─> INTAKE ─> VALIDATION ─> REVIEWER ──approve──> PAYMENT ─> COMMS
+ (any format)  │            │            │  └─escalate──> DESK (a person decides) ─approve─> PAYMENT
+               │            │            └──reject──────────────────────────────────────────> COMMS (one vendor question, if fixable)
+          model only    no model     model only where it can matter
+          in doubt
+```
+
+| Agent | One job | Why it is its own agent | May spend model tokens? |
+|---|---|---|---|
+| **Intake** | Any document to a structured Invoice | The only agent that must understand messy language; everything else works on structured data | Only when the regex reading is incomplete, inconsistent or carries warnings |
+| **Validation** | Check against ERP and policy | Exact, auditable rules; a model would add cost and doubt | Never |
+| **Reviewer** | Approve / escalate / reject, with a model draft and a challenger | The only judgement call; policy sets the floor, the model may only be stricter | Only if policy would approve **and** there is a reason for a second opinion (a warning, half the sign-off limit, or an AI-read document); the challenger only if the draft departs from policy |
+| **Desk** | Get a human decision when one is required | Owns the human-in-the-loop clock: routing, signed one-click cards, reminders, escalation, expiry | Never |
+| **Payment** | Schedule, check the payee account, send idempotently, reconcile | Money moves by rules only | Never |
+| **Comms** | Vendor question, remittance notice, AP digest | Facts to templates; no creativity wanted near money | Never |
+
+**Token and cost controls** (all in `acme_ap/llm.py` and the two gates):
+1. *Don't ask when the answer can't change.* A reject, or anything already with a person, never goes to the model (it can only tighten, and a person will look). A clean, small, structured invoice gets no second opinion.
+2. *Ask once, challenge only on disagreement.* One draft when the model agrees with policy; the challenger runs only when it departs.
+3. *Intake asks only in doubt.* A complete, arithmetically consistent regex reading is used as is (which also removes the prompt-injection surface for those documents).
+4. *Shorter prompts.* Invoice text is compacted (padding, rule lines, blank runs removed, capped at 6,000 characters); findings are sent as short tuples; replies are capped per agent.
+5. *Cache.* An identical request is answered from a local cache (`<db>.llmcache`; it holds invoice text, so keep it private).
+6. *Model per agent.* `XAI_MODEL_INTAKE`, `XAI_MODEL_REVIEWER`, `XAI_MODEL_CRITIC` select a cheaper model for the easier jobs.
+7. *Metering.* Every call is billed to an agent; the run prints calls made, cached, avoided and tokens. Set `XAI_PRICE_IN` / `XAI_PRICE_OUT` (USD per million tokens) to see money; no tariff is assumed.
+
+**Measured** with `python scripts/measure_llm_cost.py` on the 22 sample documents, through a stand-in Grok that answers correctly:
+
+| Policy | Model calls | Tokens (in + out) |
+|---|---|---|
+| Ask about everything, raw prompts (the original behaviour) | 51 | 11,251 |
+| Same calls, compact prompts | 51 | 10,964 (-3%) |
+| **Gated (default)** | **7** | **1,621 (-86%)** |
+
+Outcomes are identical in all three. **Read this fairly:** the stub never errs, so it shows how much the system *asks*, not how a real model answers; the
+sample is small and mostly clean or structured, so a mailbox full of messy scans will gate less; and the compaction saving is small here because the
+sample invoices are short. The calls avoided are the structural saving; the token figure is a volume, to be priced at your own rates. Live Grok has
+not been run.
+
 ## 5. Known limitations
 - Duplicate detection is by (vendor, invoice number, revision); which of two identical copies is called the duplicate depends on timing.
 - Stock is checked per invoice and not decremented, so results do not depend on processing order.
