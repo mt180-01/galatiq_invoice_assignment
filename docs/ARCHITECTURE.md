@@ -101,4 +101,5 @@ With `XAI_API_KEY` unset (or `--offline`) the agents run deterministically; the 
 - A revised invoice (`revision` set) is always escalated to a human; there is no delta-payment logic.
 - Non-USD invoices are escalated; there is no FX handling.
 - Item matching tolerates small typos but not larger ones; `WidgetC` correctly stays unknown.
-- Email intake reads `.eml` files; there is no live mailbox connection (IMAP/Graph), no sending, no reply parsing, and no OCR for scanned images.\n- No authentication or real NetSuite connectivity.
+- Email intake reads `.eml` files; there is no live mailbox connection (IMAP/Graph), no sending, no reply parsing, and no OCR for scanned images.
+- No authentication or real NetSuite connectivity.
