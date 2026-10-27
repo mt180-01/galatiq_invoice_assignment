@@ -211,6 +211,21 @@ Limits of this evidence: the generator and the extractor have the same author, s
 the model-facing tests use scripted models, not live Grok; authorization is by mailbox name, and a real deployment needs the identity provider
 (SSO) behind it, since anyone who can send mail as `vp-finance@...` is still that person here.
 
+## 4g. Checked against the brief's four stages
+
+`tests/test_brief.py` checks each stage on the provided invoices:
+
+| Stage | Required | Where it is, and the evidence |
+|---|---|---|
+| Ingestion | Vendor, amount, items with quantities, due date from PDFs and text; typos, missing data, fraud | `acme_ap/ingestion/`; extracted from `.txt`, `.pdf`, `.json`, `.csv`, `.xml`; typo-laden `invoice_1010`, missing vendor and negative quantities in `1009`, pressure language and a zero-stock item in `1003` are flagged, not guessed |
+| Validation | Check against a SQLite inventory; flag quantity over stock and unknown items | `inventory` table in SQLite; `insufficient_stock`, `out_of_stock`, `unknown_item` findings with the numbers ("GadgetX: 20 billed but only 5 in stock") |
+| Approval | Rule-based VP review, extra scrutiny over $10K, reasoning with a reflection/critique loop | Over $10,000 always needs a person. The reviewer drafts a quick read, a critic checks it against all the evidence, and the draft is revised: for `INV-1004-R1` and `INV-1014` the first read said approve, the critic objected ("approval conflicts with blocking findings"), the final answer is escalate (`rounds=2`). The loop is deterministic and free; Grok adds a gated second opinion on top. |
+| Payment | Mock payment if approved; log rejections with reasoning | `mock_payment(vendor, amount)` is called by the simulated bank only for approved invoices (a test spies on it); rejections are written to the audit log and the structured log with their reasons |
+
+**Honest note on the reflection loop.** Until this check it was only exercised with a live model, and my cost gating made that rarer, so offline every invoice
+showed `rounds=1`. It now always runs; the *final decisions did not change* (all 17 sample outcomes are identical), what changed is that the draft-critique-revise
+trail is recorded and shown. The "first read" is deliberately simpler than the full policy, so the loop is real work, but it is rule-based, not reasoning by a model.
+
 ## 4f. The agent team and what each one costs
 
 `python main.py agents` prints this roster; the code is `acme_ap/agents/team.py`. Every invoice carries a trace of who did what (`--json`).

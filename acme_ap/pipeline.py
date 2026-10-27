@@ -151,7 +151,7 @@ class Pipeline:
                     out.approval = await self.reviewer.decide(inv, out.findings)
             lap("approve")
             log.info("decision", extra={"trace": trace, "stage": "approve",
-                                        "detail": f"{out.approval.decision.value} after {out.approval.rounds} round(s)"})
+                                        "detail": f"{out.approval.decision.value} after {out.approval.rounds} round(s): {out.approval.reasoning}"})
 
             payment_row, pay_status = None, None
             if out.approval.decision is Decision.APPROVE:

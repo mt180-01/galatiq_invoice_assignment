@@ -27,6 +27,8 @@ def show(outcomes: list[Outcome]) -> None:
         why = o.error or (o.approval.reasoning if o.approval else "")
         if o.awaiting:
             why = f"-> {o.awaiting} (request #{o.approval_request}). {why}"
+        if o.approval and o.approval.rounds > 1:
+            why += f" [draft revised after critique: {o.approval.critiques[0]}]"
         table.add_row(Path(o.source_path).parent.name + "/body" if Path(o.source_path).name == "body.txt" else os.path.basename(o.source_path),
                       (inv.vendor if inv else "-") or "-", f"{inv.currency} {inv.total}" if inv and inv.total is not None else "-",
                       f"[{STYLE.get(o.status, 'white')}]{o.status}[/]", why[:110] + ("…" if len(why) > 110 else ""))

@@ -36,6 +36,17 @@ def policy_decision(inv: Invoice, findings: list[Finding]) -> Approval:
     return Approval(decision=Decision.APPROVE, reasoning="Within auto-approval limit; all checks passed" + note)
 
 
+def first_pass(inv: Invoice, findings: list[Finding]) -> Approval:
+    """The VP's first read: any outright error, and how big is it? It deliberately does not weigh holds, warnings or
+    risk signals; that is the critic's job, and what makes the review a two-step reflection rather than one rule."""
+    errors = [f for f in findings if f.severity is Severity.ERROR]
+    if errors:
+        return Approval(decision=Decision.REJECT, reasoning="Rejected: " + "; ".join(f.message for f in errors))
+    if (inv.total or Decimal(0)) > APPROVAL_THRESHOLD:
+        return Approval(decision=Decision.ESCALATE, reasoning=f"Over {APPROVAL_THRESHOLD}: needs sign-off")
+    return Approval(decision=Decision.APPROVE, reasoning="No errors and within the auto-approval limit")
+
+
 def critique(inv: Invoice, findings: list[Finding], draft: Approval) -> list[str]:
     """Independent rule-based critic: re-derives the strictest defensible decision from the evidence."""
     floor = policy_decision(inv, findings)
@@ -62,7 +73,7 @@ async def decide(inv: Invoice, findings: list[Finding], llm: LLM, gate: bool = F
     """gate=True spends model calls only where they can change the outcome (see second_opinion_worth_paying_for), and
     runs the critic only when the draft departs from policy: one call for the common case, three at most."""
     floor = policy_decision(inv, findings)
-    draft = floor
+    draft = first_pass(inv, findings)  # a quick read of the headlines; the critique below checks it against everything
     critiques: list[str] = []
     if llm.available and gate and not second_opinion_worth_paying_for(inv, findings, floor):
         if llm.meter:
@@ -87,13 +98,21 @@ async def decide(inv: Invoice, findings: list[Finding], llm: LLM, gate: bool = F
         except LLMUnavailable as exc:
             log.warning("approval LLM unavailable, using policy engine: %s", exc)
             draft = floor
-    # Final guardrail: never looser than policy.
-    final_issues = critique(inv, findings, draft)
-    if final_issues:
-        critiques.extend(final_issues)
-        draft = floor
+    # Reflection, always on and free: the draft is challenged against the complete evidence, and revised until the
+    # challenger has nothing left to object to (never looser than policy).
+    revisions = 0
+    for _ in range(MAX_ROUNDS):
+        issues = critique(inv, findings, draft)
+        if not issues:
+            break
+        critiques.extend(issues)
+        revisions += 1
+        draft = Approval(decision=floor.decision, reasoning=floor.reasoning)
+        log.info("draft revised after critique: %s", "; ".join(issues))
+    if draft.decision == floor.decision and not llm.available:
+        draft.reasoning = floor.reasoning  # the full-evidence wording (warnings noted, limits cited), not the quick read's
     draft.critiques = critiques
-    draft.rounds = 1 + len(critiques) if critiques else 1
+    draft.rounds = 1 + revisions
     return draft
 
 

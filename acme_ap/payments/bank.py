@@ -17,6 +17,8 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Protocol
 
+from .mock import mock_payment
+
 SETTLE_DAYS = {"ach": 2, "wire": 0}  # business-day effects ignored in the mock
 
 
@@ -86,6 +88,8 @@ class MockBank:
                 return existing  # idempotent replay: same payment, no second transfer
             if account in self.reject_accounts:
                 raise BankRejected("account closed")
+            if mock_payment(vendor, amount).get("status") != "success":
+                raise BankRejected("bank declined the payment")
             ref = f"{rail.upper()}-{hashlib.sha1(idem.encode()).hexdigest()[:10].upper()}"
             settles = on + timedelta(days=SETTLE_DAYS[rail])
             self._db.execute("INSERT INTO bank_payments VALUES (?,?,?,?,?,?,?,?,?)",
