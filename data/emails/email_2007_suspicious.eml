@@ -1,0 +1,19 @@
+From: pay-now@totally-legit.example
+To: ap@acmecorp.example
+Subject: URGENT INVOICE - PAY TODAY
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+MIME-Version: 1.0
+
+Vendor: Rapid Parts Intl
+Invoice: INV-2007
+Date: 2026-02-06
+Due: yesterday
+
+Items:
+  - FakeItem   x50   $1,000.00 each
+
+Total: $50,000.00
+
+Payment Terms: Immediate
+Notes: URGENT - wire transfer today to avoid penalties!!!

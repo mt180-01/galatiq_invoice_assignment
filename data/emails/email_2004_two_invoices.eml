@@ -1,0 +1,36 @@
+From: billing@precisionparts.example
+To: ap@acmecorp.example
+Subject: Two invoices
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="===============1556607028992908643=="
+
+--===============1556607028992908643==
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+
+Attached: this month's invoices.
+
+--===============1556607028992908643==
+Content-Type: text/csv
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="INV-2004.csv"
+MIME-Version: 1.0
+
+ZmllbGQsdmFsdWUKaW52b2ljZV9udW1iZXIsSU5WLTIwMDQKdmVuZG9yLFByZWNpc2lvbiBQYXJ0
+cyBMdGQuCmRhdGUsMjAyNi0wMi0wNQpkdWVfZGF0ZSwyMDI2LTAzLTA3Cml0ZW0sV2lkZ2V0QQpx
+dWFudGl0eSwyCnVuaXRfcHJpY2UsMjUwLjAwCnN1YnRvdGFsLDUwMC4wMAp0YXgsMC4wMAp0b3Rh
+bCw1MDAuMDAKcGF5bWVudF90ZXJtcyxOZXQgMzAK
+
+--===============1556607028992908643==
+Content-Type: application/json
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="INV-2005.json"
+MIME-Version: 1.0
+
+eyJpbnZvaWNlX251bWJlciI6IklOVi0yMDA1IiwidmVuZG9yIjp7Im5hbWUiOiJQcmVjaXNpb24g
+UGFydHMgTHRkLiJ9LCJkYXRlIjoiMjAyNi0wMi0wNSIsImR1ZV9kYXRlIjoiMjAyNi0wMy0wNyIs
+ImxpbmVfaXRlbXMiOlt7Iml0ZW0iOiJXaWRnZXRCIiwicXVhbnRpdHkiOjEsInVuaXRfcHJpY2Ui
+OjUwMC4wMH1dLCJzdWJ0b3RhbCI6NTAwLjAwLCJ0YXhfYW1vdW50IjowLCJ0b3RhbCI6NTAwLjAw
+LCJjdXJyZW5jeSI6IlVTRCIsInBheW1lbnRfdGVybXMiOiJOZXQgMzAifQ==
+
+--===============1556607028992908643==--

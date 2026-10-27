@@ -5,3 +5,4 @@ __pycache__/
 inventory.db*
 runs/
 .env
+outbox/

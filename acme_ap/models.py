@@ -36,6 +36,13 @@ class Invoice(BaseModel):
     extractor: str = ""
     parse_warnings: list[str] = Field(default_factory=list)
 
+    @property
+    def lane(self) -> str:
+        """How much work the vendor's format left to us: 'structured' < 'embedded' < 'ai-extracted'."""
+        if self.extractor.startswith("embedded"):
+            return "embedded"
+        return "structured" if self.channel == "structured" else "ai-extracted"
+
 
 class Severity(str, Enum):
     ERROR = "error"  # blocks payment
@@ -71,6 +78,9 @@ class Outcome(BaseModel):
     payment_ref: str | None = None
     error: str | None = None
     timings_ms: dict[str, float] = Field(default_factory=dict)
+    sender: str | None = None
+    subject: str | None = None
+    followup: str | None = None  # drafted vendor question (never sent automatically)
 
     @property
     def status(self) -> str:

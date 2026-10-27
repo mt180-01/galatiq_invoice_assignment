@@ -8,7 +8,7 @@ from __future__ import annotations
 import csv
 import io
 import json
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET  # vendor-supplied XML is untrusted: blocks entity bombs / XXE
 from decimal import Decimal
 
 from ..models import Invoice, LineItem
@@ -66,8 +66,30 @@ def from_json(text: str) -> Invoice:
     )
 
 
+def _local(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1]
+
+
+def _text(node, *path: str) -> str | None:
+    """Namespace-agnostic descendant lookup by local tag names, e.g. _text(root, 'Party', 'Name')."""
+    for name in path:
+        if node is None:
+            return None
+        node = next((c for c in node.iter() if c is not node and _local(c.tag) == name), None)
+    return _clean(node.text) if node is not None else None
+
+
+def _iter(node, name: str):
+    return [c for c in node.iter() if _local(c.tag) == name]
+
+
 def from_xml(text: str) -> Invoice:
-    root = ET.fromstring(text)
+    root = ET.fromstring(text.encode() if isinstance(text, str) else text)
+    kind = _local(root.tag)
+    if kind == "Invoice":
+        return _from_ubl(root)
+    if kind == "CrossIndustryInvoice":
+        return _from_cii(root)
     warnings: list[str] = []
 
     def find(path: str) -> str | None:
@@ -179,3 +201,48 @@ def _csv_tabular(rows: list[list[str]], warnings: list[str]) -> Invoice:
         total=parse_money(footer.get("total")),
         channel="structured", extractor="csv", parse_warnings=warnings,
     )
+
+
+def _from_ubl(root) -> Invoice:
+    """UBL 2.1 Invoice (PEPPOL BIS 3.0 / most national e-invoice formats)."""
+    warnings: list[str] = []
+    supplier = next(iter(_iter(root, "AccountingSupplierParty")), None)
+    items = []
+    for line in _iter(root, "InvoiceLine"):
+        price = _text(line, "Price", "PriceAmount")
+        items.append(LineItem(
+            item=_text(line, "Item", "Name") or "",
+            quantity=_qty(_text(line, "InvoicedQuantity"), warnings),
+            unit_price=parse_money(price), amount=parse_money(_text(line, "LineExtensionAmount"))))
+    return Invoice(
+        invoice_number=normalize_invoice_number(next((c.text for c in root if _local(c.tag) == "ID"), None)),
+        vendor=_text(supplier, "PartyName", "Name") or _text(supplier, "RegistrationName"),
+        date=parse_date(_text(root, "IssueDate")), due_date=parse_date(_text(root, "DueDate")),
+        currency=_text(root, "DocumentCurrencyCode") or "USD", line_items=items,
+        subtotal=parse_money(_text(root, "TaxExclusiveAmount")), tax_amount=parse_money(_text(root, "TaxTotal", "TaxAmount")),
+        total=parse_money(_text(root, "PayableAmount")), payment_terms=_text(root, "PaymentTerms", "Note"),
+        channel="structured", extractor="ubl", parse_warnings=warnings)
+
+
+def _cii_date(raw: str | None) -> str | None:
+    return f"{raw[:4]}-{raw[4:6]}-{raw[6:8]}" if raw and len(raw) >= 8 and raw[:8].isdigit() else parse_date(raw)
+
+
+def _from_cii(root) -> Invoice:
+    """UN/CEFACT Cross-Industry Invoice (what Factur-X / ZUGFeRD PDFs embed)."""
+    warnings: list[str] = []
+    items = [LineItem(
+        item=_text(line, "SpecifiedTradeProduct", "Name") or "",
+        quantity=_qty(_text(line, "BilledQuantity"), warnings),
+        unit_price=parse_money(_text(line, "NetPriceProductTradePrice", "ChargeAmount")),
+        amount=parse_money(_text(line, "LineTotalAmount"))) for line in _iter(root, "IncludedSupplyChainTradeLineItem")]
+    return Invoice(
+        invoice_number=normalize_invoice_number(_text(root, "ExchangedDocument", "ID")),
+        vendor=_text(root, "SellerTradeParty", "Name"),
+        date=_cii_date(_text(root, "ExchangedDocument", "IssueDateTime", "DateTimeString")),
+        due_date=_cii_date(_text(root, "SpecifiedTradePaymentTerms", "DueDateDateTime", "DateTimeString")),
+        currency=_text(root, "InvoiceCurrencyCode") or "USD", line_items=items,
+        subtotal=parse_money(_text(root, "LineTotalAmount")) if not items else parse_money(_text(root, "TaxBasisTotalAmount")),
+        tax_amount=parse_money(_text(root, "TaxTotalAmount")), total=parse_money(_text(root, "GrandTotalAmount")),
+        payment_terms=_text(root, "SpecifiedTradePaymentTerms", "Description"),
+        channel="structured", extractor="cii", parse_warnings=warnings)

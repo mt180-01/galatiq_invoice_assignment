@@ -1,0 +1,21 @@
+From: accounts@widgets-inc.example
+To: ap@acmecorp.example
+Subject: Invoice INV-2003 - Widgets Inc.
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+MIME-Version: 1.0
+
+Hi,
+
+Vendor: Widgets Inc.
+Invoice: INV-2003
+Date: 2026-02-04
+Due: 2026-03-06
+
+Items:
+  - WidgetB    x3    $500.00 each
+
+Total: $1,500.00
+
+Thanks,
+AR

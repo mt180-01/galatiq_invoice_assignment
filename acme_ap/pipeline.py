@@ -20,7 +20,9 @@ from decimal import Decimal
 from .agents import approval, payment, validation
 from .erp import ErpAdapter
 from .ingestion import llm_extract, parse_file
+from .intake import Origin
 from .llm import LLM
+from .outreach import draft_followup
 from .models import Approval, Decision, Finding, Invoice, Outcome, Severity
 
 log = logging.getLogger("acme.pipeline")
@@ -51,8 +53,10 @@ def bill_key(inv: Invoice) -> str:
 
 
 class Pipeline:
-    def __init__(self, erp: ErpAdapter, llm: LLM, workers: int | None = None, llm_concurrency: int = 8):
+    def __init__(self, erp: ErpAdapter, llm: LLM, workers: int | None = None, llm_concurrency: int = 8,
+                 origins: dict[str, Origin] | None = None):
         self.erp, self.llm = erp, llm
+        self.origins = origins or {}
         self.workers = workers if workers is not None else (os.cpu_count() or 1)
         self.llm_sem = asyncio.Semaphore(llm_concurrency)
 
@@ -91,7 +95,9 @@ class Pipeline:
                 pool.shutdown(wait=True)
 
     async def _process(self, path: str, parse_future: asyncio.Future, idx: int) -> Outcome:
-        out, t = Outcome(source_path=path), time.perf_counter()
+        origin = self.origins.get(path)
+        out, t = Outcome(source_path=path, sender=origin.sender if origin else None,
+                         subject=origin.subject if origin else None), time.perf_counter()
         trace = os.path.basename(path)
 
         def lap(stage: str) -> None:
@@ -145,6 +151,7 @@ class Pipeline:
             await asyncio.to_thread(self.erp.settle_bill, key, "paid" if out.paid else out.approval.decision.value,
                                     out.approval.reasoning, payment_row)
             lap("settle")
+            out.followup = draft_followup(out)
         except Exception as exc:  # noqa: BLE001 - one bad invoice never stops the batch
             out.error = f"{type(exc).__name__}: {exc}"
             log.exception("unhandled error", extra={"trace": trace, "stage": "pipeline", "detail": out.error})
