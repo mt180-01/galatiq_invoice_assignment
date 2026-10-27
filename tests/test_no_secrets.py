@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-TOKEN = re.compile(r"xai-[A-Za-z0-9_\-]{16,}")        # xAI key shape; the key itself must never appear in this file
+TOKEN = re.compile(r"xai-[A-Za-z0-9_\-]{16,}|grok_[0-9a-f]{16,}")   # key shapes; a real key must never appear in this file
 GENERIC = re.compile(r"(?i)(api[_-]?key|secret|token)\s*[=:]\s*['\"][A-Za-z0-9_\-]{24,}['\"]")
 
 
