@@ -25,7 +25,8 @@ def test_no_api_key_in_any_tracked_file():
             text = f.read_text(errors="ignore")
         except OSError:
             continue
-        if TOKEN.search(text) or GENERIC.search(text):
+        found = [m.group(0) for m in TOKEN.finditer(text)] + [m.group(0) for m in GENERIC.finditer(text)]
+        if [x for x in found if "not-a-real-key" not in x]:      # test fixtures are labelled as fake; anything else is a leak
             hits.append(str(f.relative_to(ROOT)))
     assert not hits, f"possible credential in: {hits}"
 
