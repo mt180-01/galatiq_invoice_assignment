@@ -1,0 +1,151 @@
+"""Concurrent, CPU-aware pipeline.
+
+Work is split by what it is bound on:
+  * CPU-bound  (PDF text extraction, regex/JSON/XML parsing)  -> ProcessPoolExecutor, one worker per core
+  * I/O-bound  (Grok calls, ERP/SQLite)                       -> asyncio + bounded concurrency
+Stages are chained per document with no global barrier, so as soon as a worker finishes parsing a
+file the next stage starts for it while the cores move on to the next file: cores stay busy while
+network calls are in flight, instead of the batch waiting stage by stage.
+"""
+from __future__ import annotations
+
+import asyncio
+import hashlib
+import logging
+import os
+import time
+from concurrent.futures import ProcessPoolExecutor
+from decimal import Decimal
+
+from .agents import approval, payment, validation
+from .erp import ErpAdapter
+from .ingestion import llm_extract, parse_file
+from .llm import LLM
+from .models import Approval, Decision, Finding, Invoice, Outcome, Severity
+
+log = logging.getLogger("acme.pipeline")
+PDFS_PER_WORKER = 100
+
+
+def _warm() -> None:  # pre-import heavy modules once per worker
+    import pymupdf  # noqa: F401
+
+
+def _parse_chunk(paths: list[str], want_text: bool) -> list[tuple[str, object]]:
+    """Runs in a worker process. Never raises: a bad file must not kill the batch."""
+    out: list[tuple[str, object]] = []
+    for p in paths:
+        try:
+            inv, text = parse_file(p)
+            out.append(("ok", (inv, text if want_text else "")))
+        except Exception as exc:  # noqa: BLE001 - isolate per-file failures
+            out.append(("err", f"{type(exc).__name__}: {exc}"))
+    return out
+
+
+def bill_key(inv: Invoice) -> str:
+    if inv.invoice_number:
+        vendor = "".join(c for c in (inv.vendor or "").lower() if c.isalnum())
+        return f"{vendor}|{inv.invoice_number}|{inv.revision or ''}"
+    return "anon|" + hashlib.sha1(repr(inv.model_dump(mode="json", exclude={"source_path", "source_format"})).encode()).hexdigest()[:12]
+
+
+class Pipeline:
+    def __init__(self, erp: ErpAdapter, llm: LLM, workers: int | None = None, llm_concurrency: int = 8):
+        self.erp, self.llm = erp, llm
+        self.workers = workers if workers is not None else (os.cpu_count() or 1)
+        self.llm_sem = asyncio.Semaphore(llm_concurrency)
+
+    def _plan_workers(self, n_pdfs: int) -> int:
+        """Worker processes cost ~0.7s each to start (imports); they pay back only with enough PDF work.
+        In a long-lived service the pool is reused, so this only matters for one-shot CLI runs."""
+        if self.workers is not None:
+            return self.workers
+        return min(os.cpu_count() or 1, n_pdfs // PDFS_PER_WORKER)
+
+    async def run(self, paths: list[str]) -> list[Outcome]:
+        loop = asyncio.get_running_loop()
+        want_text = self.llm.available
+        heavy = [p for p in paths if p.lower().endswith(".pdf")]  # CPU-heavy: layout analysis
+        workers = self._plan_workers(len(heavy))
+        pool = ProcessPoolExecutor(workers, initializer=_warm) if workers > 1 and heavy else None
+        self.pool_workers = workers if pool else 1
+        # Cheap formats (txt/csv/json/xml, ~0.05 ms each) are parsed inline: shipping them to a worker
+        # would cost more in IPC than the parse itself.
+        futures: dict[str, tuple[asyncio.Future, int]] = {}
+        chunk = max(1, min(32, len(heavy) // (workers * 4) or 1)) if pool else 1
+        for i in range(0, len(heavy), chunk):
+            part = heavy[i:i + chunk]
+            fut = loop.run_in_executor(pool, _parse_chunk, part, want_text)
+            for j, p in enumerate(part):
+                futures[p] = (fut, j)
+        for p in paths:
+            if p not in futures:
+                done = loop.create_future()
+                done.set_result(_parse_chunk([p], want_text))
+                futures[p] = (done, 0)
+        try:
+            return list(await asyncio.gather(*(self._process(p, *futures[p]) for p in paths)))
+        finally:
+            if pool:
+                pool.shutdown(wait=True)
+
+    async def _process(self, path: str, parse_future: asyncio.Future, idx: int) -> Outcome:
+        out, t = Outcome(source_path=path), time.perf_counter()
+        trace = os.path.basename(path)
+
+        def lap(stage: str) -> None:
+            nonlocal t
+            now = time.perf_counter()
+            out.timings_ms[stage] = round((now - t) * 1000, 2)
+            t = now
+
+        try:
+            kind, payload = (await parse_future)[idx]
+            if kind == "err":
+                out.error = f"could not read document: {payload}"
+                log.error("parse failed", extra={"trace": trace, "stage": "ingest", "detail": payload})
+                return out
+            inv, text = payload
+            lap("parse")
+            if self.llm.available and inv.channel == "unstructured":
+                async with self.llm_sem:
+                    inv = await llm_extract.extract(text, inv, self.llm)
+                lap("llm_extract")
+            out.invoice = inv
+            log.info("ingested", extra={"trace": trace, "stage": "ingest",
+                                        "detail": f"{inv.invoice_number} via {inv.extractor} ({inv.channel} lane)"})
+
+            key = bill_key(inv)
+            first = await asyncio.to_thread(self.erp.claim_bill, key, path, inv.vendor, inv.total)
+            if first:
+                out.findings = [Finding(code="duplicate_invoice", severity=Severity.ERROR,
+                                        message=f"already received from {os.path.basename(first)}; not processed twice")]
+                out.approval = Approval(decision=Decision.REJECT, reasoning=out.findings[0].message)
+                return out
+
+            # Local ERP reads take microseconds; a real (network) ERP adapter would be awaited here instead.
+            out.findings = validation.validate(inv, self.erp)
+            lap("validate")
+            for f in out.findings:
+                log.info("finding", extra={"trace": trace, "stage": "validate", "detail": f"{f.severity.value}:{f.code} {f.message}"})
+
+            async with self.llm_sem:
+                out.approval = await approval.decide(inv, out.findings, self.llm)
+            lap("approve")
+            log.info("decision", extra={"trace": trace, "stage": "approve",
+                                        "detail": f"{out.approval.decision.value} after {out.approval.rounds} round(s)"})
+
+            payment_row = None
+            if out.approval.decision is Decision.APPROVE:
+                total = inv.total or Decimal(0)
+                out.payment_ref = payment.pay(inv.vendor or "", total, inv.currency)
+                payment_row = (inv.vendor or "", total, out.payment_ref)
+                out.paid = True
+            await asyncio.to_thread(self.erp.settle_bill, key, "paid" if out.paid else out.approval.decision.value,
+                                    out.approval.reasoning, payment_row)
+            lap("settle")
+        except Exception as exc:  # noqa: BLE001 - one bad invoice never stops the batch
+            out.error = f"{type(exc).__name__}: {exc}"
+            log.exception("unhandled error", extra={"trace": trace, "stage": "pipeline", "detail": out.error})
+        return out

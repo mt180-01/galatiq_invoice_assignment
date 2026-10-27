@@ -1,3 +1,12 @@
+# Acme AP automation (solution)
+
+Run: `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && .venv/bin/python main.py --invoice_path=data/invoices`
+(a single file also works; `-v` shows per-stage logs, `--bench 20000` runs the CPU benchmark, `--json out.json` saves results).
+Set `XAI_API_KEY` to use Grok; without it everything runs offline. Tests: `.venv/bin/python -m pytest`.
+Architecture, ERP choice (NetSuite), vendor-channel strategy and CPU design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+---
+
 # Galatiq Case: Invoice Processing Automation
 
 ## Background

@@ -1,0 +1,32 @@
+"""Adapter contract, shaped like the NetSuite records an AP automation touches
+(Item, Vendor, Vendor Bill, Vendor Payment). A production `NetSuiteAdapter` would implement the
+same methods over SuiteTalk REST (OAuth 2.0 M2M) and SuiteQL; nothing upstream would change."""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from decimal import Decimal
+from typing import Protocol
+
+
+@dataclass(frozen=True)
+class ItemRecord:
+    name: str
+    stock: int
+    unit_price: Decimal
+    fuzzy: bool = False  # matched by approximate name, not exactly
+
+
+@dataclass(frozen=True)
+class VendorRecord:
+    name: str
+    status: str  # approved | blocked
+
+
+class ErpAdapter(Protocol):
+    def lookup_item(self, name: str) -> ItemRecord | None: ...
+    def lookup_vendor(self, name: str) -> VendorRecord | None: ...
+    def claim_bill(self, key: str, source: str, vendor: str | None, total: Decimal | None) -> str | None:
+        """Atomically register a vendor bill. Returns None if new, else the source that claimed it first."""
+    def settle_bill(self, key: str, status: str, reasoning: str,
+                    payment: tuple[str, Decimal, str] | None = None) -> None:
+        """One transaction: final bill status + audit entry (+ vendor payment (vendor, amount, ref) if paid)."""
