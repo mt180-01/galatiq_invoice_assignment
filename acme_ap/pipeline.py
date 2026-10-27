@@ -17,12 +17,13 @@ import time
 from concurrent.futures import ProcessPoolExecutor
 from decimal import Decimal
 
-from .agents import approval, payment, validation
+from .agents import approval, validation
 from .erp import ErpAdapter
 from .ingestion import llm_extract, parse_file
 from .intake import Origin
 from .llm import LLM
 from .outreach import draft_followup
+from .payments import default_payments
 from .models import Approval, Decision, Finding, Invoice, Outcome, Severity
 
 log = logging.getLogger("acme.pipeline")
@@ -54,10 +55,12 @@ def bill_key(inv: Invoice) -> str:
 
 class Pipeline:
     def __init__(self, erp: ErpAdapter, llm: LLM, workers: int | None = None, llm_concurrency: int = 8,
-                 origins: dict[str, Origin] | None = None, approvals=None):
+                 origins: dict[str, Origin] | None = None, approvals=None, payments=None, bank_concurrency: int = 8):
         self.erp, self.llm = erp, llm
         self.origins = origins or {}
         self.approvals = approvals
+        self.payments = payments or getattr(approvals, "payments", None) or default_payments(erp)
+        self.bank_sem = asyncio.Semaphore(bank_concurrency)
         self.workers = workers if workers is not None else (os.cpu_count() or 1)
         self.llm_sem = asyncio.Semaphore(llm_concurrency)
 
@@ -143,19 +146,21 @@ class Pipeline:
             log.info("decision", extra={"trace": trace, "stage": "approve",
                                         "detail": f"{out.approval.decision.value} after {out.approval.rounds} round(s)"})
 
-            payment_row = None
+            payment_row, pay_status = None, None
             if out.approval.decision is Decision.APPROVE:
-                total = inv.total or Decimal(0)
-                out.payment_ref = payment.pay(inv.vendor or "", total, inv.currency)
-                payment_row = (inv.vendor or "", total, out.payment_ref)
-                out.paid = True
+                async with self.bank_sem:  # banks rate-limit; many submissions still overlap
+                    res = await asyncio.to_thread(self.payments.pay, inv, key)
+                out.payment_state, out.release_on, pay_status = res.state, res.release_on, res.erp_status
+                if res.submitted:
+                    out.paid, out.payment_ref = True, res.ref
+                    payment_row = (inv.vendor or "", res.amount, res.ref)
             request = None
             if out.approval.decision is Decision.ESCALATE and self.approvals is not None:
                 request = await asyncio.to_thread(self.approvals.open_request, out, key)
                 if request:
                     out.approval_request, out.awaiting = request[0], request[1].role
                     out.approval_card = await asyncio.to_thread(self.approvals.render_card, request[0])
-            status = "paid" if out.paid else ("pending_approval" if request else out.approval.decision.value)
+            status = pay_status or ("pending_approval" if request else out.approval.decision.value)
             await asyncio.to_thread(self.erp.settle_bill, key, status, out.approval.reasoning, payment_row)
             lap("settle")
             out.followup = draft_followup(out)

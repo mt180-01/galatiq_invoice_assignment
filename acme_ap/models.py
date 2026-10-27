@@ -76,6 +76,8 @@ class Outcome(BaseModel):
     approval: Approval | None = None
     paid: bool = False
     payment_ref: str | None = None
+    payment_state: str | None = None  # scheduled | held | failed | submitted
+    release_on: str | None = None
     error: str | None = None
     timings_ms: dict[str, float] = Field(default_factory=dict)
     sender: str | None = None
@@ -91,6 +93,8 @@ class Outcome(BaseModel):
             return "FAILED"
         if self.paid:
             return "PAID"
+        if self.payment_state in ("scheduled", "held", "failed"):
+            return {"scheduled": "SCHEDULED", "held": "PAYMENT_HELD", "failed": "PAYMENT_FAILED"}[self.payment_state]
         if any(f.code == "duplicate_invoice" for f in self.findings):
             return "DUPLICATE"
         if self.awaiting:

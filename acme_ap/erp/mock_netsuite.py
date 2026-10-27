@@ -42,6 +42,7 @@ class MockNetSuite:
 
     def __init__(self, path: str | Path = "inventory.db", keep_ledger: bool = False):
         self.path = str(path)
+        self.ledger_reset = not keep_ledger
         self._local = threading.local()
         self._write = threading.Lock()
         with self._write:

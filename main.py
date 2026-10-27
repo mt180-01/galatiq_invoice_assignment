@@ -23,11 +23,13 @@ from acme_ap.ingestion import SUPPORTED
 from acme_ap.intake import expand
 from acme_ap.llm import make_llm
 from acme_ap.models import Outcome
+from acme_ap.payments import MockBank, PaymentService
 from acme_ap.pipeline import Pipeline
 
 warnings.filterwarnings("ignore")
 console = Console()
-STYLE = {"AWAITING": "cyan", "PAID": "green", "APPROVE": "green", "REJECT": "red", "ESCALATE": "yellow", "DUPLICATE": "dim", "FAILED": "bold red"}
+STYLE = {"AWAITING": "cyan", "PAID": "green", "APPROVE": "green", "REJECT": "red", "ESCALATE": "yellow", "DUPLICATE": "dim", "FAILED": "bold red",
+         "SCHEDULED": "blue", "PAYMENT_HELD": "magenta", "PAYMENT_FAILED": "bold red"}
 
 
 class KeyValueFormatter(logging.Formatter):
@@ -67,14 +69,15 @@ def make_bench_corpus(src: list[str], n: int, pdf_share: float) -> tuple[list[st
 
 async def run_batch(paths: list[str], args: argparse.Namespace, workers: int | None, origins=None) -> tuple[list[Outcome], float, float]:
     erp = MockNetSuite(args.db, keep_ledger=args.keep_ledger)
-    approvals = ApprovalService(args.db, erp, reset=not args.keep_ledger)
+    payments = PaymentService(args.db, erp, MockBank(args.db + ".bank", reset=not args.keep_ledger), reset=not args.keep_ledger)
+    approvals = ApprovalService(args.db, erp, reset=not args.keep_ledger, payments=payments)
     llm = make_llm(args.offline)
     before = resource.getrusage(resource.RUSAGE_SELF).ru_utime + resource.getrusage(resource.RUSAGE_SELF).ru_stime
     k = resource.getrusage(resource.RUSAGE_CHILDREN)
     kids_before = k.ru_utime + k.ru_stime
     t0 = time.perf_counter()
     outcomes = await Pipeline(erp, llm, workers=workers, llm_concurrency=args.llm_concurrency, origins=origins,
-                                approvals=approvals).run(paths)
+                                approvals=approvals, payments=payments).run(paths)
     wall = time.perf_counter() - t0
     own = resource.getrusage(resource.RUSAGE_SELF)
     kids = resource.getrusage(resource.RUSAGE_CHILDREN)
@@ -101,6 +104,29 @@ def show(outcomes: list[Outcome]) -> None:
     for o in outcomes:
         counts[o.status] = counts.get(o.status, 0) + 1
     console.print("  ".join(f"[{STYLE.get(k, 'white')}]{k}={v}[/]" for k, v in sorted(counts.items())))
+
+
+def payment_summary(db: str) -> None:
+    """What the treasury side looks like after this run (read from the payment ledger)."""
+    from decimal import Decimal
+    erp = MockNetSuite(db, keep_ledger=True)
+    rows = PaymentService(db, erp, MockBank(db + ".bank"), reset=False).rows()
+    if not rows:
+        return
+    amt = lambda r: Decimal(r["amount"])  # noqa: E731
+    sent = [r for r in rows if r["state"] in ("submitted", "settled")]
+    later = [r for r in rows if r["state"] == "scheduled"]
+    held = [r for r in rows if r["state"] in ("held", "failed")]
+    console.print("[bold]Payments[/]")
+    console.print(f"  sent to bank now : {len(sent)} ({sum(map(amt, sent)):,.2f})   scheduled for later : {len(later)} ({sum(map(amt, later)):,.2f})"
+                  f"   held/failed : {len(held)}")
+    discounts = sum(Decimal(r["discount"]) for r in rows)
+    if discounts:
+        console.print(f"  early-payment discounts captured : {discounts:,.2f}")
+    for r in later:
+        console.print(f"  [dim]{r['bill_key']}: release {r['release_on']} via {r['rail'].upper()}[/]")
+    for r in held:
+        console.print(f"  [yellow]{r['bill_key']}: {r['state']}: {r['last_error']}[/]")
 
 
 def scorecard(outcomes: list[Outcome]) -> None:
@@ -216,6 +242,7 @@ def main() -> None:
     for line in simulated:
         console.print(f"[yellow]SIMULATED VP[/] {line}")
     scorecard(outcomes)
+    payment_summary(args.db)
     if cards:
         console.print(f"[dim]{cards} approval request(s) awaiting a person; decision cards in {args.outbox}/approvals/. "
                       f"Respond with: python approve.py list | respond[/]")

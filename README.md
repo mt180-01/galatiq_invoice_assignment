@@ -6,6 +6,7 @@ Set `XAI_API_KEY` to use Grok; without it everything runs offline. Tests: `.venv
 Vendors just email what they already send (`--invoice_path=data/emails` for the sample emails): attachments, body text, or e-invoice XML inside a PDF are all read, and fixable problems become a short drafted question in `outbox/`.
 Scanned PDFs are OCR'd (needs `tesseract`; vectorised numpy clean-up) and always held for a person. `scripts/bench_simd.py` shows where vectorisation pays.
 Invoices over 10,000 (and flagged ones) get a one-click decision card for the right approver instead of an email chain: `outbox/approvals/`, `python approve.py --help`.
+Approved invoices are paid on their due date (or early, to capture a discount) through an idempotent bank adapter, then reconciled: `python pay.py --help`.
 Architecture, ERP choice (NetSuite), vendor-channel strategy and CPU design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ---

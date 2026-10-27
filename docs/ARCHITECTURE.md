@@ -147,6 +147,30 @@ Try it: `python main.py --invoice_path=data/approvals_demo`, read `outbox/approv
 **SIMD / vectorisation: not used here, on purpose.** Measured (`scripts/bench_approvals.py`): routing 0.8 us, hashing 2.6 us, signing/verifying a token ~2.5 us, and creating a request plus rendering its card ~100 us. A person takes minutes to days.
 Even 100,000 pending requests is ~10 s of compute in total. The cost to optimise is human waiting time (right person, evidence in the message, reminders, escalation), not CPU.
 
+## 4c. Payment: from "call a function" to a safe, scheduled, reconciled bank transfer
+
+**What was wrong:** money moved before the ledger recorded it; the reference was `sha1(vendor|amount)` (two different
+$500 bills from one vendor collided); nothing checked *where* the money went; everything was paid on day 0; one
+blocking call per invoice with no retry; no lifecycle after "paid".
+
+| Gap | Now |
+|---|---|
+| Crash between bank call and ledger | Instruction is written first, keyed by the bill (idempotency key). Before any submit we ask the bank what it holds for that key (`recover`), so nothing is paid twice. |
+| No retry / outage handling | 3 attempts with backoff per release; transient errors leave it `scheduled` and the next `release` finishes it; permanent rejections stop at once and go to a person. |
+| Pays on day 0 | Released on due date minus the rail's lead time (ACH 2d, wire same day). Overdue or no terms: now. |
+| Early-pay discounts ignored | "2/10 Net 30" is parsed; the discount is taken while the window is open (about 36% annualised, so worth it). |
+| Unknown payee account | Each vendor needs a *verified* account. A changed account needs a second person and holds that vendor's payments meanwhile. |
+| One rail | Wire at/above 25,000, ACH below. |
+| Uncontrolled outflow | Daily outbound limit enforced under the ledger lock; overflow rolls to the next day. |
+| "Paid" is a guess | States: scheduled, submitted, settled, returned, held, failed. `reconcile` compares ledger and bank: settles, flags returns, flags bank items we have no record of and amount mismatches. |
+| CPU / latency | Bank calls run off the event loop under a semaphore and outside the ledger lock, so submissions overlap. No SIMD: this stage is network- and DB-bound. |
+
+Files: `acme_ap/payments/` (`service.py` policy and ledger, `bank.py` adapter + simulated bank, `terms.py`), CLI `pay.py`.
+Policy numbers (25,000 wire threshold, 250,000 daily limit, 0.30 / 25.00 rail costs) are assumptions.
+**Not done:** no real bank (the adapter is the seam; a real one adds credentials, request signing, webhooks instead of polling);
+weekends/bank holidays ignored; no sanctions screening; no remittance-advice email to the vendor; FX not supported;
+the verification "callback" is a second person's name in a CLI, not a phone call.
+
 ## 5. Known limitations
 - Duplicate detection is by (vendor, invoice number, revision); which of two identical copies is called the duplicate depends on timing.
 - Stock is checked per invoice and not decremented, so results do not depend on processing order.

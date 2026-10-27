@@ -15,9 +15,10 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
-from ..agents import payment, validation
+from ..agents import validation
 from ..erp import ErpAdapter
 from ..models import Invoice, Outcome, Severity
+from ..payments import default_payments
 from .routing import DIRECTORY, Route, route
 from .tokens import TokenError, evidence_hash, make_token, read_token, utcnow
 
@@ -47,8 +48,9 @@ class Result:
 
 
 class ApprovalService:
-    def __init__(self, db_path: str | Path, erp: ErpAdapter, reset: bool = True):
+    def __init__(self, db_path: str | Path, erp: ErpAdapter, reset: bool = True, payments=None):
         self.erp = erp
+        self.payments = payments or default_payments(erp)
         self._lock = threading.RLock()
         self._db = sqlite3.connect(str(db_path), timeout=30, check_same_thread=False)
         self._db.execute("PRAGMA journal_mode=WAL")
@@ -155,11 +157,11 @@ class ApprovalService:
                 self._db.commit()
                 self.erp.settle_bill(row["bill_key"], "blocked", "approved but re-check failed: " + "; ".join(f.message for f in errors))
                 return Result(False, "approval recorded but payment blocked: re-check failed: " + "; ".join(f.message for f in errors))
-            total = inv.total or Decimal(0)
-            ref = payment.pay(inv.vendor or "", total, inv.currency)
-            self._close(rid, "approved", who, comment, now, ref)
-            self.erp.settle_bill(row["bill_key"], "paid", f"approved by {who}: {comment or 'no comment'}", (inv.vendor or "", total, ref))
-            return Result(True, f"approved by {who}; paid", True, ref)
+            res = self.payments.pay(inv, row["bill_key"])
+            self._close(rid, "approved", who, comment, now, res.ref)
+            self.erp.settle_bill(row["bill_key"], res.erp_status, f"approved by {who}: {comment or 'no comment'}",
+                                 (inv.vendor or "", res.amount, res.ref) if res.submitted else None)
+            return Result(True, f"approved by {who}; " + ("paid" if res.submitted else res.message), res.submitted, res.ref)
 
     def _close(self, rid: int, status: str, who: str, comment: str, now: datetime, ref: str | None = None) -> None:
         self._db.execute("UPDATE approval_requests SET status=?, decided_by=?, decided_at=?, comment=?, payment_ref=? WHERE id=?",
