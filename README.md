@@ -3,7 +3,7 @@
 Reads vendor invoices (PDF, scan, email, JSON, XML, CSV, text), checks them against the ERP, routes approvals to the
 right person, and pays on the due date through a bank adapter. Built for the case in [docs/ASSIGNMENT.md](docs/ASSIGNMENT.md).
 
-## Quick start
+## Quick start (or just `make setup && make demo`)
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt     # 1. set up
@@ -30,6 +30,7 @@ scorecard and a payments summary. Side effects go to files, never to the outside
 ## Try the other flows
 
 ```bash
+.venv/bin/python main.py demo                                              # the whole story in one go (scratch folder, offline)
 .venv/bin/python main.py --invoice_path=data/emails                    # invoices arriving as emails
 .venv/bin/python main.py --invoice_path=data/scanned                   # scanned PDFs (OCR, always held for a person)
 .venv/bin/python main.py --invoice_path=data/approvals_demo --auto-vp  # over-limit invoice, simulated VP approves
