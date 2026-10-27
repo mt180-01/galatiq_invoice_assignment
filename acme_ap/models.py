@@ -81,6 +81,9 @@ class Outcome(BaseModel):
     sender: str | None = None
     subject: str | None = None
     followup: str | None = None  # drafted vendor question (never sent automatically)
+    approval_request: int | None = None
+    awaiting: str | None = None  # role whose decision is pending
+    approval_card: str | None = None
 
     @property
     def status(self) -> str:
@@ -90,4 +93,6 @@ class Outcome(BaseModel):
             return "PAID"
         if any(f.code == "duplicate_invoice" for f in self.findings):
             return "DUPLICATE"
+        if self.awaiting:
+            return "AWAITING"
         return (self.approval.decision.value if self.approval else "unknown").upper()

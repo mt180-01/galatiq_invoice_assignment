@@ -17,6 +17,7 @@ from pathlib import Path
 from rich.console import Console
 from rich.table import Table
 
+from acme_ap.approvals import ApprovalService
 from acme_ap.erp import MockNetSuite
 from acme_ap.ingestion import SUPPORTED
 from acme_ap.intake import expand
@@ -26,7 +27,7 @@ from acme_ap.pipeline import Pipeline
 
 warnings.filterwarnings("ignore")
 console = Console()
-STYLE = {"PAID": "green", "APPROVE": "green", "REJECT": "red", "ESCALATE": "yellow", "DUPLICATE": "dim", "FAILED": "bold red"}
+STYLE = {"AWAITING": "cyan", "PAID": "green", "APPROVE": "green", "REJECT": "red", "ESCALATE": "yellow", "DUPLICATE": "dim", "FAILED": "bold red"}
 
 
 class KeyValueFormatter(logging.Formatter):
@@ -66,12 +67,14 @@ def make_bench_corpus(src: list[str], n: int, pdf_share: float) -> tuple[list[st
 
 async def run_batch(paths: list[str], args: argparse.Namespace, workers: int | None, origins=None) -> tuple[list[Outcome], float, float]:
     erp = MockNetSuite(args.db, keep_ledger=args.keep_ledger)
+    approvals = ApprovalService(args.db, erp, reset=not args.keep_ledger)
     llm = make_llm(args.offline)
     before = resource.getrusage(resource.RUSAGE_SELF).ru_utime + resource.getrusage(resource.RUSAGE_SELF).ru_stime
     k = resource.getrusage(resource.RUSAGE_CHILDREN)
     kids_before = k.ru_utime + k.ru_stime
     t0 = time.perf_counter()
-    outcomes = await Pipeline(erp, llm, workers=workers, llm_concurrency=args.llm_concurrency, origins=origins).run(paths)
+    outcomes = await Pipeline(erp, llm, workers=workers, llm_concurrency=args.llm_concurrency, origins=origins,
+                                approvals=approvals).run(paths)
     wall = time.perf_counter() - t0
     own = resource.getrusage(resource.RUSAGE_SELF)
     kids = resource.getrusage(resource.RUSAGE_CHILDREN)
@@ -88,6 +91,8 @@ def show(outcomes: list[Outcome]) -> None:
     for o in outcomes:
         inv = o.invoice
         why = o.error or (o.approval.reasoning if o.approval else "")
+        if o.awaiting:
+            why = f"-> {o.awaiting} (request #{o.approval_request}). {why}"
         table.add_row(Path(o.source_path).parent.name + "/body" if Path(o.source_path).name == "body.txt" else os.path.basename(o.source_path),
                       (inv.vendor if inv else "-") or "-", f"{inv.currency} {inv.total}" if inv and inv.total is not None else "-",
                       f"[{STYLE.get(o.status, 'white')}]{o.status}[/]", why[:110] + ("…" if len(why) > 110 else ""))
@@ -126,6 +131,34 @@ def write_outbox(outcomes: list[Outcome], outbox: Path) -> int:
     return count
 
 
+def write_cards(outcomes: list[Outcome], outbox: Path) -> int:
+    folder = outbox / "approvals"
+    folder.mkdir(parents=True, exist_ok=True)
+    for old in folder.glob("*.txt"):
+        old.unlink()
+    n = 0
+    for o in outcomes:
+        if o.approval_card:
+            (folder / f"request_{o.approval_request:03d}_{o.invoice.invoice_number}.txt").write_text(o.approval_card + "\n")
+            n += 1
+    return n
+
+
+def auto_vp(args: argparse.Namespace, outcomes: list[Outcome]) -> list[str]:
+    """DEMO ONLY: a stand-in VP that approves requests whose only reason is the amount limit (nothing else
+    flagged). Everything else stays pending for a person, to show the workflow end to end offline."""
+    erp = MockNetSuite(args.db, keep_ledger=True)
+    svc = ApprovalService(args.db, erp, reset=False)
+    log = []
+    for o in outcomes:
+        if o.approval_request and o.awaiting == "VP Finance" and not any(f.severity.value == "hold" for f in o.findings):
+            res = svc.respond(svc.tokens_for(o.approval_request)["approve"], "simulated-vp", "demo auto-approval")
+            log.append(f"request #{o.approval_request} ({o.invoice.invoice_number}): {res.message}")
+            if res.paid:
+                o.paid, o.payment_ref, o.awaiting = True, res.payment_ref, None
+    return log
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Acme AP invoice automation")
     ap.add_argument("--invoice_path", default="data/invoices", help="invoice file or directory")
@@ -133,6 +166,7 @@ def main() -> None:
     ap.add_argument("--keep-ledger", action="store_true", help="keep bills/payments from earlier runs (duplicate detection across runs)")
     ap.add_argument("--workers", type=int, default=None, help="CPU worker processes (default: auto-sized from the PDF count; 1 = serial)")
     ap.add_argument("--pdf-share", type=float, default=0.5, help="share of PDFs in the --bench corpus (real AP inboxes are mostly PDF)")
+    ap.add_argument("--auto-vp", action="store_true", help="DEMO: simulate a VP approving requests that are only over the amount limit")
     ap.add_argument("--outbox", default="outbox", help="where drafted vendor follow-up emails are written")
     ap.add_argument("--llm-concurrency", type=int, default=8)
     ap.add_argument("--offline", action="store_true", help="ignore XAI_API_KEY and use the deterministic paths")
@@ -176,8 +210,15 @@ def main() -> None:
     finally:
         shutil.rmtree(intake_dir, ignore_errors=True)
     drafts = write_outbox(outcomes, Path(args.outbox))
+    cards = write_cards(outcomes, Path(args.outbox))
+    simulated = auto_vp(args, outcomes) if args.auto_vp else []
     show(outcomes)
+    for line in simulated:
+        console.print(f"[yellow]SIMULATED VP[/] {line}")
     scorecard(outcomes)
+    if cards:
+        console.print(f"[dim]{cards} approval request(s) awaiting a person; decision cards in {args.outbox}/approvals/. "
+                      f"Respond with: python approve.py list | respond[/]")
     if drafts:
         console.print(f"[dim]{drafts} follow-up draft(s) in {args.outbox}/ (review before sending; nothing is sent automatically)[/]")
     console.print(f"[dim]{wall:.2f}s wall, {cpu:.2f}s CPU, {len(paths) / wall:,.1f} docs/s[/]")

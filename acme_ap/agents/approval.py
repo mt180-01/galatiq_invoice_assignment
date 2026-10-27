@@ -29,10 +29,9 @@ def policy_decision(inv: Invoice, findings: list[Finding]) -> Approval:
     if holds:
         return Approval(decision=Decision.ESCALATE, reasoning="Needs human review: " + "; ".join(f.message for f in holds))
     if total > APPROVAL_THRESHOLD:
-        if warns:
-            return Approval(decision=Decision.ESCALATE,
-                            reasoning=f"Over {APPROVAL_THRESHOLD} with open warnings: " + "; ".join(f.message for f in warns))
-        return Approval(decision=Decision.APPROVE, reasoning=f"Over {APPROVAL_THRESHOLD} but fully clean: known vendor, stock and arithmetic verified")
+        # Above the limit a person signs off however clean the invoice is; the system only prepares the decision.
+        why = "open warnings: " + "; ".join(f.message for f in warns) if warns else "all checks clean"
+        return Approval(decision=Decision.ESCALATE, reasoning=f"Over {APPROVAL_THRESHOLD}: human sign-off required ({why})")
     note = f" (noted: {'; '.join(f.message for f in warns)})" if warns else ""
     return Approval(decision=Decision.APPROVE, reasoning="Within auto-approval limit; all checks passed" + note)
 

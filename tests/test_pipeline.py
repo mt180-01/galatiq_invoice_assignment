@@ -96,11 +96,13 @@ def test_validation_flags(erp):
     assert "missing_vendor" in codes(Invoice(**{**base, "vendor": None}, line_items=[LineItem(item="WidgetA", quantity=1)]))
 
 
-def test_policy_over_threshold_needs_clean_record():
+def test_policy_over_threshold_always_needs_a_person():
     inv = Invoice(invoice_number="X", vendor="V", total=Decimal("20000"))
     clean = approval.policy_decision(inv, [])
     warned = approval.policy_decision(inv, [Finding(code="price_variance", severity=Severity.WARN, message="w")])
-    assert clean.decision is Decision.APPROVE and warned.decision is Decision.ESCALATE
+    # above the limit a person always signs off, however clean the invoice is
+    assert clean.decision is Decision.ESCALATE and warned.decision is Decision.ESCALATE
+    assert "human sign-off" in clean.reasoning
 
 
 class _GreedyLLM(OfflineLLM):

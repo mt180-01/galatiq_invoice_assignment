@@ -120,6 +120,33 @@ well but table rows are only partly recovered (e.g. 4 of 8 lines on one invoice)
 Also found while measuring: the PDF was opened twice per document. Opening once cut PDF parse from ~2.7 ms to ~1.9 ms, but end-to-end throughput
 did not change (the single orchestrating process is still the ceiling).
 
+## 4b. VP approval: replacing the email chain
+
+**Should it be automated?** Partly, and the split is deliberate. Approval is a fraud control, so the system automates the clerical work around the decision, not the decision itself where money or risk is high.
+
+| Situation | What happens |
+|---|---|
+| Clean, <= 10,000 | Paid automatically (the rule-based approver; unchanged) |
+| Clean but > 10,000 | **A person signs off.** Previously the AI approved these; that removed the control the brief asks for, so it was changed. |
+| Flagged (new vendor, foreign currency, revision, OCR, pressure language) | Routed to the right owner with the evidence |
+| Any hard error (stock, math, unknown item) | Rejected; no approval request exists, so nobody gets an approve button for something known to be wrong |
+
+**The workflow** (`acme_ap/approvals/`):
+- **Routing**: amount over 10k -> VP Finance, over 50k -> CFO; unknown vendor -> Procurement; foreign currency -> Treasury; fraud-style/OCR/revision -> AP Manager. Unreadable documents have nothing to approve, so no request is created.
+- **Decision card**: one short message per invoice (why you, the invoice, the system's recommendation, anything noted) with Approve and Reject links. Replaces the thread.
+- **Signed links**: HMAC-SHA256 token bound to the request, the action, a hash of the invoice content, and an expiry. Altered tokens fail; a link dies if the invoice changes after the card was sent; links are single-use.
+- **Re-check at approval time**: before any payment, validation runs again. If stock or vendor status changed since the card went out, payment is blocked even though a person clicked approve.
+- **Clock-driven**: reminder at 24 h, escalation to the delegate at 48 h (VP Finance -> CFO -> CEO), expiry at 5 days. Expiry never pays.
+- **Audit**: every step (opened, reminded, escalated, approved/rejected/blocked/expired, by whom, comment) is an event row, and the ERP bill status follows.
+
+Try it: `python main.py --invoice_path=data/approvals_demo`, read `outbox/approvals/*.txt`, then `python approve.py list` / `respond <token> --as <email>` / `tick --hours 50`.
+`--auto-vp` runs a clearly labelled **simulated** VP for demos. The brief's "simulate VP review" is covered by the rule-based approver plus this workflow; no real person or mail system is involved.
+
+**Not built / limits**: no email sending, no inbound reply parsing, no web endpoint (the links point at a fictional host and are exercised through `approve.py`), no authentication of the responder beyond the signed token (a real endpoint must authenticate the person, e.g. SSO, and check they hold the role), no segregation-of-duties check against who created the bill, no out-of-office calendar, no bulk approval. The approver directory is fictional role mailboxes.
+
+**SIMD / vectorisation: not used here, on purpose.** Measured (`scripts/bench_approvals.py`): routing 0.8 us, hashing 2.6 us, signing/verifying a token ~2.5 us, and creating a request plus rendering its card ~100 us. A person takes minutes to days.
+Even 100,000 pending requests is ~10 s of compute in total. The cost to optimise is human waiting time (right person, evidence in the message, reminders, escalation), not CPU.
+
 ## 5. Known limitations
 - Duplicate detection is by (vendor, invoice number, revision); which of two identical copies is called the duplicate depends on timing.
 - Stock is checked per invoice and not decremented, so results do not depend on processing order.

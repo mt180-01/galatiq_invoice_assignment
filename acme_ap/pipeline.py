@@ -54,9 +54,10 @@ def bill_key(inv: Invoice) -> str:
 
 class Pipeline:
     def __init__(self, erp: ErpAdapter, llm: LLM, workers: int | None = None, llm_concurrency: int = 8,
-                 origins: dict[str, Origin] | None = None):
+                 origins: dict[str, Origin] | None = None, approvals=None):
         self.erp, self.llm = erp, llm
         self.origins = origins or {}
+        self.approvals = approvals
         self.workers = workers if workers is not None else (os.cpu_count() or 1)
         self.llm_sem = asyncio.Semaphore(llm_concurrency)
 
@@ -148,8 +149,14 @@ class Pipeline:
                 out.payment_ref = payment.pay(inv.vendor or "", total, inv.currency)
                 payment_row = (inv.vendor or "", total, out.payment_ref)
                 out.paid = True
-            await asyncio.to_thread(self.erp.settle_bill, key, "paid" if out.paid else out.approval.decision.value,
-                                    out.approval.reasoning, payment_row)
+            request = None
+            if out.approval.decision is Decision.ESCALATE and self.approvals is not None:
+                request = await asyncio.to_thread(self.approvals.open_request, out, key)
+                if request:
+                    out.approval_request, out.awaiting = request[0], request[1].role
+                    out.approval_card = await asyncio.to_thread(self.approvals.render_card, request[0])
+            status = "paid" if out.paid else ("pending_approval" if request else out.approval.decision.value)
+            await asyncio.to_thread(self.erp.settle_bill, key, status, out.approval.reasoning, payment_row)
             lap("settle")
             out.followup = draft_followup(out)
         except Exception as exc:  # noqa: BLE001 - one bad invoice never stops the batch
