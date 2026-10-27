@@ -4,6 +4,7 @@ Run: `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && .ven
 (a single file also works; `-v` shows per-stage logs, `--bench 20000` runs the CPU benchmark, `--json out.json` saves results).
 Set `XAI_API_KEY` to use Grok; without it everything runs offline. Tests: `.venv/bin/python -m pytest`.
 Vendors just email what they already send (`--invoice_path=data/emails` for the sample emails): attachments, body text, or e-invoice XML inside a PDF are all read, and fixable problems become a short drafted question in `outbox/`.
+Scanned PDFs are OCR'd (needs `tesseract`; vectorised numpy clean-up) and always held for a person. `scripts/bench_simd.py` shows where vectorisation pays.
 Architecture, ERP choice (NetSuite), vendor-channel strategy and CPU design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ---

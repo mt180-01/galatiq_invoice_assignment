@@ -95,11 +95,37 @@ validation, SQLite commits): Amdahl's law. The next step is horizontal: a durabl
 each owning its own pool, and the ERP as the shared store. In the real system the dominant latency is the LLM and the ERP API, not CPU, which is why the async layer matters more than the pool.
 With `XAI_API_KEY` unset (or `--offline`) the agents run deterministically; the Grok path is covered by mocked-transport tests only and has **not** been run against the live API.
 
+### SIMD: where it helps and where it does not
+
+I measured each stage before adding anything (`scripts/bench_simd.py`, plus per-stage timings on this arm64 machine, numpy using NEON):
+
+| Stage | Cost per document | SIMD / vectorisation verdict |
+|---|---|---|
+| PDF text read (MuPDF, C) | ~1.9 ms | already native code; nothing to add |
+| Row clustering of ~70 words | 7.7 us Python vs 20 us numpy | numpy is **slower** (arrays too small); not used |
+| Validation arithmetic | 10-40 us | too small to matter; batching it would add latency for under 5% |
+| Regex extraction | 90-200 us | `re` is not vectorisable |
+| **Scanned-page clean-up** (4 MP of pixels) | **~70 ms** | **yes: whole-array numpy ops** |
+
+Scanned pages are the one place with enough data per item. `ingestion/ocr.py` flattens uneven scan lighting, thresholds (Otsu) and erases
+table rules with whole-array numpy operations, then hands the page to Tesseract. Measured: the normalise+threshold step is ~27x faster than a
+per-pixel Python loop (9 ms vs ~250 ms extrapolated from a crop), and the full clean-up is ~12% of Tesseract's time. It also makes Tesseract
+faster (one sample went from 1.9 s on the raw scan to 0.5 s on the cleaned one). Not every numpy step is SIMD (cumulative sums and `bincount` are scalar).
+Tesseract, not the vector code, is the cost that matters, which is why OCR runs in the process pool.
+
+**OCR accuracy is limited and policy reflects that.** On my synthetic scans (the repo ships none; `scripts/make_scanned_sample.py`), headers and totals are read
+well but table rows are only partly recovered (e.g. 4 of 8 lines on one invoice). So OCR output is never auto-paid: it is held for a person
+(`ocr_source`), and the vendor is not asked to explain numbers we may have misread. Real scans, skew, and stamps will be harder than these samples.
+
+Also found while measuring: the PDF was opened twice per document. Opening once cut PDF parse from ~2.7 ms to ~1.9 ms, but end-to-end throughput
+did not change (the single orchestrating process is still the ceiling).
+
 ## 5. Known limitations
 - Duplicate detection is by (vendor, invoice number, revision); which of two identical copies is called the duplicate depends on timing.
 - Stock is checked per invoice and not decremented, so results do not depend on processing order.
 - A revised invoice (`revision` set) is always escalated to a human; there is no delta-payment logic.
 - Non-USD invoices are escalated; there is no FX handling.
 - Item matching tolerates small typos but not larger ones; `WidgetC` correctly stays unknown.
+- OCR needs a local `tesseract` binary; without it a scanned PDF is held as unreadable. OCR line-item recovery is partial.
 - Email intake reads `.eml` files; there is no live mailbox connection (IMAP/Graph), no sending, no reply parsing, and no OCR for scanned images.
 - No authentication or real NetSuite connectivity.

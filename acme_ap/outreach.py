@@ -13,13 +13,15 @@ from .models import Outcome, Severity
 
 MAX_ASKS = 3
 NO_CONTACT = {"fraud_indicators", "pressure_language", "unknown_vendor", "vendor_blocked", "duplicate_invoice",
-              "extractor_disagreement"}
+              "extractor_disagreement", "ocr_source"}
 
 
 def _asks(outcome: Outcome) -> list[tuple[str, str]]:
     """(finding code, question) in priority order, de-duplicated."""
     inv = outcome.invoice
     questions: dict[str, str] = {}
+    if any(f.code == "unreadable_document" for f in outcome.findings):
+        return [("unreadable", "We could not read the attached file. Could you resend it as a text-based PDF, or just reply with the invoice number, date, items and total?")]
     for f in outcome.findings:
         if f.severity is not Severity.ERROR:
             continue

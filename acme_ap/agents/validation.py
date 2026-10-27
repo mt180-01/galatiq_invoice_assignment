@@ -24,6 +24,9 @@ def validate(inv: Invoice, erp: ErpAdapter) -> list[Finding]:
     out: list[Finding] = []
     E, H, W = Severity.ERROR, Severity.HOLD, Severity.WARN
 
+    if any(w.startswith("no text layer") for w in inv.parse_warnings):
+        # Nothing was extracted, so every other check would just echo "missing". Report the one real problem.
+        return [_f("unreadable_document", H, "document could not be read (scanned image and OCR unavailable or empty)")]
     for w in inv.parse_warnings:
         if w.startswith("extractor disagreement"):
             out.append(_f("extractor_disagreement", H, w))
@@ -56,6 +59,13 @@ def validate(inv: Invoice, erp: ErpAdapter) -> list[Finding]:
     _check_items(inv, erp, out)
     _check_math(inv, out)
     _check_fraud(inv, vendor is None, out)
+
+    if any(w.startswith("ocr:") for w in inv.parse_warnings):
+        # OCR can misread digits and drop table rows, so its output is a draft for a person, never a payment
+        # instruction. Extraction-dependent errors are capped at HOLD (a human sees them all) and the vendor is
+        # not asked to explain numbers that may simply be our misreading.
+        out = [f.model_copy(update={"severity": H}) if f.severity is E else f for f in out]
+        out.append(_f("ocr_source", H, "text recovered from a scanned image by OCR; a person must verify before payment"))
 
     if inv.total is not None and APPROVAL_THRESHOLD * Decimal("0.95") <= inv.total <= APPROVAL_THRESHOLD:
         out.append(_f("near_threshold", W, f"total {inv.total} sits just under the {APPROVAL_THRESHOLD} review threshold"))

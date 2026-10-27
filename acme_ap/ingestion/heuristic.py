@@ -85,7 +85,8 @@ def extract(text: str, fmt: str = "text") -> Invoice:
     items: list[LineItem] = []
     for line in text.splitlines():
         low = line.strip().lower()
-        if not low or low.split(":")[0].split()[0] in _LABEL_WORDS:
+        head = low.split(":")[0].split()
+        if not head or head[0] in _LABEL_WORDS:  # blank, or noise like a lone ":" from OCR
             continue
         m = _ITEM_QTY.match(line)
         if m:
