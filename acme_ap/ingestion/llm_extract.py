@@ -13,6 +13,7 @@ import re
 
 from ..llm import LLM, LLMUnavailable, as_agent
 from ..models import Invoice, LineItem
+from .heuristic import _clean_name
 from .parsing import normalize_account, normalize_invoice_number, parse_date, parse_money
 
 SYSTEM = """You extract invoice data. Return JSON:
@@ -58,8 +59,11 @@ def doubt(baseline: Invoice) -> str | None:
 
 
 def _build(data: dict) -> Invoice:
-    items = [LineItem(item=str(li["item"]), quantity=int(li["quantity"]), unit_price=parse_money(li.get("unit_price")),
-                      amount=parse_money(li.get("amount"))) for li in data.get("line_items", [])]
+    items = []
+    for li in data.get("line_items", []):
+        name, note = _clean_name(str(li["item"]))  # "WidgetA (rush order)" is item WidgetA with a note, as the regex reader sees it
+        items.append(LineItem(item=name, quantity=int(li["quantity"]), unit_price=parse_money(li.get("unit_price")),
+                              amount=parse_money(li.get("amount")), note=note or li.get("note")))
     return Invoice(
         invoice_number=normalize_invoice_number(data.get("invoice_number")), vendor=data.get("vendor") or None,
         date=parse_date(data.get("date")), due_date=parse_date(data.get("due_date")),

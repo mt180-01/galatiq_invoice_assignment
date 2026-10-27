@@ -177,3 +177,40 @@ def test_an_unusually_large_bill_from_a_known_vendor_gets_a_second_opinion_and_g
     assert llm.meter.tool_calls["reviewer"] >= 3
     offline = run(MockNetSuite(tmp_path / "o.db"), make_llm(offline=True), [f])
     assert offline[0].status == "PAID"                                                      # the rules alone would have paid it
+
+
+# ---- found by running against the live API ----------------------------------------------------------------
+def test_a_note_in_the_item_name_is_not_a_disagreement():
+    """Live Grok returned 'WidgetA (rush order)' where the regex reader reports item WidgetA with a note: same line, same quantity."""
+    from acme_ap.ingestion import llm_extract, parse_file
+    from tests.test_robustness import Scripted, as_json
+    baseline, text = parse_file(str(DATA / "invoice_1010.txt"))
+    answer = as_json(baseline)
+    answer["line_items"][3]["item"] = "WidgetA (rush order)"
+    got = asyncio.run(llm_extract.extract(text, baseline, Scripted(extraction=answer)))
+    assert not [w for w in got.parse_warnings if w.startswith("extractor disagreement")]
+    assert [(li.item, li.quantity) for li in got.line_items][-1] == ("WidgetA", 4) and got.line_items[-1].note == "rush order"
+
+
+def test_a_model_the_key_cannot_use_is_replaced_by_one_it_can(caplog):
+    seen = []
+
+    def handler(request):
+        if request.url.path.endswith("/models"):
+            return httpx.Response(200, json={"data": [{"id": "grok-imagine-image"}, {"id": "grok-4.3"}, {"id": "grok-4.20-0309-reasoning"},
+                                                      {"id": "grok-4.20-0309-non-reasoning"}, {"id": "grok-build-0.1"}]})
+        body = json.loads(request.content)
+        seen.append(body["model"])
+        if body["model"] == "grok-3":
+            return httpx.Response(404, json={"error": "The model grok-3 does not exist or your team does not have access to it."})
+        return message('{"ok": true}')
+    llm = GrokClient("k", transport=httpx.MockTransport(handler))
+    assert asyncio.run(llm.chat_json("s", "u")) == {"ok": True} and asyncio.run(llm.chat_json("s", "u2")) == {"ok": True}
+    assert seen == ["grok-3", "grok-4.20-0309-non-reasoning", "grok-4.20-0309-non-reasoning"]      # asked once, then remembered; cheapest kind chosen
+    assert llm.model == "grok-4.20-0309-non-reasoning"
+
+
+def test_unrelated_errors_do_not_trigger_model_discovery():
+    from acme_ap.llm import _model_missing
+    assert _model_missing('{"error": "The model foo does not exist"}') and not _model_missing('{"error": "Incorrect API key provided"}')
+    assert not _model_missing('{"error": "rate limit exceeded"}')

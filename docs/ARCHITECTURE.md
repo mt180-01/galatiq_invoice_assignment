@@ -98,7 +98,7 @@ that are fixed and covered by regression tests: the daily-limit check re-read ev
 **This is not linear scaling, and cores are not fully busy.** The ceiling is the single orchestrating process (result pickling,
 validation, SQLite commits): Amdahl's law. The next step is horizontal: a durable queue (SQS/Kafka) with N independent worker processes,
 each owning its own pool, and the ERP as the shared store. In the real system the dominant latency is the LLM and the ERP API, not CPU, which is why the async layer matters more than the pool.
-With `XAI_API_KEY` unset (or `--offline`) the agents run deterministically; the Grok path is covered by mocked-transport tests only and has **not** been run against the live API.
+With `XAI_API_KEY` unset (or `--offline`) the agents run deterministically; the Grok path is covered by mocked-transport tests and has been run against the live API (section 4i).
 
 ### SIMD: where it helps and where it does not
 
@@ -230,7 +230,7 @@ trail is recorded and shown. The "first read" is deliberately simpler than the f
 
 | Requirement | How it is met | Evidence |
 |---|---|---|
-| **Grok as the reasoning engine** (xAI API) | `GrokClient` speaks the OpenAI-compatible chat-completions protocol xAI uses (`https://api.x.ai/v1`, `grok-3`, `XAI_API_KEY`). Grok does the judgement work: reading documents the rules cannot, and a second opinion on invoices policy would approve. Routine, exact work (checks, routing, payment) stays in rules on purpose, to keep tokens and risk down. | `tests/test_pipeline.py`, `tests/test_tooluse.py`. **Never run against the live API** (no key). |
+| **Grok as the reasoning engine** (xAI API) | `GrokClient` speaks the OpenAI-compatible chat-completions protocol xAI uses (`https://api.x.ai/v1`, `grok-3`, `XAI_API_KEY`). Grok does the judgement work: reading documents the rules cannot, and a second opinion on invoices policy would approve. Routine, exact work (checks, routing, payment) stays in rules on purpose, to keep tokens and risk down. | `tests/test_pipeline.py`, `tests/test_tooluse.py`. Run live: `scripts/live_smoke.py` 5/5, full pipeline 17/17 (section 4i). |
 | **Multi-agent orchestration** | A custom orchestrator (`acme_ap/pipeline.py`) runs six agents (`python main.py agents`), each with a charter, tools and a trace entry per invoice. Chosen over a framework so that scheduling across CPU cores and I/O stays under our control. | `tests/test_agents_cost.py::test_trace_shows_which_agent_did_what` |
 | **Function calling / tool use** | The Reviewer's model chooses and calls read-only tools (`lookup_item`, `lookup_vendor`, `vendor_history`, `policy_limits`) in a bounded loop; bad calls come back as error messages it can correct. | `tests/test_tooluse.py` (tool loop, unknown tool, step limit, real ERP tools) |
 | **Structured outputs** | Replies must fit Pydantic schemas (`ReviewDecision`, `AuditIssues`); the request asks for a JSON object (dropped automatically if an endpoint rejects the parameter). | `test_malformed_reply_is_sent_back...`, `test_json_mode_is_dropped...` |
@@ -239,8 +239,28 @@ trail is recorded and shown. The "first read" is deliberately simpler than the f
 | **Python, PyMuPDF, local** | Python 3.13, PyMuPDF for PDFs, Tesseract for scans, SQLite, no cloud. | `requirements.txt`, `make e2e` |
 | **`python main.py --invoice_path=...`, structured logs and results** | Decisions and payments log one structured line each by default; `-v` shows every stage. | `tests/test_brief.py`, `make e2e` |
 
-The one thing that would change the picture is a live Grok run: tool-call format details, `response_format` support and real token counts are
-unverified. The client degrades safely (any failure falls back to the rules), but "works with the live API" is not claimed.
+The client degrades safely: any failure falls back to the rules, and a rejected API key switches the model off for the rest of the run.
+
+## 4i. Verified against the live Grok API
+
+Run on 2026-10-27 with a real xAI key (kept in a private file outside the repo; `scripts/live_smoke.py` reads it and never prints it).
+
+| Check | Result |
+|---|---|
+| Authentication, model name, JSON mode (`response_format`) | Pass; the endpoint accepted JSON mode |
+| Function calling with the OpenAI-style `tools` format | Pass; the model called our tool and used the result |
+| Reply validated against the Pydantic schema | Pass |
+| Extraction of a typo-heavy invoice agrees with the regex reader | Pass after one fix (below) |
+| Reviewer agent end to end with tools | Pass |
+| **Full pipeline, all 17 provided invoices, live** | **17/17 outcomes as labelled, 0 errors; 10 model calls, 5,931 tokens in / 459 out** (3 duplicate files blocked; model calls gated as described in 4f) |
+
+What the live run found that the stubs could not, all fixed and covered by tests:
+1. **Item names with notes.** Grok returned `WidgetA (rush order)` where the regex reader reports item `WidgetA` plus a note. The cross-check read that as a disagreement and held the invoice. Names are now normalised the same way on both sides.
+2. **Too many tool calls.** The reviewer made 10 tool calls for one invoice. The prompt now asks for only the tools it needs, once each; the same check made 1 call (5,154 to 3,414 tokens).
+3. **Model availability.** The key's model list (`/models`) showed only Grok 4.x ids, so the client now discovers a usable chat model (preferring non-reasoning, which does not bill hidden thinking tokens) if the configured one is rejected.
+
+Still unverified: dollar cost (set `XAI_PRICE_IN` / `XAI_PRICE_OUT`), behaviour under rate limits at volume, and Grok's accuracy on messy scans. The 5,931 tokens are
+real counts for 20 files; the earlier 1,621-token figure came from a stand-in on a different set with estimated counts, so the two are not directly comparable.
 
 ## 4f. The agent team and what each one costs
 
@@ -282,8 +302,7 @@ document ─> INTAKE ─> VALIDATION ─> REVIEWER ──approve──> PAYMENT 
 
 Outcomes are identical in all three. **Read this fairly:** the stub never errs, so it shows how much the system *asks*, not how a real model answers; the
 sample is small and mostly clean or structured, so a mailbox full of messy scans will gate less; and the compaction saving is small here because the
-sample invoices are short. The calls avoided are the structural saving; the token figure is a volume, to be priced at your own rates. Live Grok has
-not been run.
+sample invoices are short. The calls avoided are the structural saving; the token figure is a volume, to be priced at your own rates. Real Grok token counts are in section 4i.
 
 ## 5. Known limitations
 - Duplicate detection is by (vendor, invoice number, revision); which of two identical copies is called the duplicate depends on timing.

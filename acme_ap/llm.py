@@ -11,6 +11,7 @@ from __future__ import annotations
 import contextvars
 import hashlib
 import json
+import logging
 import os
 import re
 import sqlite3
@@ -37,6 +38,14 @@ def as_agent(name: str):
         yield
     finally:
         _agent.reset(token)
+
+
+log_model = logging.getLogger("acme.llm")
+
+
+def _model_missing(body: str) -> bool:
+    text = body.lower()
+    return "model" in text and any(w in text for w in ("not found", "does not exist", "not available", "no access", "invalid model", "unknown model"))
 
 
 class LLMUnavailable(RuntimeError):
@@ -177,6 +186,7 @@ class GrokClient(LLM):
         return os.environ.get(f"XAI_MODEL_{agent.upper()}") or self.model
 
     label = "Grok"
+    _model_checked = False
     _json_mode = True  # ask the API for a JSON object; switched off for good if the endpoint rejects the parameter
 
     async def _post(self, payload: dict, agent: str) -> dict:
@@ -189,6 +199,13 @@ class GrokClient(LLM):
                 self.available = False  # stop asking: every later call would fail the same way and every invoice would pay for the attempt
                 raise LLMUnavailable(f"Grok rejected the API key (HTTP {resp.status_code}: {resp.text[:160].replace(self._key, '***')}); "
                                      "falling back to the rules for the rest of this run")
+            if resp.status_code in (400, 403, 404) and not self._model_checked and _model_missing(resp.text):
+                self._model_checked = True
+                if found := await self._discover_model():
+                    log_model.warning("model %s is not available to this key; using %s", payload["model"], found)
+                    self.model = found
+                    payload = {**payload, "model": found}
+                    resp = await self._client.post("/chat/completions", json=payload)
             if resp.status_code in (400, 422) and "response_format" in payload and "response_format" in resp.text:
                 type(self)._json_mode = False  # this endpoint does not take it: carry on without
                 payload = {k: v for k, v in payload.items() if k != "response_format"}
@@ -208,6 +225,18 @@ class GrokClient(LLM):
         got = len(json.dumps(body["choices"][0]["message"]))
         self.meter.record(agent, int(usage.get("prompt_tokens") or sent // 4), int(usage.get("completion_tokens") or got // 4))
         return body
+
+    async def _discover_model(self) -> str | None:
+        """Ask the API which models this key can use and take the first plain chat model, preferring non-reasoning ones
+        (cheaper: reasoning models bill hidden thinking tokens, which routine invoice work does not need)."""
+        try:
+            resp = await self._client.get("/models")
+            ids = [m["id"] for m in resp.json().get("data", [])]
+        except (httpx.HTTPError, KeyError, ValueError, TypeError):
+            return None
+        chat = [i for i in ids if i.startswith("grok-") and not any(x in i for x in ("imagine", "video", "image", "build", "multi-agent", "vision"))]
+        plain = [i for i in chat if "non-reasoning" in i]
+        return (plain or chat or [None])[0]
 
     @staticmethod
     def _json_from(content: str) -> dict:

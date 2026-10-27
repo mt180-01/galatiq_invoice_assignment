@@ -151,7 +151,8 @@ async def _llm_draft(inv, findings, llm: LLM, issues: list[str] | None, tools: l
     user = _brief(inv, findings) + (f"\nWorth a look: {risk_hint}." if risk_hint else "") + (f"\nA reviewer objected: {issues}. Revise." if issues else "")
     reply = await structured(
         llm, "You are the VP approving accounts-payable invoices. Decide approve|reject|escalate and justify briefly. "
-        + ("You may call tools to verify facts (inventory, vendor, the vendor's payment history) before deciding. " if tools else "")
+        + ("You may call tools to verify facts, but only the ones you need, each at most once (vendor, one call per distinct item, "
+           "the vendor's payment history), and then decide: the findings you were given are already checked. " if tools else "")
         + 'Reply as JSON: {"decision": "approve|reject|escalate", "reasoning": "..."}', user, ReviewDecision, tools)
     return Approval(decision=Decision(reply.decision), reasoning=reply.reasoning)
 
