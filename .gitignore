@@ -7,3 +7,6 @@ runs/
 .env
 outbox/
 *.llmcache
+.env.*
+*.key
+xai_key

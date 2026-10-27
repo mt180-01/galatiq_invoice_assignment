@@ -167,6 +167,7 @@ class GrokClient(LLM):
                  transport: httpx.AsyncBaseTransport | None = None, timeout: float = 30.0,
                  cache: LLMCache | None = None, meter: Meter | None = None):
         self.model, self.cache, self.meter = model, cache, meter or Meter()
+        self._key = api_key
         self._client = httpx.AsyncClient(
             base_url=base_url, timeout=timeout, transport=transport,
             headers={"Authorization": f"Bearer {api_key}"},
@@ -180,8 +181,14 @@ class GrokClient(LLM):
 
     async def _post(self, payload: dict, agent: str) -> dict:
         """One API call with usage metering. Raises LLMUnavailable on any transport or protocol failure."""
+        if not self.available:
+            raise LLMUnavailable("Grok disabled for this run: the API key was rejected")
         try:
             resp = await self._client.post("/chat/completions", json=payload)
+            if resp.status_code in (401, 403) or (resp.status_code == 400 and "api key" in resp.text.lower()):
+                self.available = False  # stop asking: every later call would fail the same way and every invoice would pay for the attempt
+                raise LLMUnavailable(f"Grok rejected the API key (HTTP {resp.status_code}: {resp.text[:160].replace(self._key, '***')}); "
+                                     "falling back to the rules for the rest of this run")
             if resp.status_code in (400, 422) and "response_format" in payload and "response_format" in resp.text:
                 type(self)._json_mode = False  # this endpoint does not take it: carry on without
                 payload = {k: v for k, v in payload.items() if k != "response_format"}
@@ -189,8 +196,13 @@ class GrokClient(LLM):
             resp.raise_for_status()
             body = resp.json()
             body["choices"][0]["message"]
+        except LLMUnavailable:
+            raise
+        except httpx.HTTPStatusError as exc:
+            detail = exc.response.text[:160].replace(self._key, "***")
+            raise LLMUnavailable(f"Grok call failed: HTTP {exc.response.status_code}: {detail}") from exc
         except (httpx.HTTPError, KeyError, IndexError, ValueError, TypeError) as exc:
-            raise LLMUnavailable(f"Grok call failed: {exc}") from exc
+            raise LLMUnavailable(f"Grok call failed: {str(exc).replace(self._key, '***')}") from exc
         usage = body.get("usage") or {}
         sent = sum(len(json.dumps(m)) for m in payload["messages"])
         got = len(json.dumps(body["choices"][0]["message"]))
@@ -251,10 +263,22 @@ class GrokClient(LLM):
         await self._client.aclose()
 
 
+def read_api_key() -> str | None:
+    """XAI_API_KEY from the environment, else from a private file outside the repo (XAI_API_KEY_FILE, default ~/.config/acme_ap/xai_key).
+    The key is never written into the project, logs, caches or outputs."""
+    if key := os.environ.get("XAI_API_KEY"):
+        return key.strip()
+    path = Path(os.environ.get("XAI_API_KEY_FILE") or Path.home() / ".config" / "acme_ap" / "xai_key")
+    try:
+        return path.read_text().strip() or None
+    except OSError:
+        return None
+
+
 def make_llm(offline: bool = False, cache_path: str | Path | None = None, simulate: bool = False) -> LLM:
     """offline: no model at all (rules only). XAI_API_KEY set: Grok. Otherwise (or simulate=True): the local stand-in, so the full
     agent protocol still runs with no internet."""
-    key = os.environ.get("XAI_API_KEY")
+    key = read_api_key()
     if offline:
         return OfflineLLM()
     if key and not simulate:

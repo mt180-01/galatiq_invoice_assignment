@@ -14,6 +14,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt     # 1. set 
 `make setup`, `make test`, `make demo` and `make bench` do the same; `make e2e` runs the whole workflow through the command-line tools and checks every step.
 A single file works too (`--invoice_path=data/invoices/invoice_1001.txt`). Add `-v` for per-stage logs and `--json out.json`
 to save results. Set `XAI_API_KEY` to use Grok. Without a key a local stand-in model (labelled as such) runs the same agent protocol, tool calls included, so everything works with no internet; `--offline` turns the model off entirely and `--simulate` forces the stand-in even when a key is set.
+Keep the key out of the repo: export `XAI_API_KEY` in your shell, or save it alone in `~/.config/acme_ap/xai_key` (`chmod 600`), where the code reads it. `python scripts/live_smoke.py` checks the live API; `tests/test_no_secrets.py` fails if a credential is ever committed.
 Scanned PDFs need `tesseract` installed.
 
 ## What you will see

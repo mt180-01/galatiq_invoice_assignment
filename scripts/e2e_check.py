@@ -8,7 +8,8 @@ from pathlib import Path
 
 REPO = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent.parent
 PY = str(REPO / ".venv/bin/python") if (REPO / ".venv/bin/python").exists() else sys.executable
-ENV = {**os.environ, "PYTHONWARNINGS": "ignore", "COLUMNS": "220"}
+ENV = {**{k: v for k, v in os.environ.items() if k != "XAI_API_KEY"}, "PYTHONWARNINGS": "ignore", "COLUMNS": "220",
+       "XAI_API_KEY_FILE": "/nonexistent/xai_key"}  # this check is free and offline: it never uses a real key
 results = []
 
 
