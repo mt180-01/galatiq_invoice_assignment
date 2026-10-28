@@ -27,7 +27,7 @@ def test_every_page_has_the_landmarks_a_screen_reader_and_keyboard_need(ui):  # 
         assert 'role="status" aria-live="polite"' in html                                  # changes to the display settings are announced
         assert "<th>" not in html and "<th class" not in html.replace('<th scope="col" class', "")   # every header cell is scoped to its column
     dash, _ = get(base + "/")
-    assert dash.count("<table>") == dash.count("<caption")                                    # every table is named
+    assert dash.count("<table") == dash.count("<caption")                                    # every table is named
 
 
 def test_status_is_a_word_and_a_symbol_never_colour_alone(ui):  # noqa: F811
@@ -77,3 +77,14 @@ def test_plain_mode_is_linear_sentences_without_tables_colour_or_box_drawing(tmp
 def test_the_default_output_is_unchanged(tmp_path):
     out = (lambda p: p.stdout + p.stderr)(run_cli(tmp_path))
     assert "Invoice results" in out and "Totals:" not in out
+
+
+def test_tables_stack_into_labelled_cards_on_a_phone_without_losing_their_meaning(ui):  # noqa: F811
+    """Found in a real browser at 375px: Status and "What happened" were off-screen inside a sideways-scrolling table."""
+    base, _ = ui
+    dash, _ = get(base + "/")
+    assert "max-width:600px" in web.CSS and "tr.hd" in web.CSS and "attr(data-label)" in web.CSS and "minmax(140px" in web.CSS
+    rows = re.findall(r'<tr role="row">(.*?)</tr>', dash, re.S)
+    assert rows and all(r.count('role="cell"') == r.count("<td") for r in rows)           # explicit roles: stacked layout must not erase the table for a screen reader
+    assert 'data-label="Status"' in dash and 'data-label="What happened"' in dash and 'data-label="Vendor"' in dash
+    assert '<tr role="row" class="hd">' in dash and 'role="columnheader"' in dash          # the header row is visually hidden when stacked, never removed

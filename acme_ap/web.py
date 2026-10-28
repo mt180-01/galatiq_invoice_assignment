@@ -64,7 +64,7 @@ CSS = """
 header{background:var(--card);border-bottom:1px solid var(--line);padding:14px 20px;display:flex;gap:16px;align-items:baseline;flex-wrap:wrap}
 header b{font-size:1.0625rem}header a{color:var(--brand);text-decoration:none}main{max-width:1100px;margin:0 auto;padding:20px 16px 48px}
 h1{font-size:1.375rem;margin:4px 0 4px}h2{font-size:1rem;margin:28px 0 10px}.sub{color:var(--mute);margin:0 0 18px}
-.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
 .tile{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}.tile .n{font-size:1.75rem;font-weight:650;line-height:1.1}
 .tile .l{color:var(--mute);font-size:0.8125rem}.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:14px}
 table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
@@ -100,7 +100,10 @@ html[data-contrast="high"] .skip,html[data-contrast="high"] button[aria-pressed=
 --bad:#ff9d94;--badbg:#000;--wait:#ffe08a;--waitbg:#000;--info:#9ad8ff;--infobg:#000;--mutebg:#1a1a1a}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 @media (forced-colors:active){.pill,.tile,.card{border:1px solid CanvasText}button[aria-pressed=true]{outline:3px solid Highlight}}
-@media (max-width:600px){.kv{grid-template-columns:1fr}th,td{padding:8px}}
+@media (max-width:600px){.kv{grid-template-columns:1fr}th,td{padding:8px}
+.scroll{overflow:visible}table,tr,td,caption{display:block;width:100%}tr.hd{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+tr{border-bottom:1px solid var(--line);padding:6px 4px}tr:last-child{border-bottom:0}td{border:0;padding:3px 8px;white-space:normal!important;text-align:left!important}
+td[data-label]:not([data-label=""])::before{content:attr(data-label);display:block;font-size:.72rem;color:var(--mute);text-transform:uppercase;letter-spacing:.04em}}
 """
 
 STATUS = {"paid": ("Paid", "ok"), "scheduled": ("Scheduled", "info"), "pending_approval": ("Waiting for a person", "wait"), "reject": ("Rejected", "bad"),
@@ -170,9 +173,16 @@ def speak_button(target: str, label: str = "Read aloud") -> str:
 
 
 def table(caption: str, head: str, rows: str) -> str:
-    """A data table a screen reader can navigate: a caption, and header cells scoped to their columns."""
-    head = re.sub(r"<th(?=[ >])", '<th scope="col"', head)
-    return f'<div class="scroll"><table><caption class="sr-only">{e(caption)}</caption><tr>{head}</tr>{rows}</table></div>'
+    """A data table a screen reader can navigate: a caption, header cells scoped to their columns, and explicit roles so the meaning survives
+    the stacked layout used on narrow screens. Each cell also carries its column name (shown as a label when the rows stack into cards)."""
+    labels = [re.sub(r"<[^>]+>", "", h).strip() for h in re.findall(r"<th[^>]*>(.*?)</th>", head)]
+    head = re.sub(r"<th(?=[ >])", '<th scope="col" role="columnheader"', head)
+
+    def label_row(m: re.Match) -> str:
+        n = iter(range(len(labels)))
+        return re.sub(r"<td(?=[ >])", lambda _: f'<td role="cell" data-label="{e(labels[i] if (i := next(n, -1)) >= 0 and i < len(labels) else "")}"', m.group(0))
+    rows = re.sub(r"<tr>.*?</tr>", lambda m: label_row(m).replace("<tr>", '<tr role="row">', 1), rows, flags=re.S)
+    return f'<div class="scroll"><table role="table"><caption class="sr-only">{e(caption)}</caption><tr role="row" class="hd">{head}</tr>{rows}</table></div>'
 
 
 def page(title: str, body: str, refresh: bool = False) -> bytes:
