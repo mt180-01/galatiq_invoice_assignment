@@ -5,6 +5,14 @@ reads invoices in any format, checks them against the ERP, gets the right person
 happened. Six agents with distinct jobs: Intake, Validation, Reviewer and Comms use Grok where reasoning helps (with tools and self-checks); Desk and Payment are deliberately rules-only, because a mistake there costs money. The order of the stages is fixed; the agents do not plan or delegate to each other. Built for the case in
 [docs/ASSIGNMENT.md](docs/ASSIGNMENT.md).
 
+## Quickstart
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt   # Tesseract is only needed for scanned PDFs
+python main.py --invoice_path=data/invoices                                              # the brief's command: all 17 sample invoices, free, no key
+python main.py serve --demo                                                              # the web interface at http://127.0.0.1:8765
+```
+
 > **Which model runs?** By default, **Grok**, replayed: its answers come from real runs recorded on 2026-10-27 and 2026-10-28 against `grok-4.20-0309-non-reasoning`, shipped in this repository, so a run
 > needs no key, no network and no money (the cost shown is what xAI reported when recorded). `--grok` calls xAI live (needs `XAI_API_KEY`, capped at $0.25 a run); `--simulate` is a local stand-in that is
 > *not* Grok; `--offline` uses no model. An invoice of your own is not in the recordings, so the rules read it (the report says "N not recorded"): use `--grok` to put Grok on it.
@@ -20,19 +28,34 @@ happened. Six agents with distinct jobs: Intake, Validation, Reviewer and Comms 
 
 The command line is first-class too: [`docs/img/demo.svg`](docs/img/demo.svg) is the real output of `python main.py demo`.
 
+## What the brief asked for, and where it is
+
+| The brief says | Here |
+|---|---|
+| Run `python main.py --invoice_path=...` with structured logs and results | exactly that. Decisions and payments are always logged as `key="value"` lines (`acme.decision`, `acme.payment`); **`-v` adds the per-stage logs** (ingest, each finding). Example: `acme.payment Paid 5000.00 to Widgets Inc.`. `--json FILE` writes the full results |
+| A local SQLite inventory the validation stage checks | **`inventory.db`**, created on the first run (`--db` to move it) with the brief's four rows (`WidgetA` 15, `WidgetB` 10, `GadgetX` 5, `FakeItem` 0) plus unit prices and an approved-vendor table: `acme_ap/erp/mock_netsuite.py` |
+| Flag stock mismatches, unknown items, invalid data | `insufficient_stock`, `out_of_stock`, `unknown_item`, `invalid_quantity` and more: `acme_ap/agents/validation.py` |
+| **Invoices over $10,000 need additional scrutiny / VP approval** | above 10,000 a person signs off however clean the invoice is: `APPROVAL_THRESHOLD = 10000` in `agents/validation.py` and `VP_THRESHOLD = 10000` in `approvals/routing.py` (CFO above 50,000) |
+| Approval agent with a reflection or critique loop | draft, then critique, then revise, up to 3 rounds: `acme_ap/agents/approval.py` |
+| **`mock_payment(vendor, amount)`** if approved; log the rejection with reasoning if not | `acme_ap/payments/mock.py` is the brief's function, unchanged in behaviour; the simulated bank calls it to move the money (`payments/bank.py`). A rejection is logged with its reasoning and kept in the audit log |
+| Grok as the reasoning engine; function calling, structured outputs, self-correction | `acme_ap/llm.py` (xAI's OpenAI-compatible API, tools, strict JSON Schema); which model actually runs by default is explained above |
+| A multi-agent orchestration (framework or custom) | custom, `acme_ap/pipeline.py` and `acme_ap/agents/team.py`; `python main.py agents` prints the roster |
+
 ## Results
 
-| What | Result | Evidence |
-|---|---|---|
-| The 17 provided invoices | **17 / 17 end as labelled**, 8 / 8 on the outcomes the brief itself states, 0 wrongly paid: 7 paid, 8 rejected, 2 sent to a person, 3 duplicates blocked | **[docs/EVALUATION.md](docs/EVALUATION.md)**: every invoice, decision and reason, rules-only and LLM-on reported separately |
-| Same run on **live Grok** | 17 / 17, 0 errors, 36 model calls and 42 tool calls, **$0.021 total (about $0.0012 per invoice)** as reported by xAI | [`docs/live_runs/`](docs/live_runs/): recorded transcript, JSON, and a **recording you can replay offline for free** (`--replay-llm`) |
-| Reading messy documents (independent test) | 58 invoices in 12 layouts written by Grok, answers fixed beforehand: the regex rules alone read **48%** fully right, with Grok when in doubt **58 / 58**; 0 wrong invoices would have been approved either way. Degraded **scans** (30, through OCR): rules 63%, with Grok **83%** | [docs/EXTRACTION_EVAL.md](docs/EXTRACTION_EVAL.md), [docs/SCAN_EVAL.md](docs/SCAN_EVAL.md), replayable for free |
-| **Red team** | 13 fraud and failure scenarios (look-alike vendor, split purchase, re-numbered duplicate, inflated prices, hidden instructions to the AI, ...) plus 3 clean control invoices: **13 / 13 stopped, 3 / 3 still approved**, with rules only and with the recorded live Grok run. The first run stopped 7 / 13 and live Grok once *invented a shipping charge* to repair a fake total: both are fixed and pinned by tests | **[docs/RED_TEAM.md](docs/RED_TEAM.md)**, `python scripts/red_team.py` |
-| Errors caught before payment | stock shortfalls, unknown items, arithmetic that doesn't add up, a fraud pattern, a changed bank account, duplicates across formats | `data/invoices`, `tests/test_brief.py` |
-| Robustness to garbage | 2,000 randomly corrupted invoices: **0 approved with a wrong value** (a stray "see invoice 31337" once got through; found and fixed) | `scripts/stress_extraction.py` |
-| Speed | a clean invoice spends about 10-15 ms in the system, against "5 days" in the brief; about 2,200 documents/s on 14 cores | `main.py --bench`, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §4 |
-| Waiting on a person | never silent: reminder at 24 h, escalation at 48 h, expiry at 5 days | `approve.py tick`, `make e2e` |
-| Tests | **349 tests** plus a **60-check end-to-end run** from a fresh clone; a test fails the build if a credential is ever committed | `make test`, `make e2e` |
+| What | Mode | Result | Evidence |
+|---|---|---|---|
+| The 17 provided invoices | rules only (`--offline`) | **17 / 17 end as labelled**, 8 / 8 on the outcomes the brief itself states, 0 wrongly paid: 7 paid, 8 rejected, 2 sent to a person, 3 duplicates blocked | **[docs/EVALUATION.md](docs/EVALUATION.md)**: every invoice, decision and reason, the two modes reported separately |
+| The 17 provided invoices | Grok, replayed from a live recording (the default) | the same 17 / 17, 0 errors; 36 model calls and 42 tool calls; **$0.0208 total (about $0.0012 per invoice)**, the cost xAI reported when it was recorded live; the model changed no decision | [`docs/live_runs/`](docs/live_runs/): transcript, JSON and the recording (`--replay-llm`) |
+| Reading 58 messy invoices (12 layouts written by Grok, answers fixed beforehand) | rules only | **48%** fully right (28 / 58); 0 wrong invoices would have been approved | [docs/EXTRACTION_EVAL.md](docs/EXTRACTION_EVAL.md) |
+| Reading the same 58 | Grok when the rules are in doubt, replayed | **58 / 58** fully right; 33 model calls, $0.031 | [docs/EXTRACTION_EVAL.md](docs/EXTRACTION_EVAL.md) |
+| Reading 30 degraded scans (through OCR) | rules only / Grok, replayed | **63%** / **83%** | [docs/SCAN_EVAL.md](docs/SCAN_EVAL.md) |
+| **Red team** | rules only, and Grok replayed (both reported) | 13 fraud and failure scenarios (look-alike vendor, split purchase, re-numbered duplicate, inflated prices, hidden instructions to the AI, ...) plus 3 clean control invoices: **13 / 13 stopped, 3 / 3 still approved**, with rules only and with the recorded live Grok run. The first run stopped 7 / 13 and live Grok once *invented a shipping charge* to repair a fake total: both are fixed and pinned by tests | **[docs/RED_TEAM.md](docs/RED_TEAM.md)**, `python scripts/red_team.py` |
+| Errors caught before payment | rules (no model involved) | stock shortfalls, unknown items, arithmetic that doesn't add up, a fraud pattern, a changed bank account, duplicates across formats | `data/invoices`, `tests/test_brief.py` |
+| Robustness to garbage | rules only | 2,000 randomly corrupted invoices: **0 approved with a wrong value** (a stray "see invoice 31337" once got through; found and fixed) | `scripts/stress_extraction.py` |
+| Speed | no model (`--offline`) | a clean invoice spends about 10-15 ms in the system, against "5 days" in the brief; about 2,200 documents/s on 14 cores | `main.py --bench`, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §4 |
+| Waiting on a person | no model | never silent: reminder at 24 h, escalation at 48 h, expiry at 5 days | `approve.py tick`, `make e2e` |
+| Tests | no model | **351 tests** plus a **60-check end-to-end run** from a fresh clone; a test fails the build if a credential is ever committed | `make test`, `make e2e` |
 
 ## Business impact
 
@@ -93,15 +116,15 @@ document -> INTAKE -> VALIDATION -> REVIEWER --approve--> PAYMENT -> COMMS
 ## Run it
 
 ```bash
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt      # set up (Tesseract only for scanned PDFs)
-.venv/bin/python main.py --invoice_path=data/invoices                   # process the sample invoices on Grok's recorded answers (no key, free, offline)
-.venv/bin/python main.py --invoice_path=data/invoices --reset           # run again from an empty ledger (without --reset the ledger is kept: nothing is ever paid twice)
-.venv/bin/python main.py serve --demo                                   # the web interface: dashboard, upload, review queue (http://127.0.0.1:8765)
-.venv/bin/python main.py --simulate --invoice_path=data/invoices         # the same, on the local stand-in model instead of the recording
-.venv/bin/python main.py demo                                           # the whole story in one command
-.venv/bin/python main.py --replay-llm docs/live_runs/provided-invoices.cassette.jsonl --invoice_path=data/invoices   # a real Grok run, replayed offline for free
-.venv/bin/python main.py --trace --invoice_path=data/self_correction    # watch the agents work
-.venv/bin/python main.py --grok --invoice_path=data/invoices            # real Grok: billed per token, capped per run
+python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt   # set up (Tesseract only for scanned PDFs)
+python main.py --invoice_path=data/invoices                   # process the sample invoices on Grok's recorded answers (no key, free, offline)
+python main.py --invoice_path=data/invoices --reset           # run again from an empty ledger (without --reset the ledger is kept: nothing is ever paid twice)
+python main.py serve --demo                                   # the web interface: dashboard, upload, review queue (http://127.0.0.1:8765)
+python main.py --simulate --invoice_path=data/invoices         # the same, on the local stand-in model instead of the recording
+python main.py demo                                           # the whole story in one command
+python main.py --replay-llm docs/live_runs/provided-invoices.cassette.jsonl --invoice_path=data/invoices   # a real Grok run, replayed offline for free
+python main.py --trace --invoice_path=data/self_correction    # watch the agents work
+python main.py --grok --invoice_path=data/invoices            # real Grok: billed per token, capped per run
 make test        make lint        make e2e        make ui
 ```
 
@@ -116,7 +139,7 @@ Contributing and a map of the code: [CONTRIBUTING.md](CONTRIBUTING.md). More: `a
 | Criterion | Where to look |
 |---|---|
 | **Functionality** | 17/17 end to end, offline and on live Grok; `make e2e` (60 checks from a fresh clone) |
-| **Code quality** | typed models, one responsibility per module, error handling at every boundary (a failing model step never fails an invoice), structured logs, 349 tests |
+| **Code quality** | typed models, one responsibility per module, error handling at every boundary (a failing model step never fails an invoice), structured logs, 351 tests |
 | **Agentic sophistication** | the table above: tool use, strict structured output, five self-correction loops, six agents with charters, guards; recorded, replayable live runs and a per-invoice evaluation |
 | **Shipping mindset** | simulated what must be (bank, ERP, email) behind adapters; cut what doesn't earn its keep (no framework, no database server, no auth system); limits stated in §5 of the architecture doc |
 | **Presentation** | this page; measured results with evidence; business impact, cost and ROI; design decisions; screenshots from a real run |

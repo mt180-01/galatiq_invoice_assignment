@@ -30,3 +30,23 @@ def test_the_readme_names_the_model_the_recordings_were_made_with():
             if isinstance(body, dict) and body.get("model"):
                 models.add(body["model"])
     assert models and all(m in readme for m in models), models
+
+
+def test_every_readme_table_row_has_as_many_columns_as_its_header():
+    lines = (ROOT / "README.md").read_text().splitlines()
+    i = 0
+    while i < len(lines):
+        if lines[i].startswith("|") and i + 1 < len(lines) and re.match(r"^\|[-| ]+\|$", lines[i + 1]):
+            width = len(re.findall(r"(?<!\\)\|", lines[i])) - 1
+            while i < len(lines) and lines[i].startswith("|"):
+                assert len(re.findall(r"(?<!\\)\|", lines[i])) - 1 == width, f"README line {i + 1}: {lines[i][:70]}"
+                i += 1
+        else:
+            i += 1
+
+
+def test_the_quickstart_uses_the_command_the_brief_gives():
+    readme = (ROOT / "README.md").read_text()
+    quick = readme.split("## Quickstart", 1)[1].split("```", 2)[1]
+    assert "python main.py --invoice_path=data/invoices" in quick and ".venv/bin/python" not in quick
+    assert readme.index("## Quickstart") < readme.index("## Results") < readme.index("## Run it")
