@@ -19,6 +19,8 @@ from decimal import Decimal
 
 from .agents.team import CommsAgent, DeskAgent, IntakeAgent, PaymentAgent, ReviewerAgent, ValidationAgent, step
 from .erp import ErpAdapter
+from .approvals.tokens import evidence_hash
+from .identity import bill_key
 from .ingestion import parse_file
 from .intake import Origin
 from .llm import LLM, invoice_ledger
@@ -46,13 +48,6 @@ def _parse_chunk(paths: list[str], want_text: bool) -> list[tuple[str, object]]:
     return out
 
 
-def bill_key(inv: Invoice) -> str:
-    if inv.invoice_number:
-        vendor = "".join(c for c in (inv.vendor or "").lower() if c.isalnum())
-        return f"{vendor}|{inv.invoice_number}|{inv.revision or ''}"
-    return "anon|" + hashlib.sha1(repr(inv.model_dump(mode="json", exclude={"source_path", "source_format"})).encode()).hexdigest()[:12]
-
-
 class Pipeline:
     def __init__(self, erp: ErpAdapter, llm: LLM, workers: int | None = None, llm_concurrency: int = 8,
                  origins: dict[str, Origin] | None = None, approvals=None, payments=None, bank_concurrency: int = 8,
@@ -66,7 +61,7 @@ class Pipeline:
         self.intake, self.validator = IntakeAgent(llm, gated), ValidationAgent(erp, self.payments, llm)
         self.reviewer, self.desk = ReviewerAgent(llm, erp, gated), DeskAgent(approvals)
         self.payer, self.comms = PaymentAgent(self.payments, bank_concurrency), CommsAgent(llm)
-        self.workers = workers if workers is not None else (os.cpu_count() or 1)
+        self.workers = workers  # None = decide from the amount of PDF work (see _plan_workers); an int is an explicit choice
         self.llm_sem = asyncio.Semaphore(llm_concurrency)
 
     def _plan_workers(self, n_pdfs: int) -> int:
@@ -125,7 +120,7 @@ class Pipeline:
                    "cost_ticks": sum(e[4] for e in ledger)} if ledger else {}
         if self.store is not None and (out.invoice is not None or out.error):
             try:
-                await asyncio.to_thread(self.store.save, out, bill_key(out.invoice) if out.invoice else None)
+                await asyncio.to_thread(self.store.save, out, bill_key(out.invoice, self.erp) if out.invoice else None)
             except Exception:  # noqa: BLE001 - keeping a record must never fail an invoice
                 log.exception("could not store the outcome")
         return out
@@ -158,8 +153,8 @@ class Pipeline:
             log.info("ingested", extra={"trace": trace, "stage": "ingest",
                                         "detail": f"{inv.invoice_number} via {inv.extractor} ({inv.channel} lane)"})
 
-            key = bill_key(inv)
-            first = await asyncio.to_thread(self.erp.claim_bill, key, path, inv.vendor, inv.total)
+            key = bill_key(inv, self.erp)
+            first = await asyncio.to_thread(self.erp.claim_bill, key, path, inv.vendor, inv.total, evidence_hash(inv))
             if first:
                 out.findings = [Finding(code="duplicate_invoice", severity=Severity.ERROR,
                                         message=f"already received from {os.path.basename(first)}; not processed twice")]
@@ -181,6 +176,13 @@ class Pipeline:
                                         "detail": f"{out.approval.decision.value} after {out.approval.rounds} round(s): {out.approval.reasoning}"})
 
             payment_row, pay_status = None, None
+            if out.approval.decision is Decision.APPROVE and getattr(self.erp, "stock_policy", "cap") == "reserve":
+                # Cumulative stock control (opt-in): the units this invoice consumes are set aside atomically before payment, so two invoices that each
+                # fit in stock cannot both be approved when together they do not.
+                short = await asyncio.to_thread(self.erp.reserve_stock, key, [(li.item, li.quantity) for li in inv.line_items])
+                if short:
+                    out.findings.append(Finding(code="insufficient_stock", severity=Severity.ERROR, message="; ".join(short)))
+                    out.approval = Approval(decision=Decision.REJECT, reasoning="Rejected: " + "; ".join(short))
             if out.approval.decision is Decision.APPROVE:
                 async with step(out, "Payment", "scheduled / sent"):
                     res = await self.payer.pay(inv, key)

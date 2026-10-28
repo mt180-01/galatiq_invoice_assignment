@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 os.environ["XAI_API_KEY_FILE"] = "/nonexistent"        # screenshots always come from the free local model
 os.environ.pop("XAI_API_KEY", None)
+os.environ["ACME_APPROVAL_SECRET"] = "screenshots-not-a-real-key"   # never touch the real signing key
 
 from acme_ap.runner import run_batch  # noqa: E402
 from acme_ap.web import make_server  # noqa: E402

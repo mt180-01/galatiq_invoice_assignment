@@ -6,6 +6,7 @@ the mail system and expose `respond` behind an authenticated HTTPS endpoint.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import secrets
@@ -40,6 +41,24 @@ CREATE TABLE IF NOT EXISTS approval_events (id INTEGER PRIMARY KEY AUTOINCREMENT
 """
 
 
+def load_secret() -> bytes:
+    """The key that signs decision links. ACME_APPROVAL_SECRET (any string), else a private file (ACME_APPROVAL_SECRET_FILE, default
+    ~/.config/acme_ap/approval_secret, created on first use, owner-only). It is deliberately not in the database: whoever can read the
+    database can read the ledger, but must not be able to mint approvals."""
+    if env := os.environ.get("ACME_APPROVAL_SECRET"):
+        return hashlib.sha256(env.encode()).digest()
+    path = Path(os.environ.get("ACME_APPROVAL_SECRET_FILE") or Path.home() / ".config" / "acme_ap" / "approval_secret")
+    try:
+        return bytes.fromhex(path.read_text().strip())
+    except (OSError, ValueError):
+        key = secrets.token_hex(32)
+        path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
+            f.write(key)
+        return bytes.fromhex(key)
+
+
 @dataclass
 class Result:
     ok: bool
@@ -61,11 +80,9 @@ class ApprovalService:
             if reset:
                 self._db.executescript("DELETE FROM approval_requests; DELETE FROM approval_events; "
                                        "DELETE FROM sqlite_sequence WHERE name IN ('approval_requests', 'approval_events');")
-            row = self._db.execute("SELECT v FROM meta WHERE k='secret'").fetchone()
-            if not row:
-                self._db.execute("INSERT INTO meta VALUES ('secret', ?)", (secrets.token_hex(32),))
+            self._db.execute("DELETE FROM meta WHERE k='secret'")  # databases from before kept the signing key here, readable by anyone with the file
             self._db.commit()
-            self._secret = bytes.fromhex(self._db.execute("SELECT v FROM meta WHERE k='secret'").fetchone()[0])
+        self._secret = load_secret()
 
     # ---- helpers ---------------------------------------------------------------------------
     def _event(self, rid: int, at: datetime, event: str, detail: str = "") -> None:
@@ -83,8 +100,8 @@ class ApprovalService:
         rows = self._fetch("SELECT * FROM approval_requests WHERE id=?", (rid,))
         return rows[0] if rows else None
 
-    def _token(self, rid: int, action: str, ev_hash: str, now: datetime) -> str:
-        return make_token(self._secret, rid, action, ev_hash, now + EXPIRE_AFTER)
+    def _token(self, rid: int, action: str, ev_hash: str, now: datetime, who: str) -> str:
+        return make_token(self._secret, rid, action, ev_hash, now + EXPIRE_AFTER, who)
 
     # ---- create ----------------------------------------------------------------------------
     def open_request(self, outcome: Outcome, bill_key: str, now: datetime | None = None) -> tuple[int, Route] | None:
@@ -128,27 +145,33 @@ class ApprovalService:
                    "  REVIEW BEFORE APPROVING: " + "; ".join(f.message for f in out.findings if f.severity is Severity.HOLD))]
         if verified:
             lines += ["", "NOTED (did not block)", *[f"  - {f.message}" for f in verified]]
-        lines += ["", f"  APPROVE: {LINK_BASE}{self._token(rid, 'approve', row['ev_hash'], now)}",
-                  f"  REJECT:  {LINK_BASE}{self._token(rid, 'reject', row['ev_hash'], now)}", "",
-                  "These links work once, only for this invoice as shown, and expire in 5 days.",
+        owner = DIRECTORY[row["role"]]["email"]
+        lines += ["", f"  APPROVE: {LINK_BASE}{self._token(rid, 'approve', row['ev_hash'], now, owner)}",
+                  f"  REJECT:  {LINK_BASE}{self._token(rid, 'reject', row['ev_hash'], now, owner)}", "",
+                  "These links were issued to you. They work once, only for this invoice as shown, and expire in 5 days. Do not forward them.",
                   "Nothing is paid until you approve; if you do not respond it will be escalated to your delegate."]
         return "\n".join(lines)
 
     # ---- respond ---------------------------------------------------------------------------
-    def respond(self, token: str, who: str, comment: str = "", now: datetime | None = None) -> Result:
+    def respond(self, token: str, who: str | None = None, comment: str = "", now: datetime | None = None) -> Result:
+        """Decide a request. Identity comes from the link itself: it was issued to one mailbox. `who`, if given, must be that mailbox (a typed
+        name can only ever agree with the link, never override it)."""
         now = now or utcnow()
         try:
             data = read_token(self._secret, token, now)
         except TokenError as exc:
             return Result(False, f"refused: {exc}")
-        rid, action = data["r"], data["a"]
+        rid, action, holder = data["r"], data["a"], (data.get("w") or "").strip().lower()
+        if who and who.strip().lower() != holder:
+            return Result(False, f"refused: this link was issued to {holder or 'nobody'}; {who.strip()} cannot use it")
+        who = holder
         with self._lock:
             row = self._row(rid)
             if row is None:
                 return Result(False, "refused: unknown request")
             if row["status"] != "pending":
                 return Result(False, f"refused: request already {row['status']}")
-            if who.strip().lower() not in authorized(row["role"], row["escalated_from"]):
+            if holder not in authorized(row["role"], row["escalated_from"]):
                 self._event(rid, now, "refused", f"{who} is not authorized to decide for {row['role']}")
                 self._db.commit()
                 return Result(False, f"refused: {who} is not authorized to decide for {row['role']}")
@@ -169,6 +192,13 @@ class ApprovalService:
                 self._db.commit()
                 self.erp.settle_bill(row["bill_key"], "blocked", "approved but re-check failed: " + "; ".join(f.message for f in errors))
                 return Result(False, "approval recorded but payment blocked: re-check failed: " + "; ".join(f.message for f in errors))
+            short = self.erp.reserve_stock(row["bill_key"], [(li.item, li.quantity) for li in inv.line_items])
+            if short:
+                self._close(rid, "blocked", who, comment, now)
+                self._event(rid, now, "blocked", "; ".join(short))
+                self._db.commit()
+                self.erp.settle_bill(row["bill_key"], "blocked", "approved but stock was taken by earlier invoices: " + "; ".join(short))
+                return Result(False, "approval recorded but payment blocked: re-check failed: " + "; ".join(short))
             res = self.payments.pay(inv, row["bill_key"])
             self._close(rid, "approved", who, comment, now, res.ref)
             self.erp.settle_bill(row["bill_key"], res.erp_status, f"approved by {who}: {comment or 'no comment'}",
@@ -243,12 +273,14 @@ class ApprovalService:
             raise TokenError("unknown request")
         return {"id": row["id"], "action": data["a"], "status": row["status"], "role": row["role"], "reasons": json.loads(row["reasons"]),
                 "invoice": Invoice.model_validate_json(row["invoice_json"]), "outcome": Outcome.model_validate_json(row["outcome_json"]),
-                "approvers": sorted(authorized(row["role"], row["escalated_from"])), "primary": DIRECTORY[row["role"]]["email"], "tokens": self.tokens_for(row["id"], now),
+                "approver": (data.get("w") or "").lower(), "tokens": self.tokens_for(row["id"], now, approver=data.get("w") or None),
                 "decided_by": row["decided_by"], "comment": row["comment"]}
 
-    def tokens_for(self, rid: int, now: datetime | None = None) -> dict[str, str]:
+    def tokens_for(self, rid: int, now: datetime | None = None, approver: str | None = None) -> dict[str, str]:
+        """Links for a request, issued to `approver` (default: the mailbox the request is with now)."""
         row = self._row(rid)
-        return {a: self._token(rid, a, row["ev_hash"], now or utcnow()) for a in ("approve", "reject")}
+        who = approver or DIRECTORY[row["role"]]["email"]
+        return {a: self._token(rid, a, row["ev_hash"], now or utcnow(), who) for a in ("approve", "reject")}
 
     def events(self, rid: int) -> list[tuple[str, str, str]]:
         return [tuple(r) for r in self._fetch("SELECT at, event, detail FROM approval_events WHERE request_id=? ORDER BY id", (rid,))]

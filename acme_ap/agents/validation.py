@@ -2,6 +2,7 @@
 every finding is reproducible and auditable."""
 from __future__ import annotations
 
+import os
 import re
 from collections import defaultdict
 from datetime import date
@@ -61,6 +62,11 @@ def validate(inv: Invoice, erp: ErpAdapter, accounts=None) -> list[Finding]:
     if accounts and inv.vendor and inv.bank_account:
         if problem := accounts.check_account(inv.vendor, inv.bank_account):
             out.append(_f("bank_account_changed", H, problem))
+    if inv.invoice_number and inv.total is not None:
+        from ..identity import bill_key  # local import: identity needs the ERP package, validation is imported by it indirectly
+        for dup in erp.similar_bills(inv.invoice_number, inv.total, inv.vendor or "", bill_key(inv, erp)):
+            out.append(_f("possible_duplicate", H, f"same invoice number and total as a bill already received from {dup['vendor']!r} ({dup['status']}, "
+                                                    f"{os.path.basename(dup['source'])}): possibly the same bill under a different vendor spelling"))
     _check_dates(inv, out)
     _check_items(inv, erp, out)
     _check_math(inv, out)

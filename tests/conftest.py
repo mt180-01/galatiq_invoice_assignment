@@ -19,3 +19,9 @@ def _instant_retries(monkeypatch):
     """Retry logic is tested, but nobody should wait for it."""
     from acme_ap.llm import GrokClient
     monkeypatch.setattr(GrokClient, "DEFAULT_RETRY", (0, 0))
+
+
+@pytest.fixture(autouse=True)
+def _fixed_approval_secret(monkeypatch):
+    """Decision links are signed with a key kept outside the database; tests use a fixed one and never touch ~/.config."""
+    monkeypatch.setenv("ACME_APPROVAL_SECRET", "test-secret-not-for-real-use")

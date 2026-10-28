@@ -139,7 +139,7 @@ did not change (the single orchestrating process is still the ceiling).
 **The workflow** (`acme_ap/approvals/`):
 - **Routing**: amount over 10k -> VP Finance, over 50k -> CFO; unknown vendor -> Procurement; foreign currency -> Treasury; fraud-style/OCR/revision -> AP Manager. Unreadable documents have nothing to approve, so no request is created.
 - **Decision card**: one short message per invoice (why you, the invoice, the system's recommendation, anything noted) with Approve and Reject links. Replaces the thread.
-- **Signed links**: HMAC-SHA256 token bound to the request, the action, a hash of the invoice content, and an expiry. Altered tokens fail; a link dies if the invoice changes after the card was sent; links are single-use.
+- **Signed links**: HMAC-SHA256 token bound to the request, the action, the **approver it was issued to**, a hash of the invoice content, and an expiry. Altered tokens fail; a link dies if the invoice changes after the card was sent; links are single-use. Identity is the link's: a typed name can only agree with it, never override it (see 4l).
 - **Re-check at approval time**: before any payment, validation runs again. If stock or vendor status changed since the card went out, payment is blocked even though a person clicked approve.
 - **Clock-driven**: reminder at 24 h, escalation to the delegate at 48 h (VP Finance -> CFO -> CEO), expiry at 5 days. Expiry never pays.
 - **Audit**: every step (opened, reminded, escalated, approved/rejected/blocked/expired, by whom, comment) is an event row, and the ERP bill status follows.
@@ -208,8 +208,8 @@ Invoices are untrusted input and the model reads them, so these were tested adve
 | Randomly worded, mis-spelled, OCR-damaged invoices with stray lines (`scripts/stress_extraction.py`) | 2,000 generated invoices over four seeds: **0 approved with a wrong value**. The first run found 4% approved with the wrong invoice number (a stray "see also invoice 31337" won); the extractor now prefers the canonical `INV-` form and treats equally plausible numbers or conflicting totals as a hold. The price of that safety is that 15-21% of these deliberately messy invoices go to a person. |
 
 Limits of this evidence: the generator and the extractor have the same author, so the stress test finds bugs but does not estimate real-world accuracy;
-the model-facing tests use scripted models, not live Grok; authorization is by mailbox name, and a real deployment needs the identity provider
-(SSO) behind it, since anyone who can send mail as `vp-finance@...` is still that person here.
+the model-facing tests use scripted models, not live Grok; a decision link acts as the mailbox it was issued to (anyone who holds it, or
+can read that mailbox, is that person), so a real deployment needs delivery by email and the identity provider (SSO) behind the page.
 
 ## 4g. Checked against the brief's four stages
 
@@ -255,6 +255,20 @@ development came to a few cents. xAI's published rates for the model used are ab
 tokens (third-party pricing guides; not confirmed from an official page). Whether free promotional credits cover usage depends on the account and cannot
 be read with an API key; check the xAI console. Tests and `make e2e` never use a key.
 
+## 4l. Problems found in review, and what was done
+
+A reviewer found these; each was checked against the code first, fixed, and covered by `tests/test_review_fixes.py` (and the end-to-end run).
+
+| Finding | Verdict | Fix |
+|---|---|---|
+| **The ledger was wiped on every run**, so running the CLI twice paid an invoice twice; duplicate protection held only inside one run | True; the most serious | The ledger is kept by default. `--reset` starts over. A re-run that is mostly duplicates says why. The benchmark and `serve --demo` use their own scratch databases so they can never wipe the real one |
+| **Stock is never reduced after payment** | True as stated, but the brief's own sample table lists INV-1001, 1004 and 1006 as "within stock", and they bill 10 + 3 + 5 = 18 WidgetA against 15 on hand: stock is a per-invoice cap, and a decrementing default would reject INV-1006 | Default unchanged. **Opt-in `--stock-policy reserve`** (stored with the database, so `approve.py`, `pay.py` and the web page follow it): validation sees only unclaimed stock; the units are reserved atomically just before payment (12 invoices racing for 15 units: exactly 7 approved, whatever the timing); a person approving later cannot spend units an earlier approval took; a payment that fails for good releases them |
+| **The duplicate key included the raw vendor name**, so a respelled vendor got past it | True | The key uses the vendor's master-data name, so an alias (`FastShip Ltd.`) is the same vendor. The same invoice number and total from a *similar* vendor name (not the same key) is held for a person as `possible_duplicate`, and the sender is not contacted. The lookup is indexed, not a scan |
+| **An invoice number was claimed before validation**, so with the ledger kept, a corrected resubmission of a rejected invoice was blocked forever | True | An earlier attempt that never paid (rejected, blocked, expired) no longer holds the number: a *changed* resubmission is processed and the audit log records it. An *identical* copy of a rejected invoice is a duplicate (processing it again can only repeat the rejection; found by the end-to-end run when a JSON and a PDF of one bill were both processed, which also exposed that `250.0` and `250.00` hashed differently). A claim left behind by a crashed run expires after 15 minutes |
+| **`import resource` is Unix-only**, so the CLI crashed on Windows | True | Optional import; without it CPU time is this process's alone. A test hides the module and runs a batch. (The `Makefile` and shell snippets assume Unix; on Windows run the `python` commands directly. Not tested on Windows itself.) |
+| **`_plan_workers` was dead code**, so even 3 PDFs started a full process pool | True: `workers` was never `None` | `None` now means "decide from the amount of PDF work"; a few PDFs are parsed inline, and an explicit `--workers` is still respected |
+| **No real identity check on approvals; the HMAC secret sat in readable SQLite** | Partly stale (a stranger was already refused), but identity was self-asserted and the key was in the database | A link is **issued to one mailbox** and carries it under the signature: `--as` / a typed name can only agree with it, and editing it breaks the signature. A link issued to someone not authorised for that request is refused. The signing key moved out of the database to `ACME_APPROVAL_SECRET` or a private file (`~/.config/acme_ap/approval_secret`, owner-only); a database from before has the key deleted from it. Forwarding a link still lets the recipient act as the addressee, which is inherent to this model; real deployments need email delivery and SSO |
+
 ## 4k. The web interface
 
 `python main.py serve [--demo]` (or `make ui`) starts a local interface on `127.0.0.1:8765`: a **dashboard** (what happened, who is waiting and for how long, where the money
@@ -264,8 +278,8 @@ and links now point here instead of a made-up domain. It is the standard library
 
 Security properties, tested: every dynamic value is HTML-escaped (a vendor named `<script>...` is shown as text); a strict content-security-policy, `nosniff` and `no-store` on every
 response; forged, empty, replayed and expired links are refused; a stranger's identity is refused; a double click pays once; the invoice is re-checked before any payment.
-Limit: the page lets you pick who you are from the mailboxes the routing table authorises for that request. That is a stand-in for single sign-on, and a real deployment
-must authenticate the person before showing this page. Screenshots in `docs/img/` are generated from a real run by `scripts/make_screens.py`.
+Identity on the page comes from the link, which was issued to one mailbox (no pick-list, no typing). That is a stand-in for single sign-on: a real deployment must deliver
+links by email and authenticate the person before showing the page. Screenshots in `docs/img/` are generated from a real run by `scripts/make_screens.py`.
 
 ## 4i. Verified against the live Grok API
 
@@ -345,8 +359,8 @@ opinion with tool calls before every payment, the resolver, and model-written no
 model answers, and the sample is small and mostly clean.
 
 ## 5. Known limitations
-- Duplicate detection is by (vendor, invoice number, revision); which of two identical copies is called the duplicate depends on timing.
-- Stock is checked per invoice and not decremented, so results do not depend on processing order.
+- Duplicates: see 4l. Which of two identical copies is called the duplicate still depends on timing.
+- Stock is checked per invoice by default; the optional `reserve` policy is cumulative but, because invoices are approved concurrently, which of two competing invoices gets the last units depends on timing (see 4l).
 - A revised invoice (`revision` set) is always escalated to a human; there is no delta-payment logic.
 - Non-USD invoices are escalated; there is no FX handling.
 - Item matching tolerates small typos but not larger ones; `WidgetC` correctly stays unknown.

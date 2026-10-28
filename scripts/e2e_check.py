@@ -9,7 +9,8 @@ from pathlib import Path
 REPO = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent.parent
 PY = str(REPO / ".venv/bin/python") if (REPO / ".venv/bin/python").exists() else sys.executable
 ENV = {**{k: v for k, v in os.environ.items() if k != "XAI_API_KEY"}, "PYTHONWARNINGS": "ignore", "COLUMNS": "220",
-       "XAI_API_KEY_FILE": "/nonexistent/xai_key"}  # this check is free and offline: it never uses a real key
+       "XAI_API_KEY_FILE": "/nonexistent/xai_key",  # this check is free and offline: it never uses a real key
+       "ACME_APPROVAL_SECRET": "e2e-secret-not-for-real-use"}  # and signs its links with its own key, not the one in ~/.config
 results = []
 
 
@@ -68,6 +69,16 @@ out_dir = Path(outbox)
 check("outbox: follow-ups, approval cards, notices, digest",
       len(list(out_dir.glob("*.txt"))) >= 4 and len(list((out_dir / "approvals").glob("*.txt"))) == 2 and (out_dir / "daily_digest.txt").exists() and list((out_dir / "notices").glob("*.txt")))
 
+# 4a. the ledger remembers: running twice never pays twice; --reset starts over
+dbl = str(tmp / "twice.db")
+one = ["main.py", "--offline", "--db", dbl, "--outbox", outbox + "T", "--invoice_path", "data/invoices/invoice_1001.txt"]
+py(*one)
+rc, out2 = py(*one)
+pays = subprocess.run([PY, "-c", f"import sqlite3;print(sqlite3.connect('{dbl}').execute('select count(*) from vendor_payments').fetchone()[0])"], capture_output=True, text=True).stdout.strip()
+check("running the CLI twice on the same invoice pays it once (the ledger is kept)", "DUPLICATE=1" in out2 and pays == "1" and "already processed in an earlier run" in out2, f"payments in ledger: {pays}")
+rc, out3 = py(*one, "--reset")
+check("--reset starts from an empty ledger", "PAID=1" in out3)
+
 # 4b. the default run (no flags): local stand-in model with real tool calls, same outcomes, structured logs
 dbs = str(tmp / "sim.db")
 rc, out = py("main.py", "--db", dbs, "--outbox", outbox + "S", "--json", str(tmp / "s.json"), "--invoice_path", "data/invoices")
@@ -116,9 +127,11 @@ try:
             return urllib.request.urlopen(urllib.request.Request(base + "/decide", data=urllib.parse.urlencode(f).encode(), method="POST"), timeout=10).read().decode()
         except urllib.error.HTTPError as err:
             return err.read().decode()
-    check("a stranger cannot decide through the page", "not authorized" in post(decision="approve", who="attacker@evil.example", **form))
-    check("the VP approves in the browser flow and the invoice is paid", "paid" in post(decision="approve", who="vp-finance@acmecorp.example", **form))
-    check("a second click is refused", "already approved" in post(decision="approve", who="vp-finance@acmecorp.example", **form))
+    tampered = dict(form, t_approve=form["t_approve"][:-3] + ("AAA" if not form["t_approve"].endswith("AAA") else "BBB"))
+    check("a tampered link is refused by the page", "signature" in post(decision="approve", **tampered))
+    check("the page shows who the link was issued to, with no identity pick-list", "<b>vp-finance@acmecorp.example</b>" in decision and "<select" not in decision)
+    check("the VP approves in the browser flow (a typed name carries no weight) and the invoice is paid", "paid" in post(decision="approve", who="attacker@evil.example", **form))
+    check("a second click is refused", "already approved" in post(decision="approve", **form))
     inv_id = re.search(r'href="/invoice/(\d+)">INV-3201<', urllib.request.urlopen(base + "/", timeout=10).read().decode()).group(1)
     detail = urllib.request.urlopen(base + f"/invoice/{inv_id}", timeout=10).read().decode()
     check("the invoice page shows the agents' trace with the tool call and the correction", "What each agent did" in detail and "search_items" in detail and "corrected" in detail)
@@ -136,7 +149,7 @@ vp_card = next(c for c in cards if "INV-3001" in c.name)
 bank_card = next(c for c in cards if "INV-3004" in c.name)
 tok = lambda card, kind: re.search(rf"{kind}: \S*\?t=(\S+)", card.read_text()).group(1)
 rc, out = py("approve.py", "--db", db2, "respond", tok(vp_card, "APPROVE"), "--as", "attacker@evil.example")
-check("a stranger cannot use the VP's link", "not authorized" in out)
+check("a stranger cannot claim to be the VP's link holder", "was issued to vp-finance@acmecorp.example" in out)
 rc, out = py("approve.py", "--db", db2, "respond", tok(vp_card, "APPROVE"), "--as", "vp-finance@acmecorp.example", "--comment", "ok")
 check("VP approves INV-3001 via the signed link -> paid", "approved by vp-finance@acmecorp.example; paid" in out, out.strip())
 rc, out = py("approve.py", "--db", db2, "respond", tok(vp_card, "APPROVE"), "--as", "vp-finance@acmecorp.example")

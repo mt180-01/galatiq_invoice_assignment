@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import resource
 import time
 from pathlib import Path
 
@@ -16,23 +15,32 @@ from .payments import MockBank, PaymentService
 from .pipeline import Pipeline
 from .store import OutcomeStore
 
+try:  # Unix only. Without it (Windows) CPU time is this process's alone and worker processes are not counted.
+    import resource
+except ImportError:  # pragma: no cover - exercised by a test that hides the module
+    resource = None
+
+
+def cpu_seconds() -> float:
+    """CPU time used so far by this process and its finished children."""
+    if resource is None:
+        return time.process_time()
+    own, kids = resource.getrusage(resource.RUSAGE_SELF), resource.getrusage(resource.RUSAGE_CHILDREN)
+    return own.ru_utime + own.ru_stime + kids.ru_utime + kids.ru_stime
+
 
 async def run_batch(paths: list[str], args: argparse.Namespace, workers: int | None, origins=None) -> tuple[list[Outcome], float, float]:
-    erp = MockNetSuite(args.db, keep_ledger=args.keep_ledger)
+    erp = MockNetSuite(args.db, keep_ledger=args.keep_ledger, stock_policy=getattr(args, "stock_policy", None))
     payments = PaymentService(args.db, erp, MockBank(args.db + ".bank", reset=not args.keep_ledger), reset=not args.keep_ledger)
     approvals = ApprovalService(args.db, erp, reset=not args.keep_ledger, payments=payments)
     llm = make_llm(args.offline, cache_path=None if args.offline else args.db + ".llmcache", simulate=getattr(args, "simulate", False), live=getattr(args, "grok", False))
-    before = resource.getrusage(resource.RUSAGE_SELF).ru_utime + resource.getrusage(resource.RUSAGE_SELF).ru_stime
-    k = resource.getrusage(resource.RUSAGE_CHILDREN)
-    kids_before = k.ru_utime + k.ru_stime
+    before = cpu_seconds()
     t0 = time.perf_counter()
     outcomes = await Pipeline(erp, llm, workers=workers, llm_concurrency=args.llm_concurrency, origins=origins,
                                 approvals=approvals, payments=payments, store=None if getattr(args, "no_store", False) else OutcomeStore(args.db, reset=not args.keep_ledger),
                               llm_policy=getattr(args, "llm_policy", "gated")).run(paths)
     wall = time.perf_counter() - t0
-    own = resource.getrusage(resource.RUSAGE_SELF)
-    kids = resource.getrusage(resource.RUSAGE_CHILDREN)
-    cpu = own.ru_utime + own.ru_stime - before + kids.ru_utime + kids.ru_stime - kids_before
+    cpu = cpu_seconds() - before
     if hasattr(llm, "aclose"):
         await llm.aclose()
     return outcomes, wall, cpu

@@ -12,7 +12,7 @@ from __future__ import annotations
 from .models import Outcome, Severity
 
 MAX_ASKS = 3
-NO_CONTACT = {"fraud_indicators", "bank_account_changed", "pressure_language", "unknown_vendor", "vendor_blocked", "duplicate_invoice",
+NO_CONTACT = {"fraud_indicators", "bank_account_changed", "possible_duplicate", "pressure_language", "unknown_vendor", "vendor_blocked", "duplicate_invoice",
               "extractor_disagreement", "ocr_source"}
 
 

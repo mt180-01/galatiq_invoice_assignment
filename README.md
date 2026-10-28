@@ -24,7 +24,7 @@ The command line is first-class too: [`docs/img/demo.svg`](docs/img/demo.svg) is
 | Robustness to garbage | 2,000 randomly corrupted invoices: **0 approved with a wrong value** (a stray "see invoice 31337" once got through; found and fixed) | `scripts/stress_extraction.py` |
 | Speed | a clean invoice spends about 10-15 ms in the system, against "5 days" in the brief; about 2,200 documents/s on 14 cores | `main.py --bench`, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §4 |
 | Waiting on a person | never silent: reminder at 24 h, escalation at 48 h, expiry at 5 days | `approve.py tick`, `make e2e` |
-| Tests | **189 tests** plus a **47-check end-to-end run** from a fresh clone; a test fails the build if a credential is ever committed | `make test`, `make e2e` |
+| Tests | **221 tests** plus a **50-check end-to-end run** from a fresh clone; a test fails the build if a credential is ever committed | `make test`, `make e2e` |
 
 The pain points, one by one: **errors** are caught by exact checks and an independent second reading, not by trusting one model; **delays** shrink to milliseconds for
 clean invoices and to a bounded clock for the ones that need a person; **frustrated stakeholders** get a one-question email at most, a remittance notice when paid,
@@ -79,6 +79,7 @@ wherever it appears.
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt      # set up (Tesseract only for scanned PDFs)
 .venv/bin/python main.py --invoice_path=data/invoices                   # process the sample invoices (free, offline)
+.venv/bin/python main.py --invoice_path=data/invoices --reset           # run it again from an empty ledger (without --reset the ledger is kept: nothing is ever paid twice)
 .venv/bin/python main.py serve --demo                                   # the web interface at http://127.0.0.1:8765 (loads a worked example); after a normal run: `main.py serve`, and the approval links in the cards open there
 .venv/bin/python main.py demo                                           # the whole story in one command
 .venv/bin/python main.py --trace --invoice_path=data/self_correction    # watch the agents work
@@ -96,8 +97,8 @@ More: `approve.py` and `pay.py` (approver and treasury command lines), `main.py 
 
 | Criterion | Where to look |
 |---|---|
-| **Functionality** | 17/17 end to end, offline and on live Grok; `make e2e` (47 checks from a fresh clone) |
-| **Code quality** | typed models, one responsibility per module, error handling at every boundary (a failing model step never fails an invoice), structured logs, 189 tests |
+| **Functionality** | 17/17 end to end, offline and on live Grok; `make e2e` (50 checks from a fresh clone) |
+| **Code quality** | typed models, one responsibility per module, error handling at every boundary (a failing model step never fails an invoice), structured logs, 221 tests |
 | **Agentic sophistication** | the table above: tool use, strict structured output, five self-correction loops, six agents with charters, guards, recorded live runs |
 | **Shipping mindset** | simulated what must be (bank, ERP, email) behind adapters; cut what doesn't earn its keep (no framework, no database server, no auth system); limits stated in §5 of the architecture doc |
 | **Presentation** | this page; measured results with evidence; cost and ROI; screenshots from a real run |
@@ -119,7 +120,9 @@ More: `approve.py` and `pay.py` (approver and treasury command lines), `main.py 
 
 ## Limits worth knowing
 
-The bank, ERP and email are simulated behind adapters; no email is sent. The web interface lets you pick who is deciding from the people the routing table authorises for that
-request, which stands in for single sign-on that a real deployment must put in front. Grok's accuracy on messy scans is unmeasured. Details and the full list:
+The bank, ERP and email are simulated behind adapters; no email is sent. A decision link is issued to one approver's mailbox and whoever holds it acts as that person (the
+"magic link" model); it is single-use, expires, is bound to the invoice as shown, and is signed with a key kept outside the database. A real deployment must deliver it by email
+and put single sign-on in front of the page. Stock is checked per invoice by default (the brief's own sample table requires that); `--stock-policy reserve` makes approvals
+use it up. Grok's accuracy on messy scans is unmeasured. Details and the full list:
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (ERP choice, vendor strategy, CPU design, approval and payment design, hardening, live verification, limits) and
 [docs/live_runs/](docs/live_runs/).

@@ -208,20 +208,19 @@ class App:
         notes = [f for f in o.findings if f.severity.value == "warn"]
         if notes:
             body.append('<div class="card"><b>Noted (did not block)</b><ul class="f">' + "".join(f"<li>{e(f.message)}</li>" for f in notes) + "</ul></div>")
-        opts = "".join(f'<option value="{e(a)}">{e(a)}</option>' for a in sorted(d["approvers"], key=lambda a: (a != d["primary"], a)))  # the role's own mailbox first
         body.append(f'<form method="post" action="/decide" class="card"><input type="hidden" name="t_approve" value="{e(d["tokens"]["approve"])}">'
-                    f'<input type="hidden" name="t_reject" value="{e(d["tokens"]["reject"])}"><label for="who">Deciding as</label><select id="who" name="who">{opts}</select>'
+                    f'<input type="hidden" name="t_reject" value="{e(d["tokens"]["reject"])}"><div class="kv"><div>Deciding as</div><div><b>{e(d["approver"])}</b></div></div>'
                     '<label for="comment">Comment (optional)</label><textarea id="comment" name="comment" rows="2" maxlength="300"></textarea>'
                     '<div class="actions"><button class="approve" name="decision" value="approve">Approve and pay</button>'
                     '<button class="reject" name="decision" value="reject">Reject</button></div>'
                     '<div class="note">Nothing is paid until you approve. The invoice is re-checked first, so a changed bank account or stock problem still blocks it. '
-                    'In this local demo you pick who you are from the people authorised for this request; a real deployment puts single sign-on in front of this page.</div></form>')
+                    'This link was issued to the mailbox above, so whoever holds it acts as that person: do not forward it. A real deployment would deliver it by email and put single sign-on in front of this page.</div></form>')
         return 200, page("Decision", "".join(body))
 
     def respond(self, form: dict[str, str]) -> tuple[int, bytes]:
         choice = "approve" if form.get("decision") == "approve" else "reject"
         token = form.get("t_approve" if choice == "approve" else "t_reject", "")
-        res = self.approvals.respond(token, form.get("who", ""), form.get("comment", "")[:300])
+        res = self.approvals.respond(token, None, form.get("comment", "")[:300])  # who is the link's holder; a posted name carries no weight
         kind = "ok" if res.ok else "bad"
         return (200 if res.ok else 400), page("Result", f'<h1>{pill("Done" if res.ok else "Not done", kind)}</h1><div class="card">{e(res.message)}</div>'
                                                         + (f'<div class="card">Payment reference <code>{e(res.payment_ref)}</code></div>' if res.payment_ref else "")

@@ -66,10 +66,11 @@ def serve_ui(argv: list[str]) -> None:
     from acme_ap.web import serve
 
     ap = argparse.ArgumentParser(prog="main.py serve")
-    ap.add_argument("--db", default="inventory.db")
+    ap.add_argument("--db", default=None, help="default: inventory.db, or ui_demo.db with --demo (so a demo never overwrites your ledger)")
     ap.add_argument("--port", type=int, default=8765)
-    ap.add_argument("--demo", action="store_true", help="first process the sample invoices (provided, self-correction, approval demo) into --db with the free local model")
+    ap.add_argument("--demo", action="store_true", help="first process the sample invoices (provided, self-correction, approval demo) into --db with the free local model; replaces what --db holds")
     a = ap.parse_args(argv)
+    a.db = a.db or ("ui_demo.db" if a.demo else "inventory.db")
     if a.demo:
         from types import SimpleNamespace
         paths = collect("data/invoices") + collect("data/self_correction") + collect("data/approvals_demo")
@@ -101,7 +102,10 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Acme AP invoice automation")
     ap.add_argument("--invoice_path", default="data/invoices", help="invoice file or directory")
     ap.add_argument("--db", default="inventory.db")
-    ap.add_argument("--keep-ledger", action="store_true", help="keep bills/payments from earlier runs (duplicate detection across runs)")
+    ap.add_argument("--stock-policy", choices=("cap", "reserve"), default=None,
+                    help="cap (default): each invoice is checked against stock on hand. reserve: also against what earlier approved invoices already claimed (stored with the database)")
+    ap.add_argument("--reset", action="store_true", help="start with an empty ledger. By default the ledger is kept between runs, so an invoice paid earlier is a duplicate now")
+    ap.add_argument("--keep-ledger", action="store_true", help=argparse.SUPPRESS)  # the old spelling of what is now the default
     ap.add_argument("--workers", type=int, default=None, help="CPU worker processes (default: auto-sized from the PDF count; 1 = serial)")
     ap.add_argument("--pdf-share", type=float, default=0.5, help="share of PDFs in the --bench corpus (real AP inboxes are mostly PDF)")
     ap.add_argument("--auto-vp", action="store_true", help="DEMO: simulate a VP approving requests that are only over the amount limit")
@@ -117,6 +121,7 @@ def main() -> None:
     ap.add_argument("--bench", type=int, metavar="N", help="throughput benchmark over N generated documents, serial vs parallel")
     ap.add_argument("-v", "--verbose", action="store_true", help="show per-stage structured logs")
     args = ap.parse_args()
+    args.keep_ledger = not args.reset  # the ledger is the system's memory of what was paid: it survives between runs unless you ask otherwise
 
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(KeyValueFormatter())
@@ -132,6 +137,7 @@ def main() -> None:
     if args.bench:
         corpus, tmp = make_bench_corpus(paths, args.bench, args.pdf_share)
         args.no_store = True  # a benchmark does not need 20,000 records kept
+        args.db, args.keep_ledger = str(Path(tmp) / "bench.db"), False  # and it must never touch the real ledger
         logging.getLogger().setLevel(logging.ERROR)
         for name in ("acme.decision", "acme.payment"):
             logging.getLogger(name).setLevel(logging.ERROR)
@@ -172,6 +178,10 @@ def main() -> None:
         show_trace(outcomes)
     scorecard(outcomes)
     payment_summary(args.db)
+    repeats = sum(o.status == "DUPLICATE" for o in outcomes)
+    if repeats and repeats >= len(outcomes) / 2 and not args.reset:
+        console.print(f"[yellow]{repeats} of {len(outcomes)} documents were already processed in an earlier run: the ledger is kept between runs so nothing is paid twice. "
+                      f"Add --reset to start from an empty ledger.[/]")
     if cards:
         console.print(f"[dim]{cards} approval request(s) awaiting a person; decision cards in {args.outbox}/approvals/. "
                       f"Respond with: python approve.py list | respond[/]")

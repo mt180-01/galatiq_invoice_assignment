@@ -119,25 +119,36 @@ def test_approval_page_then_decision_pays_once(ui):
     base, db = ui
     link = approve_link(base)
     code, body, _ = get(link)
-    assert code == 200 and "Pay USD 12,500.00 to Widgets Inc.?" in body and "Approve and pay" in body and "vp-finance@acmecorp.example" in body and "In short" in body and "Why this needs you" in body
+    assert code == 200 and "Pay USD 12,500.00 to Widgets Inc.?" in body and "Approve and pay" in body and "In short" in body and "Why this needs you" in body
+    assert "Deciding as" in body and "<b>vp-finance@acmecorp.example</b>" in body and "<select" not in body       # identity is the link's, not a pick-list
     form = dict(zip(("t_approve", "t_reject"), re.findall(r'name="t_(?:approve|reject)" value="([^"]+)"', body)))
-    stranger = post(base + "/decide", decision="approve", who="attacker@evil.example", **form)
-    assert stranger[0] == 400 and "not authorized" in stranger[1]
-    ok = post(base + "/decide", decision="approve", who="vp-finance@acmecorp.example", comment="looks right", **form)
+    ok = post(base + "/decide", decision="approve", who="attacker@evil.example", comment="looks right", **form)                   # a posted name has no weight
     assert ok[0] == 200 and "paid" in ok[1] and "Payment reference" in ok[1]
-    again = post(base + "/decide", decision="approve", who="vp-finance@acmecorp.example", **form)
-    assert again[0] == 400 and "already approved" in again[1]                    # a double click or replay pays nothing twice
-    assert "already <b>approved</b>" in get(link)[1]
     import sqlite3
+    assert sqlite3.connect(db).execute("SELECT decided_by FROM approval_requests WHERE bill_key LIKE '%3001%'").fetchone()[0] == "vp-finance@acmecorp.example"
+    again = post(base + "/decide", decision="approve", **form)
+    assert again[0] == 400 and "already approved" in again[1]                                                                        # a double click or replay pays nothing twice
+    assert "already <b>approved</b>" in get(link)[1]
     assert sqlite3.connect(db).execute("SELECT COUNT(*) FROM vendor_payments WHERE bill_key LIKE '%3001%'").fetchone()[0] == 1
     assert "Waiting for a decision" in get(base + "/")[1]
+
+
+def test_a_tampered_form_token_is_refused(ui):
+    base, db = ui
+    _, body, _ = get(approve_link(base))
+    form = dict(zip(("t_approve", "t_reject"), re.findall(r'name="t_(?:approve|reject)" value="([^"]+)"', body)))
+    form["t_approve"] = form["t_approve"][:-3] + ("AAA" if not form["t_approve"].endswith("AAA") else "BBB")
+    res = post(base + "/decide", decision="approve", **form)
+    assert res[0] == 400 and "signature" in res[1]
+    import sqlite3
+    assert sqlite3.connect(db).execute("SELECT COUNT(*) FROM vendor_payments WHERE bill_key LIKE '%3001%'").fetchone()[0] == 0
 
 
 def test_reject_works_and_does_not_pay(ui):
     base, db = ui
     _, body, _ = get(approve_link(base))
     form = dict(zip(("t_approve", "t_reject"), re.findall(r'name="t_(?:approve|reject)" value="([^"]+)"', body)))
-    res = post(base + "/decide", decision="reject", who="cfo@acmecorp.example", **form)
+    res = post(base + "/decide", decision="reject", **form)
     assert res[0] == 200 and "rejected" in res[1]
     import sqlite3
     assert sqlite3.connect(db).execute("SELECT COUNT(*) FROM vendor_payments WHERE bill_key LIKE '%3001%'").fetchone()[0] == 0

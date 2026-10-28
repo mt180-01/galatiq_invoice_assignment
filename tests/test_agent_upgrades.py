@@ -161,10 +161,10 @@ def test_the_trace_records_model_calls_tool_calls_and_conclusions(tmp_path):
     json.dumps(o.trace)                                                                                          # serialisable for --json
 
 
-def test_the_trace_flag_prints_it():
+def test_the_trace_flag_prints_it(tmp_path):
     env = {**os.environ, "PYTHONWARNINGS": "ignore", "COLUMNS": "220", "XAI_API_KEY_FILE": "/nonexistent"}
     env.pop("XAI_API_KEY", None)
-    p = subprocess.run([sys.executable, "main.py", "--trace", "--db", "/tmp/_trace_test.db", "--outbox", "/tmp/_trace_test_out", "--invoice_path", "data/self_correction"],
+    p = subprocess.run([sys.executable, "main.py", "--trace", "--db", str(tmp_path / "t.db"), "--outbox", str(tmp_path / "out"), "--invoice_path", "data/self_correction"],
                        cwd=ROOT, capture_output=True, text=True, env=env, timeout=120)
     out = p.stdout + p.stderr
     assert p.returncode == 0 and "tool search_items" in out and "corrected: 'Wdgt B' -> 'WidgetB'" in out and "suggested: vendor 'Widget Inc'" in out

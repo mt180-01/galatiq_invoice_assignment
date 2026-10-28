@@ -1,4 +1,5 @@
 import asyncio
+import json
 import sqlite3
 from datetime import timedelta
 from decimal import Decimal
@@ -148,25 +149,91 @@ def test_many_escalations_at_once_do_not_corrupt_each_other(tmp_path, env):
     assert all(o.approval_card and o.awaiting == "VP Finance" for o in outs)
 
 
-def test_only_the_right_people_can_use_a_token(env):
+def test_a_link_is_issued_to_one_mailbox_and_a_typed_name_cannot_override_it(env):
     db, erp, svc = env
-    (o,) = run(erp, svc, [DEMO])                                          # VP Finance request
+    (o,) = run(erp, svc, [DEMO])                                          # with VP Finance
     tok = svc.tokens_for(o.approval_request)["approve"]
-    for stranger in ("attacker@evil.example", "procurement@acmecorp.example", "", "vp-finance@acmecorp.example.evil.com"):
-        res = svc.respond(tok, stranger)
-        assert not res.ok and "not authorized" in res.message, stranger
+    for claimed in ("attacker@evil.example", "procurement@acmecorp.example", "cfo@acmecorp.example", "vp-finance@acmecorp.example.evil.com"):
+        res = svc.respond(tok, claimed)
+        assert not res.ok and "was issued to vp-finance@acmecorp.example" in res.message, claimed
     assert payments(db) == 0
-    assert svc.respond(tok, "  CFO@AcmeCorp.example ").paid                # a more senior person may decide, case/spacing ignored
-    assert any(e[1] == "refused" for e in svc.events(o.approval_request))   # and the attempts are on the audit trail
+    assert any(e[1] != "refused" for e in svc.events(o.approval_request))   # nothing was decided by any of those attempts
+    assert svc.respond(tok, "  VP-Finance@AcmeCorp.example ").paid           # the holder may state who they are, case and spacing ignored
 
 
-def test_after_escalation_the_delegate_and_anyone_senior_may_decide(env):
+def test_the_holder_need_not_type_anything(env):
+    db, erp, svc = env
+    (o,) = run(erp, svc, [DEMO])
+    res = svc.respond(svc.tokens_for(o.approval_request)["approve"])
+    assert res.paid and svc._row(o.approval_request)["decided_by"] == "vp-finance@acmecorp.example"          # identity came from the link
+
+
+def test_a_link_for_someone_who_may_not_decide_is_refused_even_if_validly_signed(env):
+    db, erp, svc = env
+    (o,) = run(erp, svc, [DEMO])
+    stranger = svc.tokens_for(o.approval_request, approver="procurement@acmecorp.example")["approve"]     # genuine signature, wrong person for a VP request
+    res = svc.respond(stranger)
+    assert not res.ok and "not authorized" in res.message and payments(db) == 0
+    assert any(e[1] == "refused" for e in svc.events(o.approval_request))                                    # and the attempt is on the audit trail
+    senior = svc.tokens_for(o.approval_request, approver="CFO@acmecorp.example")["approve"]                  # a more senior person, with a link issued to them
+    assert svc.respond(senior).paid
+
+
+def test_editing_who_a_link_was_issued_to_breaks_its_signature(env):
+    import base64
+    db, erp, svc = env
+    (o,) = run(erp, svc, [DEMO])
+    body, sig = svc.tokens_for(o.approval_request)["approve"].split(".")
+    data = json.loads(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)))
+    data["w"] = "ceo@acmecorp.example"
+    forged = base64.urlsafe_b64encode(json.dumps(data, separators=(",", ":")).encode()).decode().rstrip("=") + "." + sig
+    res = svc.respond(forged)
+    assert not res.ok and "signature" in res.message and payments(db) == 0
+
+
+def test_the_signing_key_is_not_in_the_database_and_other_keys_cannot_mint_links(env, monkeypatch):
+    db, erp, svc = env
+    run(erp, svc, [DEMO])
+    assert sqlite3.connect(db).execute("SELECT COUNT(*) FROM meta WHERE k='secret'").fetchone()[0] == 0
+    assert "test-secret-not-for-real-use" not in Path(db).read_bytes().decode("latin-1")
+    monkeypatch.setenv("ACME_APPROVAL_SECRET", "someone-elses-key")
+    other = ApprovalService(db, erp, reset=False)
+    mint = other.tokens_for(1)["approve"]                                                                    # signed with a different key...
+    monkeypatch.setenv("ACME_APPROVAL_SECRET", "test-secret-not-for-real-use")
+    assert not ApprovalService(db, erp, reset=False).respond(mint).ok                                         # ...so the real service refuses it
+
+
+def test_an_old_database_that_kept_the_key_inside_loses_it(tmp_path):
+    db = tmp_path / "old.db"
+    con = sqlite3.connect(db)
+    con.execute("CREATE TABLE meta (k TEXT PRIMARY KEY, v TEXT)")
+    con.execute("INSERT INTO meta VALUES ('secret', 'deadbeef')")
+    con.commit(); con.close()
+    ApprovalService(db, MockNetSuite(db), reset=False)
+    assert sqlite3.connect(db).execute("SELECT COUNT(*) FROM meta WHERE k='secret'").fetchone()[0] == 0
+
+
+def test_the_secret_file_is_created_private_when_no_env_key_is_set(tmp_path, monkeypatch):
+    import stat
+    from acme_ap.approvals.service import load_secret
+    monkeypatch.delenv("ACME_APPROVAL_SECRET")
+    monkeypatch.setenv("ACME_APPROVAL_SECRET_FILE", str(tmp_path / "cfg" / "key"))
+    first = load_secret()
+    path = tmp_path / "cfg" / "key"
+    assert path.exists() and stat.S_IMODE(path.stat().st_mode) == 0o600 and stat.S_IMODE(path.parent.stat().st_mode) == 0o700
+    assert load_secret() == first and len(first) == 32                                                        # stable across processes
+
+
+def test_after_escalation_the_old_and_the_new_owners_links_both_work_but_only_once(env):
     db, erp, svc = env
     (o,) = run(erp, svc, [DEMO])
     t0 = utcnow()
-    svc.tick(t0 + timedelta(hours=50))                                    # VP Finance -> CFO
-    tok = svc.tokens_for(o.approval_request, t0)["approve"]
-    assert svc.respond(tok, "ceo@acmecorp.example", now=t0 + timedelta(hours=51)).paid
+    vp_link = svc.tokens_for(o.approval_request, t0)["approve"]                                              # the VP's link, issued before escalation
+    svc.tick(t0 + timedelta(hours=50))                                                                        # VP Finance -> CFO
+    cfo_link = svc.tokens_for(o.approval_request, t0)["approve"]                                              # default now: the CFO's mailbox
+    assert svc.respond(cfo_link, now=t0 + timedelta(hours=51)).paid
+    again = svc.respond(vp_link, now=t0 + timedelta(hours=52))
+    assert not again.ok and "already approved" in again.message and payments(db) == 1
 
 
 def test_authorization_sets():

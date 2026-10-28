@@ -200,6 +200,8 @@ class PaymentService:
                 self._db.execute("UPDATE payments SET state='submitted', bank_ref=?, last_error=NULL WHERE bill_key=?", (receipt.ref, key))
             else:
                 state = "failed" if permanent or self._row(key)["attempts"] >= GIVE_UP_AFTER else "scheduled"
+                if state == "failed":
+                    self.erp.release_stock(key)  # nothing will be paid, so the units it set aside are free again
                 self._add_to_day(today, -cents)  # nothing left the bank: give the headroom back
                 self._db.execute("UPDATE payments SET state=?, last_error=? WHERE bill_key=?", (state, error, key))
             self._db.commit()

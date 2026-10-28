@@ -2,7 +2,7 @@
 
   python approve.py list                         pending/decided requests
   python approve.py card 3                       show the decision card for request 3
-  python approve.py respond <token> --as vp-finance@acmecorp.example [--comment "ok"]
+  python approve.py respond <token> [--as vp-finance@acmecorp.example] [--comment "ok"]   (the link is issued to one mailbox; --as can only agree with it)
   python approve.py tick --hours 50              fast-forward the clock: reminders, escalation, expiry
 """
 from __future__ import annotations
@@ -22,7 +22,7 @@ def main() -> None:
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("list")
     c = sub.add_parser("card"); c.add_argument("id", type=int)
-    r = sub.add_parser("respond"); r.add_argument("token"); r.add_argument("--as", dest="who", required=True); r.add_argument("--comment", default="")
+    r = sub.add_parser("respond"); r.add_argument("token"); r.add_argument("--as", dest="who", default=None, help="optional; the link already says who it was issued to, and this must match"); r.add_argument("--comment", default="")
     t = sub.add_parser("tick"); t.add_argument("--hours", type=float, default=0)
     a = ap.parse_args()
     svc = ApprovalService(a.db, MockNetSuite(a.db, keep_ledger=True), reset=False)

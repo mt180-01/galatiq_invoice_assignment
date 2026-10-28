@@ -32,7 +32,7 @@ def authorized(role: str, escalated_from: str | None = None) -> set[str]:
 
 
 # Which finding needs whose eyes (first match wins, in this order).
-_DOMAIN = [("fraud_indicators", "AP Manager"), ("bank_account_changed", "AP Manager"), ("pressure_language", "AP Manager"), ("extractor_disagreement", "AP Manager"),
+_DOMAIN = [("fraud_indicators", "AP Manager"), ("bank_account_changed", "AP Manager"), ("possible_duplicate", "AP Manager"), ("pressure_language", "AP Manager"), ("extractor_disagreement", "AP Manager"),
            ("ocr_source", "AP Manager"), ("revision", "AP Manager"), ("foreign_currency", "Treasury"), ("unknown_vendor", "Procurement")]
 NOT_APPROVABLE = {"unreadable_document"}  # nothing to approve: a person has to read/key it first
 
