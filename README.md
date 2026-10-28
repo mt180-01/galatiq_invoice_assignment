@@ -21,7 +21,7 @@ The command line is first-class too: [`docs/img/demo.svg`](docs/img/demo.svg) is
 | What | Result | Evidence |
 |---|---|---|
 | The 17 provided invoices | **17 / 17 end as labelled**, 8 / 8 on the outcomes the brief itself states, 0 wrongly paid: 7 paid, 8 rejected, 2 sent to a person, 3 duplicates blocked | **[docs/EVALUATION.md](docs/EVALUATION.md)**: every invoice, decision and reason, rules-only and LLM-on reported separately |
-| Same run on **live Grok** | 17 / 17, 0 errors, 36 model calls and 42 tool calls, **$0.020 total (about $0.0012 per invoice)** as reported by xAI | [`docs/live_runs/`](docs/live_runs/): recorded transcript, JSON, and a **recording you can replay offline for free** (`--replay-llm`) |
+| Same run on **live Grok** | 17 / 17, 0 errors, 36 model calls and 42 tool calls, **$0.017 total (about $0.0010 per invoice)** as reported by xAI | [`docs/live_runs/`](docs/live_runs/): recorded transcript, JSON, and a **recording you can replay offline for free** (`--replay-llm`) |
 | Errors caught before payment | stock shortfalls, unknown items, arithmetic that doesn't add up, a fraud pattern, a changed bank account, duplicates across formats | `data/invoices`, `tests/test_brief.py` |
 | Robustness to garbage | 2,000 randomly corrupted invoices: **0 approved with a wrong value** (a stray "see invoice 31337" once got through; found and fixed) | `scripts/stress_extraction.py` |
 | Speed | a clean invoice spends about 10-15 ms in the system, against "5 days" in the brief; about 2,200 documents/s on 14 cores | `main.py --bench`, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §4 |
@@ -34,7 +34,7 @@ The command line is first-class too: [`docs/img/demo.svg`](docs/img/demo.svg) is
 |---|---|---|---|
 | **Error rate** | 30% of invoices | on the provided set, all 10 problem invoices were stopped or sent to a person before any money moved, **0 wrong payments** (the brief itself names 5 of them: a stock mismatch, out-of-stock/fraud, two unknown items, invalid data) | `docs/EVALUATION.md`; 2,000-invoice stress test |
 | **Time per invoice** | 5 days | clean invoices: milliseconds, no human. Invoices needing a person: a prepared one-click card, with a clock that reminds at 24 h and escalates at 48 h | `main.py` impact block, `approve.py tick` |
-| **Cost per invoice (model)** | n/a | **about $0.0012** measured live, roughly **$118 a year at 100,000 invoices**; free by default | `docs/live_runs/`, `scripts/roi.py` |
+| **Cost per invoice (model)** | n/a | **about $0.0010** measured live, roughly **$101 a year at 100,000 invoices**; free by default | `docs/live_runs/`, `scripts/roi.py` |
 | **People's time** | 12 min of keying and chasing (assumed) | only the invoices that need a decision, and those arrive summarised | `scripts/roi.py` (your inputs) |
 
 The savings side depends on Acme's volume and wages, which the brief does not give, so `python scripts/roi.py` takes your numbers and shows the structure and a sensitivity table. With *placeholder*

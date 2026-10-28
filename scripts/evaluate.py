@@ -42,7 +42,7 @@ def same(a: str, b: str) -> bool:
 
 def run(**mode) -> tuple[list, object]:
     with tempfile.TemporaryDirectory() as tmp:
-        base = dict(db=str(Path(tmp) / "e.db"), keep_ledger=False, llm_concurrency=8, offline=False, simulate=False, grok=False, no_store=True)
+        base = dict(db=str(Path(tmp) / "e.db"), keep_ledger=False, llm_concurrency=8, offline=False, simulate=False, grok=False, no_store=True, sequential=True)  # file order, one at a time: which copy of a duplicate is blocked must not depend on thread timing
         args = SimpleNamespace(**{**base, **mode})
         outs, _, _ = asyncio.run(run_batch([str(p) for p in sorted(DATA.iterdir())], args, 1))
     by_inv = {}

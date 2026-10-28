@@ -76,8 +76,14 @@ rstatus = {}
 for o in rp:
     if o["status"] != "DUPLICATE":
         rstatus[o["invoice"]["invoice_number"] + (f"-{o['invoice']['revision']}" if o["invoice"].get("revision") else "")] = o["status"]
-check("a recorded live Grok run replays offline: 36 model calls answered, 0 missing, the recorded cost", "36 model call(s) answered from the recording, 0 not recorded" in out and "spent $0.0200" in out)
-check("the replay reaches the same 17 outcomes and reproduces the model's notes", rstatus == expected and sum(bool(o.get("explanation")) for o in rp) == 10, f"{sum(rstatus[k] == v for k, v in expected.items())}/17")
+cassette = [json.loads(l) for l in (REPO / "docs/live_runs/provided-invoices.cassette.jsonl").read_text().splitlines()[1:]]
+recorded_cost = sum(r["body"]["usage"]["cost_in_usd_ticks"] for r in cassette) / 1e10
+check("a recorded live Grok run replays offline: every model call answered, none missing, the recorded cost",
+      f"{len(cassette)} model call(s) answered from the recording, 0 not recorded" in out and f"spent ${recorded_cost:.4f}" in out, f"{len(cassette)} calls, ${recorded_cost:.4f}")
+live_json = json.loads((REPO / "docs/live_runs/2026-10-27-provided-invoices.json").read_text())
+check("the replay reaches the same 17 outcomes and reproduces the model's notes exactly",
+      rstatus == expected and sorted(map(str, (o.get("explanation") for o in rp))) == sorted(map(str, (o.get("explanation") for o in live_json))),
+      f"{sum(rstatus[k] == v for k, v in expected.items())}/17")
 rc, out = py("scripts/evaluate.py", "--check")
 check("docs/EVALUATION.md (rules-only and LLM-on, every invoice) is current", rc == 0 and "is current" in out)
 

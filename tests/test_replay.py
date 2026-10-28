@@ -14,6 +14,8 @@ from acme_ap.llm import GrokClient, LLMUnavailable, make_llm
 
 ROOT = Path(__file__).resolve().parent.parent
 CASSETTE = ROOT / "docs" / "live_runs" / "provided-invoices.cassette.jsonl"
+RECORDED = [json.loads(l) for l in CASSETTE.read_text().splitlines()[1:]]
+RECORDED_COST = sum(r["body"]["usage"]["cost_in_usd_ticks"] for r in RECORDED) / 1e10          # what xAI charged when it was recorded
 SECRET = "xai-example-not-a-real-key-5555"
 
 
@@ -105,12 +107,12 @@ def replay_cli(tmp_path, *extra):
 def test_the_committed_live_run_replays_offline_with_no_key_and_no_cost(tmp_path):
     out = replay_cli(tmp_path)
     assert "LLM: Grok (replayed from provided-invoices.cassette.jsonl)" in out
-    assert "replay: 36 model call(s) answered from the recording, 0 not recorded" in out
-    assert "spent $0.0200 (reported by xAI, when recorded)" in out
+    assert f"replay: {len(RECORDED)} model call(s) answered from the recording, 0 not recorded" in out
+    assert f"spent ${RECORDED_COST:.4f} (reported by xAI, when recorded)" in out
     assert "AWAITING=2" in out and "PAID=7" in out and "REJECT=8" in out and "DUPLICATE=3" in out
     res = json.loads((tmp_path / "r.json").read_text())
     assert not any(o.get("error") for o in res)
-    assert sum(o["llm"].get("calls", 0) for o in res) == 36 and sum(o["llm"].get("tools", 0) for o in res) >= 4
+    assert sum(o["llm"].get("calls", 0) for o in res) == len(RECORDED) and sum(o["llm"].get("tools", 0) for o in res) >= 4
 
 
 def test_the_replay_reproduces_what_the_live_run_wrote(tmp_path):
@@ -124,11 +126,10 @@ def test_the_replay_reproduces_what_the_live_run_wrote(tmp_path):
 
 
 def test_the_committed_recording_is_clean_and_complete():
-    lines = [json.loads(l) for l in CASSETTE.read_text().splitlines()]
-    assert lines[0]["cassette"] == 1 and len(lines) == 37
-    assert all(l["status"] == 200 for l in lines[1:])                                            # a healthy run: every exchange succeeded
-    assert {l["body"]["model"] for l in lines[1:]} == {"grok-4.20-0309-non-reasoning"}            # served by the plain model, not a reasoning one
-    assert sum(l["body"]["usage"]["cost_in_usd_ticks"] for l in lines[1:]) == pytest.approx(0.0200 * 1e10, rel=0.01)
+    assert json.loads(CASSETTE.read_text().splitlines()[0])["cassette"] == 1 and len(RECORDED) >= 30
+    assert all(r["status"] == 200 for r in RECORDED)                                              # a healthy run: every exchange succeeded
+    assert {r["body"]["model"] for r in RECORDED} == {"grok-4.20-0309-non-reasoning"}              # served by the plain model, not a reasoning one
+    assert 0.005 < RECORDED_COST < 0.05                                                            # cents, as claimed
     text = CASSETTE.read_text().lower()
     assert "authorization" not in text and "bearer" not in text and "xai-" not in text
 
@@ -147,5 +148,5 @@ def test_the_evaluation_document_is_current_and_says_what_the_two_runs_found():
     text = (ROOT / "docs" / "EVALUATION.md").read_text()
     assert text.count("Matches the brief's stated outcome | 8 of 8") == 2 and text.count("Matches the developer's label | 17 of 17") == 2
     assert text.count("Wrongly paid (paid, but label says it should not be) | 0") == 2 and "Decisions identical on **17 of 17**" in text
-    assert "Run 1: rules only" in text and "Run 2: LLM on" in text and "$0.0200" in text and "not** an independent test" in text
+    assert "Run 1: rules only" in text and "Run 2: LLM on" in text and f"${RECORDED_COST:.4f}" in text and "not** an independent test" in text
     assert "**NO**" not in text

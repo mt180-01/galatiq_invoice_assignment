@@ -51,10 +51,11 @@ def _parse_chunk(paths: list[str], want_text: bool) -> list[tuple[str, object]]:
 class Pipeline:
     def __init__(self, erp: ErpAdapter, llm: LLM, workers: int | None = None, llm_concurrency: int = 8,
                  origins: dict[str, Origin] | None = None, approvals=None, payments=None, bank_concurrency: int = 8,
-                 llm_policy: str = "gated", store=None):
+                 llm_policy: str = "gated", store=None, sequential: bool = False):
         self.erp, self.llm = erp, llm
         self.origins = origins or {}
         self.approvals = approvals
+        self.sequential = sequential  # one document at a time, in the order given: slower, but repeatable (which copy of a duplicate is blocked, what a recording replays)
         self.store = store  # optional: keeps each finished outcome for the web interface
         self.payments = payments or getattr(approvals, "payments", None) or default_payments(erp)
         gated = llm_policy == "gated"  # "always" = ask the model on every invoice (the pre-optimisation behaviour, kept for comparison)
@@ -93,6 +94,8 @@ class Pipeline:
                 done.set_result(_parse_chunk([p], want_text))
                 futures[p] = (done, 0)
         try:
+            if self.sequential:
+                return [await self._process(p, *futures[p]) for p in paths]
             return list(await asyncio.gather(*(self._process(p, *futures[p]) for p in paths)))
         finally:
             if pool:

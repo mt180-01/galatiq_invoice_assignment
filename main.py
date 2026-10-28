@@ -114,6 +114,7 @@ def main() -> None:
     ap.add_argument("--llm-concurrency", type=int, default=8)
     ap.add_argument("--llm-policy", choices=("gated", "always"), default="gated",
                     help="gated (default): ask the model only where it can change the result; always: ask on every invoice (costly)")
+    ap.add_argument("--sequential", action="store_true", help="process documents one at a time in file order: slower, but repeatable (implied by --record-llm and --replay-llm)")
     ap.add_argument("--record-llm", metavar="FILE", help="run on live Grok (billed, capped) and save every request/response to FILE so the run can be replayed offline")
     ap.add_argument("--replay-llm", metavar="FILE", help="answer model calls from a recording made with --record-llm: no network, no key, no cost")
     ap.add_argument("--trace", action="store_true", help="show, per invoice, what each agent did: model calls, tool calls, conclusions")
@@ -124,7 +125,8 @@ def main() -> None:
     ap.add_argument("--bench", type=int, metavar="N", help="throughput benchmark over N generated documents, serial vs parallel")
     ap.add_argument("-v", "--verbose", action="store_true", help="show per-stage structured logs")
     args = ap.parse_args()
-    args.keep_ledger = not args.reset  # the ledger is the system's memory of what was paid: it survives between runs unless you ask otherwise
+    args.keep_ledger = not args.reset
+    args.sequential = args.sequential or bool(args.record_llm or args.replay_llm)  # a recording is only replayable if the order of work is the same  # the ledger is the system's memory of what was paid: it survives between runs unless you ask otherwise
 
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(KeyValueFormatter())

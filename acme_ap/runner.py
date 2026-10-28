@@ -39,7 +39,7 @@ async def run_batch(paths: list[str], args: argparse.Namespace, workers: int | N
     t0 = time.perf_counter()
     outcomes = await Pipeline(erp, llm, workers=workers, llm_concurrency=args.llm_concurrency, origins=origins,
                                 approvals=approvals, payments=payments, store=None if getattr(args, "no_store", False) else OutcomeStore(args.db, reset=not args.keep_ledger),
-                              llm_policy=getattr(args, "llm_policy", "gated")).run(paths)
+                              llm_policy=getattr(args, "llm_policy", "gated"), sequential=getattr(args, "sequential", False)).run(paths)
     wall = time.perf_counter() - t0
     cpu = cpu_seconds() - before
     if hasattr(llm, "replay"):

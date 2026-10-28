@@ -273,7 +273,7 @@ A reviewer found these; each was checked against the code first, fixed, and cove
 
 * **Record and replay.** `--record-llm FILE` runs on live Grok and saves each exchange (request hash, status, response; never headers); `--replay-llm FILE` answers the same questions from the
   file: no network, no key, no cost, and the cost shown is what xAI reported when recorded. The recording includes failures (429s, timeouts), so a replay goes through the same retries and
-  fallbacks. The model name is not part of the match. If prompts change on purpose, the replay reports the questions it cannot answer (those steps use the rules) and the fix is to record again.
+  fallbacks. The model name is not part of the match. Recording and replay process documents one at a time in file order (`--sequential`, implied), so which copy of a duplicated invoice is blocked cannot vary with thread timing. If prompts change on purpose, the replay reports the questions it cannot answer (those steps use the rules) and the fix is to record again.
 * **[EVALUATION.md](EVALUATION.md).** Every invoice with its decision, in two separate runs (rules only; the recorded live Grok run replayed), the brief's stated outcome for the eight invoices it
   specifies (independent of this code) kept apart from the developer's labels for all 17 (not independent), and what the model did on each. `python scripts/evaluate.py --check` fails if it is out of
   date, and a test runs it. Result: both runs 17/17, 8/8 against the brief, 0 wrongly paid, decisions identical; the model's contribution on these clear-cut invoices is second opinions, notes and
@@ -319,7 +319,7 @@ What the live run found that the stubs could not, all fixed and covered by tests
 | Run | Result | Cost (as reported by xAI) |
 |---|---|---|
 | 17 provided invoices, `--grok` (an earlier round, before the default model changed) | 17/17 outcomes as labelled, 0 errors; 7 of 7 paid invoices had a Grok second opinion; 9 plain-English notes and 4 follow-ups written and accepted by the grounding check | $0.0619 (26 model calls) |
-| **17 provided invoices, recorded** (`docs/live_runs/`, replayable offline) | 17/17, 0 errors; 36 model calls and 42 tool calls, all served by the non-reasoning model; slowest step 3.7 s; per-invoice table in [EVALUATION.md](EVALUATION.md) | **$0.0200** |
+| **17 provided invoices, recorded** (`docs/live_runs/`, replayable offline) | 17/17, 0 errors; 36 model calls and 42 tool calls, all served by the non-reasoning model; slowest step 3.7 s; per-invoice table in [EVALUATION.md](EVALUATION.md) | **$0.0171** |
 | `data/self_correction`, `--grok --trace` | `Wdgt B` found by catalogue search and corrected to `WidgetB`; `GadgetY` correctly left alone; look-alike vendor `Widget Inc` flagged with a suggestion, not changed | $0.0147 (10 calls) |
 
 What this round found that nothing else could, all fixed and tested: (a) one call returned **HTTP 429 "model is currently at capacity"**, so calls now retry twice with
@@ -371,7 +371,7 @@ Comms agent run the same under both, since they only act when there is something
 
 Outcomes are identical in all three. The earlier version of this table (7 calls, 1,621 tokens) is higher now because of what was added on purpose: a second
 opinion with tool calls before every payment, the resolver, and model-written notes. **Real Grok on the 17 provided invoices (section 4i): 36 model calls,
-20,234 tokens in / 2,231 out, $0.0200 as reported by xAI** (the figure is lower than an earlier $0.062 run because the default model is now a plain one, not a reasoning one). Read this fairly: the stand-in never errs, so it shows how much the system *asks*, not how a real
+20,234 tokens in / 2,254 out, $0.0171 as reported by xAI** (the figure is lower than an earlier $0.062 run because the default model is now a plain one, not a reasoning one). Read this fairly: the stand-in never errs, so it shows how much the system *asks*, not how a real
 model answers, and the sample is small and mostly clean.
 
 ## 5. Known limitations
