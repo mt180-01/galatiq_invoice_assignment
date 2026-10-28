@@ -1,0 +1,11 @@
+Summit Manufacturing Co.
+Invoice INV-9807
+Invoice Date: July 24, 2026
+
+- 4 x GadgetX @ $760.00 each
+- 9 x WidgetB @ $490.00 each
+
+Subtotal: $7,450.00
+Tax: $0.00 (0%)
+Shipping: $120.00
+Total: $7,570.00 USD

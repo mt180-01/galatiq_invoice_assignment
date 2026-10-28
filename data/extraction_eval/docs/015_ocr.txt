@@ -1,0 +1,28 @@
+Widgets Inc.
+123 Gadget Lane
+Techville, TX 75001
+
+INVOICE
+
+Invoice Number: INV-9312
+Invoice Date: 08/08/2026
+Due Date: 09/22/2026
+
+Bill To:
+Acme Corp
+456 Industrial Way
+Metropolis, NY 10001
+
+Description                  Qty     Unit Price     Amount
+3 x GadgetX                   3        $750.00      $2250.00
+
+Subtotal:                                             $2250.00
+Tax (8%):                                              $180.00
+Shipping:                                               $25.00
+
+Total Due:                                            $2455.00
+
+Please remit payment in USD to Widgets Inc. via wire transfer or check.
+Thank you for your business!
+
+* OCR note: some characters may be misread from PDF scan *

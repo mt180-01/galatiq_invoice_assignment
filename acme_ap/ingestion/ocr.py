@@ -14,8 +14,10 @@ import shutil
 import subprocess
 
 import numpy as np
+import pymupdf
 
 DPI = 200
+LOW_CONFIDENCE = 85.0  # mean Tesseract confidence below this means the text was too small for the resolution used (measured: 9 pt text at 200 dpi scored 57, at 300 dpi 95)
 BLOCK = 32  # background-estimation tile, in pixels
 
 
@@ -80,12 +82,14 @@ def _otsu(img: np.ndarray) -> int:
         mean0 = sum0 / w0
         mean1 = (sum0[-1] - sum0) / w1
         between = w0 * w1 * (mean0 - mean1) ** 2
+    if not np.isfinite(between).any():  # a single grey level (a blank page): nothing to separate, so everything is background
+        return 0
     return int(np.nanargmax(between))
 
 
-def recognise(gray: np.ndarray) -> list[tuple]:
-    """Run Tesseract on a cleaned page; returns word boxes (x0, y0, x1, y1, text) in PDF points, the same
-    shape PyMuPDF gives for text pages, so scans and digital PDFs share one layout reconstruction.
+def recognise(gray: np.ndarray, dpi: int = DPI) -> tuple[list[tuple], float]:
+    """Run Tesseract on a cleaned page rendered at `dpi`; returns (word boxes (x0, y0, x1, y1, text) in PDF points, the same
+    shape PyMuPDF gives for text pages, so scans and digital PDFs share one layout reconstruction; mean word confidence 0-100).
     Raises RuntimeError if the engine fails."""
     h, w = gray.shape
     pgm = f"P5\n{w} {h}\n255\n".encode() + gray.tobytes()  # netpbm: no image library needed
@@ -93,11 +97,29 @@ def recognise(gray: np.ndarray) -> list[tuple]:
                           capture_output=True, timeout=120)
     if proc.returncode != 0:
         raise RuntimeError(proc.stderr.decode(errors="replace")[:200])
-    k = 72.0 / DPI
-    words = []
+    k = 72.0 / dpi
+    words, confidences = [], []
     for line in proc.stdout.decode("utf-8", errors="replace").splitlines()[1:]:
         cols = line.split("\t")
         if len(cols) == 12 and cols[0] == "5" and cols[11].strip():
             x, y, bw, bh = (int(c) for c in cols[6:10])
             words.append((x * k, y * k, (x + bw) * k, (y + bh) * k, cols[11].strip()))
-    return words
+            confidences.append(float(cols[10]))
+    return words, (sum(confidences) / len(confidences) if confidences else 0.0)
+
+
+def read_page(page) -> list[tuple]:
+    """OCR a PDF page at the resolution that suits its text. Start at DPI; if Tesseract is not confident (small type), try 1.5x and 2x and keep the
+    most confident reading. Pages that read well the first time cost no extra pass."""
+    best: tuple[list[tuple], float] | None = None
+    for dpi in (DPI, int(DPI * 1.5), DPI * 2):
+        pix = page.get_pixmap(matrix=pymupdf.Matrix(dpi / 72, dpi / 72), colorspace=pymupdf.csGRAY)
+        gray = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width)
+        words, conf = recognise(clean_page(gray), dpi)
+        if not words and best is None:
+            return []  # a blank page (a back side, a separator sheet): no resolution will find text that is not there
+        if best is None or conf > best[1] + 2:  # a clearly better reading, not noise
+            best = (words, conf)
+        if best[1] >= LOW_CONFIDENCE:
+            break
+    return best[0]

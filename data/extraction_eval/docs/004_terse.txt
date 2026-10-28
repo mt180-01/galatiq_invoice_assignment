@@ -1,0 +1,13 @@
+ACME INDUSTRIAL SUPPLIES
+
+INV# SI-1024   DATE 08/14/26   DUE 09/13/26
+
+QTY   ITEM      U/P      AMT
+2     WidgetA   240.00   480.00
+7     WidgetB   500.00   3500.00
+
+SUBTOTAL          3980.00
+TAX (0%)             0.00
+SHIPPING            60.00
+TOTAL             4040.00 USD
+

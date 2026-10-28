@@ -279,6 +279,13 @@ A reviewer found these; each was checked against the code first, fixed, and cove
   date, and a test runs it. Result: both runs 17/17, 8/8 against the brief, 0 wrongly paid, decisions identical; the model's contribution on these clear-cut invoices is second opinions, notes and
   emails, not different decisions (that is in `data/self_correction/`).
 
+**Reading accuracy, measured independently.** `data/extraction_eval/` holds 58 invoices in 12 styles (bullets, email, prose, tables, OCR-style, threads...). Grok wrote the *rendering*; the true values were
+fixed by our code beforehand, so the model that reads them is not marking its own work. `scripts/evaluate_extraction.py` runs rules / gated / always-model: critical fields (vendor, number, total, items) fully
+right 28/58 (48%) / 58/58 / 58/58; "silent wrong" (critical field wrong *and* policy would approve) 0 in all three; gated uses 33 model calls ($0.031) against 58 ($0.054). Model answers are accepted only
+when grounded in the document text (`_disagreements`), and a bank account is never taken from the model alone. `scripts/evaluate_scans.py` typesets invoices, rasterises, degrades and OCRs them: rules 19/30,
+with Grok 25/30 ($0.024). OCR is adaptive: 200 dpi first, retried at 300/400 when Tesseract's mean confidence is under 85, best result kept (this took rules from 37% to 63%). Both are replayed from
+recordings (`--check`, under a second, no key) and tested. Also here: model-written plain-English note and vendor email run concurrently, and the outcome store batches writes (about +18% throughput).
+
 ## 4k. The web interface
 
 `python main.py serve [--demo]` (or `make ui`) starts a local interface on `127.0.0.1:8765`: a **dashboard** (what happened, who is waiting and for how long, where the money
@@ -319,7 +326,7 @@ What the live run found that the stubs could not, all fixed and covered by tests
 | Run | Result | Cost (as reported by xAI) |
 |---|---|---|
 | 17 provided invoices, `--grok` (an earlier round, before the default model changed) | 17/17 outcomes as labelled, 0 errors; 7 of 7 paid invoices had a Grok second opinion; 9 plain-English notes and 4 follow-ups written and accepted by the grounding check | $0.0619 (26 model calls) |
-| **17 provided invoices, recorded** (`docs/live_runs/`, replayable offline) | 17/17, 0 errors; 36 model calls and 42 tool calls, all served by the non-reasoning model; slowest step 3.7 s; per-invoice table in [EVALUATION.md](EVALUATION.md) | **$0.0171** |
+| **17 provided invoices, recorded** (`docs/live_runs/`, replayable offline) | 17/17, 0 errors; 36 model calls and 42 tool calls, all served by the non-reasoning model; slowest step 5.6 s; per-invoice table in [EVALUATION.md](EVALUATION.md) | **$0.0208** |
 | `data/self_correction`, `--grok --trace` | `Wdgt B` found by catalogue search and corrected to `WidgetB`; `GadgetY` correctly left alone; look-alike vendor `Widget Inc` flagged with a suggestion, not changed | $0.0147 (10 calls) |
 
 What this round found that nothing else could, all fixed and tested: (a) one call returned **HTTP 429 "model is currently at capacity"**, so calls now retry twice with
@@ -371,7 +378,7 @@ Comms agent run the same under both, since they only act when there is something
 
 Outcomes are identical in all three. The earlier version of this table (7 calls, 1,621 tokens) is higher now because of what was added on purpose: a second
 opinion with tool calls before every payment, the resolver, and model-written notes. **Real Grok on the 17 provided invoices (section 4i): 36 model calls,
-20,234 tokens in / 2,254 out, $0.0171 as reported by xAI** (the figure is lower than an earlier $0.062 run because the default model is now a plain one, not a reasoning one). Read this fairly: the stand-in never errs, so it shows how much the system *asks*, not how a real
+20,406 tokens in / 2,243 out, $0.0208 as reported by xAI** (the figure is lower than an earlier $0.062 run because the default model is now a plain one, not a reasoning one). Read this fairly: the stand-in never errs, so it shows how much the system *asks*, not how a real
 model answers, and the sample is small and mostly clean.
 
 ## 5. Known limitations
@@ -380,6 +387,6 @@ model answers, and the sample is small and mostly clean.
 - A revised invoice (`revision` set) is always escalated to a human; there is no delta-payment logic.
 - Non-USD invoices are escalated; there is no FX handling.
 - Item matching tolerates small typos but not larger ones; `WidgetC` correctly stays unknown.
-- OCR needs a local `tesseract` binary; without it a scanned PDF is held as unreadable. OCR line-item recovery is partial.
+- OCR needs a local `tesseract` binary; without it a scanned PDF is held as unreadable. On degraded scans the model gets 25/30 right (rules 19/30); the rest go to a person. The extraction corpus is model-written, not real supplier mail.
 - Email intake reads `.eml` files; there is no live mailbox connection (IMAP/Graph), no sending, no reply parsing, and no OCR for scanned images.
 - No authentication or real NetSuite connectivity.

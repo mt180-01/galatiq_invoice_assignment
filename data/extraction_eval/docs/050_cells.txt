@@ -1,0 +1,43 @@
+Vendor:
+Global Supply Chain Partners
+
+Invoice Number:
+91498
+
+Invoice Date:
+09/18/2026
+
+Due Date:
+10/18/2026
+
+Description:
+GadgetX
+Quantity:
+11
+Unit Price:
+750.00
+
+Description:
+WidgetA
+Quantity:
+1
+Unit Price:
+250.00
+
+Description:
+WidgetB
+Quantity:
+11
+Unit Price:
+510.00
+
+Subtotal:
+14110.00
+Tax (0%):
+0.00
+Shipping:
+120.00
+Total:
+14230.00
+Currency:
+USD

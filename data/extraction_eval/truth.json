@@ -1,0 +1,1639 @@
+[
+ {
+  "id": 0,
+  "style": "columns",
+  "file": "docs/000_columns.txt",
+  "truth": {
+   "vendor": "Gadgets Co.",
+   "invoice_number": "INV-6116",
+   "date": "2026-09-14",
+   "due_date": null,
+   "currency": "USD",
+   "items": [
+    {
+     "item": "GadgetX",
+     "quantity": 4,
+     "unit_price": "750.00"
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 10,
+     "unit_price": "500.00"
+    },
+    {
+     "item": "WidgetA",
+     "quantity": 2,
+     "unit_price": "250.00"
+    }
+   ],
+   "subtotal": "8500.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "60",
+   "total": "8560.00"
+  }
+ },
+ {
+  "id": 1,
+  "style": "email",
+  "file": "docs/001_email.txt",
+  "truth": {
+   "vendor": "Gadgets Co.",
+   "invoice_number": "20430",
+   "date": "2026-07-21",
+   "due_date": "2026-09-04",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetB",
+     "quantity": 3,
+     "unit_price": "500.00"
+    }
+   ],
+   "subtotal": "1500.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "25",
+   "total": "1525.00"
+  }
+ },
+ {
+  "id": 2,
+  "style": "cells",
+  "file": "docs/002_cells.txt",
+  "truth": {
+   "vendor": "Consolidated Materials Group",
+   "invoice_number": "13644",
+   "date": "2026-05-06",
+   "due_date": "2026-05-21",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetA",
+     "quantity": 10,
+     "unit_price": "240.00"
+    },
+    {
+     "item": "GadgetX",
+     "quantity": 6,
+     "unit_price": "740.00"
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 1,
+     "unit_price": "490.00"
+    }
+   ],
+   "subtotal": "7330.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "120",
+   "total": "7450.00"
+  }
+ },
+ {
+  "id": 4,
+  "style": "terse",
+  "file": "docs/004_terse.txt",
+  "truth": {
+   "vendor": "Acme Industrial Supplies",
+   "invoice_number": "SI-1024",
+   "date": "2026-08-14",
+   "due_date": "2026-09-13",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetA",
+     "quantity": 2,
+     "unit_price": "240.00"
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 7,
+     "unit_price": "500.00"
+    }
+   ],
+   "subtotal": "3980.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "60",
+   "total": "4040.00"
+  }
+ },
+ {
+  "id": 5,
+  "style": "multiline",
+  "file": "docs/005_multiline.txt",
+  "truth": {
+   "vendor": "TechParts International",
+   "invoice_number": "SI-5517",
+   "date": "2026-08-19",
+   "due_date": "2026-09-03",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetA",
+     "quantity": 8,
+     "unit_price": "250.00"
+    }
+   ],
+   "subtotal": "2000.00",
+   "tax_rate": 8,
+   "tax_amount": "160.00",
+   "shipping": "0",
+   "total": "2160.00"
+  }
+ },
+ {
+  "id": 6,
+  "style": "refs",
+  "file": "docs/006_refs.txt",
+  "truth": {
+   "vendor": "Hartwell & Sons Ltd",
+   "invoice_number": "INV-2277",
+   "date": "2026-08-08",
+   "due_date": "2026-09-22",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "GadgetX",
+     "quantity": 3,
+     "unit_price": "740.00"
+    }
+   ],
+   "subtotal": "2220.00",
+   "tax_rate": 5,
+   "tax_amount": "111.00",
+   "shipping": "0",
+   "total": "2331.00"
+  }
+ },
+ {
+  "id": 7,
+  "style": "bullets",
+  "file": "docs/007_bullets.txt",
+  "truth": {
+   "vendor": "Summit Manufacturing Co.",
+   "invoice_number": "INV-9807",
+   "date": "2026-07-24",
+   "due_date": null,
+   "currency": "USD",
+   "items": [
+    {
+     "item": "GadgetX",
+     "quantity": 4,
+     "unit_price": "760.00"
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 9,
+     "unit_price": "490.00"
+    }
+   ],
+   "subtotal": "7450.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "120",
+   "total": "7570.00"
+  }
+ },
+ {
+  "id": 8,
+  "style": "twocol",
+  "file": "docs/008_twocol.txt",
+  "truth": {
+   "vendor": "Gadgets Co.",
+   "invoice_number": "INV-4992",
+   "date": "2026-05-01",
+   "due_date": "2026-05-16",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "GadgetX",
+     "quantity": 1,
+     "unit_price": "750.00"
+    }
+   ],
+   "subtotal": "750.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "25",
+   "total": "775.00"
+  }
+ },
+ {
+  "id": 9,
+  "style": "thread",
+  "file": "docs/009_thread.txt",
+  "truth": {
+   "vendor": "Hartwell & Sons Ltd",
+   "invoice_number": "INV-4459",
+   "date": "2026-08-23",
+   "due_date": "2026-09-22",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "GadgetX",
+     "quantity": 6,
+     "unit_price": "750.00"
+    },
+    {
+     "item": "WidgetA",
+     "quantity": 10,
+     "unit_price": "250.00"
+    }
+   ],
+   "subtotal": "7000.00",
+   "tax_rate": 5,
+   "tax_amount": "350.00",
+   "shipping": "120",
+   "total": "7470.00"
+  }
+ },
+ {
+  "id": 10,
+  "style": "caps",
+  "file": "docs/010_caps.txt",
+  "truth": {
+   "vendor": "Nova Supply Partners",
+   "invoice_number": "INV-9559",
+   "date": "2026-03-18",
+   "due_date": "2026-04-02",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetB",
+     "quantity": 7,
+     "unit_price": "500.00"
+    }
+   ],
+   "subtotal": "3500.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "60",
+   "total": "3560.00"
+  }
+ },
+ {
+  "id": 11,
+  "style": "prose",
+  "file": "docs/011_prose.txt",
+  "truth": {
+   "vendor": "Acme Industrial Supplies",
+   "invoice_number": "SI-6063",
+   "date": "2026-03-02",
+   "due_date": "2026-04-16",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetA",
+     "quantity": 5,
+     "unit_price": "260.00"
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 5,
+     "unit_price": "500.00"
+    }
+   ],
+   "subtotal": "3800.00",
+   "tax_rate": 5,
+   "tax_amount": "190.00",
+   "shipping": "120",
+   "total": "4110.00"
+  }
+ },
+ {
+  "id": 12,
+  "style": "columns",
+  "file": "docs/012_columns.txt",
+  "truth": {
+   "vendor": "Gadgets Co.",
+   "invoice_number": "INV-9778",
+   "date": "2026-04-06",
+   "due_date": "2026-05-06",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetA",
+     "quantity": 2,
+     "unit_price": "250.00"
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 7,
+     "unit_price": "490.00"
+    }
+   ],
+   "subtotal": "3930.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "0",
+   "total": "3930.00"
+  }
+ },
+ {
+  "id": 13,
+  "style": "email",
+  "file": "docs/013_email.txt",
+  "truth": {
+   "vendor": "TechParts International",
+   "invoice_number": "INV-7598",
+   "date": "2026-09-09",
+   "due_date": "2026-10-24",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "GadgetX",
+     "quantity": 11,
+     "unit_price": "740.00"
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 12,
+     "unit_price": "500.00"
+    }
+   ],
+   "subtotal": "14140.00",
+   "tax_rate": 8,
+   "tax_amount": "1131.20",
+   "shipping": "0",
+   "total": "15271.20"
+  }
+ },
+ {
+  "id": 14,
+  "style": "cells",
+  "file": "docs/014_cells.txt",
+  "truth": {
+   "vendor": "Summit Manufacturing Co.",
+   "invoice_number": "SI-9129",
+   "date": "2026-07-17",
+   "due_date": "2026-08-16",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetA",
+     "quantity": 1,
+     "unit_price": "250.00"
+    },
+    {
+     "item": "GadgetX",
+     "quantity": 12,
+     "unit_price": "750.00"
+    }
+   ],
+   "subtotal": "9250.00",
+   "tax_rate": 8,
+   "tax_amount": "740.00",
+   "shipping": "0",
+   "total": "9990.00"
+  }
+ },
+ {
+  "id": 15,
+  "style": "ocr",
+  "file": "docs/015_ocr.txt",
+  "truth": {
+   "vendor": "Widgets Inc.",
+   "invoice_number": "INV-9312",
+   "date": "2026-08-08",
+   "due_date": "2026-09-22",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "GadgetX",
+     "quantity": 3,
+     "unit_price": "750.00"
+    }
+   ],
+   "subtotal": "2250.00",
+   "tax_rate": 8,
+   "tax_amount": "180.00",
+   "shipping": "25",
+   "total": "2455.00"
+  }
+ },
+ {
+  "id": 16,
+  "style": "terse",
+  "file": "docs/016_terse.txt",
+  "truth": {
+   "vendor": "Brightline Fabrication",
+   "invoice_number": "INV-6936",
+   "date": "2026-05-04",
+   "due_date": "2026-06-03",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetB",
+     "quantity": 4,
+     "unit_price": "510.00"
+    },
+    {
+     "item": "WidgetA",
+     "quantity": 8,
+     "unit_price": "240.00"
+    },
+    {
+     "item": "GadgetX",
+     "quantity": 11,
+     "unit_price": "750.00"
+    }
+   ],
+   "subtotal": "12210.00",
+   "tax_rate": 5,
+   "tax_amount": "610.50",
+   "shipping": "60",
+   "total": "12880.50"
+  }
+ },
+ {
+  "id": 17,
+  "style": "multiline",
+  "file": "docs/017_multiline.txt",
+  "truth": {
+   "vendor": "MegaWidgets Corp",
+   "invoice_number": "INV-7061",
+   "date": "2026-08-09",
+   "due_date": "2026-08-24",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetA",
+     "quantity": 7,
+     "unit_price": "250.00"
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 9,
+     "unit_price": "500.00"
+    },
+    {
+     "item": "GadgetX",
+     "quantity": 8,
+     "unit_price": "750.00"
+    }
+   ],
+   "subtotal": "12250.00",
+   "tax_rate": 5,
+   "tax_amount": "612.50",
+   "shipping": "25",
+   "total": "12887.50"
+  }
+ },
+ {
+  "id": 18,
+  "style": "refs",
+  "file": "docs/018_refs.txt",
+  "truth": {
+   "vendor": "Nova Supply Partners",
+   "invoice_number": "52408",
+   "date": "2026-08-17",
+   "due_date": "2026-10-01",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetA",
+     "quantity": 7,
+     "unit_price": "250.00"
+    }
+   ],
+   "subtotal": "1750.00",
+   "tax_rate": 8,
+   "tax_amount": "140.00",
+   "shipping": "60",
+   "total": "1950.00"
+  }
+ },
+ {
+  "id": 19,
+  "style": "bullets",
+  "file": "docs/019_bullets.txt",
+  "truth": {
+   "vendor": "Nova Supply Partners",
+   "invoice_number": "INV-3048",
+   "date": "2026-05-13",
+   "due_date": "2026-06-27",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "GadgetX",
+     "quantity": 4,
+     "unit_price": "760.00"
+    }
+   ],
+   "subtotal": "3040.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "60",
+   "total": "3100.00"
+  }
+ },
+ {
+  "id": 20,
+  "style": "twocol",
+  "file": "docs/020_twocol.txt",
+  "truth": {
+   "vendor": "QuickShip Distributers",
+   "invoice_number": "53224",
+   "date": "2026-04-25",
+   "due_date": "2026-05-25",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetB",
+     "quantity": 3,
+     "unit_price": "500.00"
+    }
+   ],
+   "subtotal": "1500.00",
+   "tax_rate": 8,
+   "tax_amount": "120.00",
+   "shipping": "25",
+   "total": "1645.00"
+  }
+ },
+ {
+  "id": 21,
+  "style": "thread",
+  "file": "docs/021_thread.txt",
+  "truth": {
+   "vendor": "TechParts International",
+   "invoice_number": "INV-3805",
+   "date": "2026-07-15",
+   "due_date": "2026-08-29",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetA",
+     "quantity": 5,
+     "unit_price": "250.00"
+    }
+   ],
+   "subtotal": "1250.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "60",
+   "total": "1310.00"
+  }
+ },
+ {
+  "id": 22,
+  "style": "caps",
+  "file": "docs/022_caps.txt",
+  "truth": {
+   "vendor": "Acme Industrial Supplies",
+   "invoice_number": "60061",
+   "date": "2026-04-11",
+   "due_date": "2026-04-26",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetA",
+     "quantity": 10,
+     "unit_price": "250.00"
+    }
+   ],
+   "subtotal": "2500.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "0",
+   "total": "2500.00"
+  }
+ },
+ {
+  "id": 23,
+  "style": "prose",
+  "file": "docs/023_prose.txt",
+  "truth": {
+   "vendor": "QuickShip Distributers",
+   "invoice_number": "SI-7753",
+   "date": "2026-01-04",
+   "due_date": "2026-01-19",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetB",
+     "quantity": 3,
+     "unit_price": "510.00"
+    },
+    {
+     "item": "GadgetX",
+     "quantity": 10,
+     "unit_price": "750.00"
+    }
+   ],
+   "subtotal": "9030.00",
+   "tax_rate": 8,
+   "tax_amount": "722.40",
+   "shipping": "25",
+   "total": "9777.40"
+  }
+ },
+ {
+  "id": 24,
+  "style": "columns",
+  "file": "docs/024_columns.txt",
+  "truth": {
+   "vendor": "Atlas Industrial Supply",
+   "invoice_number": "38268",
+   "date": "2026-06-14",
+   "due_date": "2026-07-29",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "GadgetX",
+     "quantity": 6,
+     "unit_price": "760.00"
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 2,
+     "unit_price": "490.00"
+    }
+   ],
+   "subtotal": "5540.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "25",
+   "total": "5565.00"
+  }
+ },
+ {
+  "id": 25,
+  "style": "email",
+  "file": "docs/025_email.txt",
+  "truth": {
+   "vendor": "Global Supply Chain Partners",
+   "invoice_number": "INV-5537",
+   "date": "2026-02-06",
+   "due_date": "2026-03-08",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetB",
+     "quantity": 6,
+     "unit_price": "500.00"
+    },
+    {
+     "item": "WidgetA",
+     "quantity": 8,
+     "unit_price": "240.00"
+    },
+    {
+     "item": "GadgetX",
+     "quantity": 1,
+     "unit_price": "740.00"
+    }
+   ],
+   "subtotal": "5660.00",
+   "tax_rate": 5,
+   "tax_amount": "283.00",
+   "shipping": "60",
+   "total": "6003.00"
+  }
+ },
+ {
+  "id": 26,
+  "style": "cells",
+  "file": "docs/026_cells.txt",
+  "truth": {
+   "vendor": "TechParts International",
+   "invoice_number": "INV-4708",
+   "date": "2026-04-03",
+   "due_date": "2026-04-18",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "GadgetX",
+     "quantity": 10,
+     "unit_price": "750.00"
+    },
+    {
+     "item": "WidgetA",
+     "quantity": 9,
+     "unit_price": "260.00"
+    }
+   ],
+   "subtotal": "9840.00",
+   "tax_rate": 8,
+   "tax_amount": "787.20",
+   "shipping": "0",
+   "total": "10627.20"
+  }
+ },
+ {
+  "id": 27,
+  "style": "ocr",
+  "file": "docs/027_ocr.txt",
+  "truth": {
+   "vendor": "Acme Industrial Supplies",
+   "invoice_number": "INV-8660",
+   "date": "2026-04-24",
+   "due_date": "2026-05-09",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetB",
+     "quantity": 8,
+     "unit_price": "490.00"
+    },
+    {
+     "item": "WidgetA",
+     "quantity": 11,
+     "unit_price": "250.00"
+    },
+    {
+     "item": "GadgetX",
+     "quantity": 2,
+     "unit_price": "750.00"
+    }
+   ],
+   "subtotal": "8170.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "0",
+   "total": "8170.00"
+  }
+ },
+ {
+  "id": 28,
+  "style": "terse",
+  "file": "docs/028_terse.txt",
+  "truth": {
+   "vendor": "Global Supply Chain Partners",
+   "invoice_number": "INV-2927",
+   "date": "2026-04-12",
+   "due_date": null,
+   "currency": "USD",
+   "items": [
+    {
+     "item": "GadgetX",
+     "quantity": 4,
+     "unit_price": "750.00"
+    }
+   ],
+   "subtotal": "3000.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "120",
+   "total": "3120.00"
+  }
+ },
+ {
+  "id": 29,
+  "style": "multiline",
+  "file": "docs/029_multiline.txt",
+  "truth": {
+   "vendor": "Precision Parts Ltd.",
+   "invoice_number": "INV-4269",
+   "date": "2026-02-19",
+   "due_date": "2026-03-06",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetA",
+     "quantity": 6,
+     "unit_price": "240.00"
+    }
+   ],
+   "subtotal": "1440.00",
+   "tax_rate": 8,
+   "tax_amount": "115.20",
+   "shipping": "0",
+   "total": "1555.20"
+  }
+ },
+ {
+  "id": 30,
+  "style": "refs",
+  "file": "docs/030_refs.txt",
+  "truth": {
+   "vendor": "Nova Supply Partners",
+   "invoice_number": "SI-5180",
+   "date": "2026-04-06",
+   "due_date": "2026-05-06",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetA",
+     "quantity": 11,
+     "unit_price": "250.00"
+    },
+    {
+     "item": "GadgetX",
+     "quantity": 2,
+     "unit_price": "750.00"
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 8,
+     "unit_price": "510.00"
+    }
+   ],
+   "subtotal": "8330.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "0",
+   "total": "8330.00"
+  }
+ },
+ {
+  "id": 31,
+  "style": "bullets",
+  "file": "docs/031_bullets.txt",
+  "truth": {
+   "vendor": "Reliable Components Inc.",
+   "invoice_number": "INV-4197",
+   "date": "2026-09-04",
+   "due_date": "2026-09-19",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetB",
+     "quantity": 5,
+     "unit_price": "500.00"
+    },
+    {
+     "item": "WidgetA",
+     "quantity": 5,
+     "unit_price": "250.00"
+    },
+    {
+     "item": "GadgetX",
+     "quantity": 4,
+     "unit_price": "750.00"
+    }
+   ],
+   "subtotal": "6750.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "25",
+   "total": "6775.00"
+  }
+ },
+ {
+  "id": 32,
+  "style": "twocol",
+  "file": "docs/032_twocol.txt",
+  "truth": {
+   "vendor": "Precision Parts Ltd.",
+   "invoice_number": "INV-9697",
+   "date": "2026-06-05",
+   "due_date": "2026-07-20",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "GadgetX",
+     "quantity": 8,
+     "unit_price": "750.00"
+    }
+   ],
+   "subtotal": "6000.00",
+   "tax_rate": 8,
+   "tax_amount": "480.00",
+   "shipping": "60",
+   "total": "6540.00"
+  }
+ },
+ {
+  "id": 33,
+  "style": "thread",
+  "file": "docs/033_thread.txt",
+  "truth": {
+   "vendor": "Summit Manufacturing Co.",
+   "invoice_number": "SI-5275",
+   "date": "2026-04-05",
+   "due_date": "2026-05-05",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetB",
+     "quantity": 3,
+     "unit_price": "500.00"
+    },
+    {
+     "item": "WidgetA",
+     "quantity": 12,
+     "unit_price": "250.00"
+    }
+   ],
+   "subtotal": "4500.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "0",
+   "total": "4500.00"
+  }
+ },
+ {
+  "id": 34,
+  "style": "caps",
+  "file": "docs/034_caps.txt",
+  "truth": {
+   "vendor": "Atlas Industrial Supply",
+   "invoice_number": "INV-8081",
+   "date": "2026-08-25",
+   "due_date": "2026-09-09",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "GadgetX",
+     "quantity": 1,
+     "unit_price": "750.00"
+    }
+   ],
+   "subtotal": "750.00",
+   "tax_rate": 8,
+   "tax_amount": "60.00",
+   "shipping": "120",
+   "total": "930.00"
+  }
+ },
+ {
+  "id": 35,
+  "style": "prose",
+  "file": "docs/035_prose.txt",
+  "truth": {
+   "vendor": "Consolidated Materials Group",
+   "invoice_number": "71601",
+   "date": "2026-02-20",
+   "due_date": null,
+   "currency": "USD",
+   "items": [
+    {
+     "item": "GadgetX",
+     "quantity": 8,
+     "unit_price": "750.00"
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 2,
+     "unit_price": "510.00"
+    },
+    {
+     "item": "WidgetA",
+     "quantity": 4,
+     "unit_price": "250.00"
+    }
+   ],
+   "subtotal": "8020.00",
+   "tax_rate": 5,
+   "tax_amount": "401.00",
+   "shipping": "0",
+   "total": "8421.00"
+  }
+ },
+ {
+  "id": 36,
+  "style": "columns",
+  "file": "docs/036_columns.txt",
+  "truth": {
+   "vendor": "Nova Supply Partners",
+   "invoice_number": "INV-7088",
+   "date": "2026-09-15",
+   "due_date": "2026-09-30",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "GadgetX",
+     "quantity": 12,
+     "unit_price": "740.00"
+    }
+   ],
+   "subtotal": "8880.00",
+   "tax_rate": 5,
+   "tax_amount": "444.00",
+   "shipping": "25",
+   "total": "9349.00"
+  }
+ },
+ {
+  "id": 37,
+  "style": "email",
+  "file": "docs/037_email.txt",
+  "truth": {
+   "vendor": "Hartwell & Sons Ltd",
+   "invoice_number": "33278",
+   "date": "2026-02-08",
+   "due_date": "2026-03-10",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetA",
+     "quantity": 8,
+     "unit_price": "250.00"
+    }
+   ],
+   "subtotal": "2000.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "0",
+   "total": "2000.00"
+  }
+ },
+ {
+  "id": 38,
+  "style": "cells",
+  "file": "docs/038_cells.txt",
+  "truth": {
+   "vendor": "Reliable Components Inc.",
+   "invoice_number": "SI-8435",
+   "date": "2026-06-25",
+   "due_date": "2026-07-10",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetB",
+     "quantity": 4,
+     "unit_price": "500.00"
+    },
+    {
+     "item": "WidgetA",
+     "quantity": 5,
+     "unit_price": "240.00"
+    }
+   ],
+   "subtotal": "3200.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "25",
+   "total": "3225.00"
+  }
+ },
+ {
+  "id": 39,
+  "style": "ocr",
+  "file": "docs/039_ocr.txt",
+  "truth": {
+   "vendor": "TechParts International",
+   "invoice_number": "INV-4070",
+   "date": "2026-02-08",
+   "due_date": "2026-03-10",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetB",
+     "quantity": 3,
+     "unit_price": "500.00"
+    }
+   ],
+   "subtotal": "1500.00",
+   "tax_rate": 5,
+   "tax_amount": "75.00",
+   "shipping": "120",
+   "total": "1695.00"
+  }
+ },
+ {
+  "id": 40,
+  "style": "terse",
+  "file": "docs/040_terse.txt",
+  "truth": {
+   "vendor": "Reliable Components Inc.",
+   "invoice_number": "INV-2966",
+   "date": "2026-07-15",
+   "due_date": "2026-08-29",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "GadgetX",
+     "quantity": 9,
+     "unit_price": "760.00"
+    },
+    {
+     "item": "WidgetA",
+     "quantity": 4,
+     "unit_price": "250.00"
+    }
+   ],
+   "subtotal": "7840.00",
+   "tax_rate": 8,
+   "tax_amount": "627.20",
+   "shipping": "0",
+   "total": "8467.20"
+  }
+ },
+ {
+  "id": 41,
+  "style": "multiline",
+  "file": "docs/041_multiline.txt",
+  "truth": {
+   "vendor": "Gadgets Co.",
+   "invoice_number": "SI-1594",
+   "date": "2026-09-08",
+   "due_date": null,
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetB",
+     "quantity": 2,
+     "unit_price": "490.00"
+    },
+    {
+     "item": "WidgetA",
+     "quantity": 10,
+     "unit_price": "260.00"
+    },
+    {
+     "item": "GadgetX",
+     "quantity": 3,
+     "unit_price": "750.00"
+    }
+   ],
+   "subtotal": "5830.00",
+   "tax_rate": 5,
+   "tax_amount": "291.50",
+   "shipping": "0",
+   "total": "6121.50"
+  }
+ },
+ {
+  "id": 42,
+  "style": "refs",
+  "file": "docs/042_refs.txt",
+  "truth": {
+   "vendor": "Brightline Fabrication",
+   "invoice_number": "SI-8711",
+   "date": "2026-02-20",
+   "due_date": null,
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetB",
+     "quantity": 12,
+     "unit_price": "500.00"
+    },
+    {
+     "item": "WidgetA",
+     "quantity": 12,
+     "unit_price": "240.00"
+    }
+   ],
+   "subtotal": "8880.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "120",
+   "total": "9000.00"
+  }
+ },
+ {
+  "id": 43,
+  "style": "bullets",
+  "file": "docs/043_bullets.txt",
+  "truth": {
+   "vendor": "Consolidated Materials Group",
+   "invoice_number": "44237",
+   "date": "2026-05-25",
+   "due_date": "2026-06-09",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "GadgetX",
+     "quantity": 4,
+     "unit_price": "750.00"
+    }
+   ],
+   "subtotal": "3000.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "120",
+   "total": "3120.00"
+  }
+ },
+ {
+  "id": 44,
+  "style": "twocol",
+  "file": "docs/044_twocol.txt",
+  "truth": {
+   "vendor": "Summit Manufacturing Co.",
+   "invoice_number": "19858",
+   "date": "2026-09-21",
+   "due_date": null,
+   "currency": "USD",
+   "items": [
+    {
+     "item": "GadgetX",
+     "quantity": 2,
+     "unit_price": "750.00"
+    }
+   ],
+   "subtotal": "1500.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "0",
+   "total": "1500.00"
+  }
+ },
+ {
+  "id": 45,
+  "style": "thread",
+  "file": "docs/045_thread.txt",
+  "truth": {
+   "vendor": "Widgets Inc.",
+   "invoice_number": "INV-8488",
+   "date": "2026-02-17",
+   "due_date": "2026-03-04",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "GadgetX",
+     "quantity": 11,
+     "unit_price": "750.00"
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 3,
+     "unit_price": "510.00"
+    }
+   ],
+   "subtotal": "9780.00",
+   "tax_rate": 5,
+   "tax_amount": "489.00",
+   "shipping": "0",
+   "total": "10269.00"
+  }
+ },
+ {
+  "id": 46,
+  "style": "caps",
+  "file": "docs/046_caps.txt",
+  "truth": {
+   "vendor": "Consolidated Materials Group",
+   "invoice_number": "SI-9602",
+   "date": "2026-05-19",
+   "due_date": "2026-06-18",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "GadgetX",
+     "quantity": 8,
+     "unit_price": "740.00"
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 8,
+     "unit_price": "510.00"
+    }
+   ],
+   "subtotal": "10000.00",
+   "tax_rate": 8,
+   "tax_amount": "800.00",
+   "shipping": "0",
+   "total": "10800.00"
+  }
+ },
+ {
+  "id": 47,
+  "style": "prose",
+  "file": "docs/047_prose.txt",
+  "truth": {
+   "vendor": "Nova Supply Partners",
+   "invoice_number": "INV-3658",
+   "date": "2026-02-07",
+   "due_date": "2026-02-22",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetB",
+     "quantity": 7,
+     "unit_price": "500.00"
+    }
+   ],
+   "subtotal": "3500.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "120",
+   "total": "3620.00"
+  }
+ },
+ {
+  "id": 48,
+  "style": "columns",
+  "file": "docs/048_columns.txt",
+  "truth": {
+   "vendor": "TechParts International",
+   "invoice_number": "INV-4176",
+   "date": "2026-06-01",
+   "due_date": null,
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetA",
+     "quantity": 10,
+     "unit_price": "250.00"
+    }
+   ],
+   "subtotal": "2500.00",
+   "tax_rate": 8,
+   "tax_amount": "200.00",
+   "shipping": "120",
+   "total": "2820.00"
+  }
+ },
+ {
+  "id": 49,
+  "style": "email",
+  "file": "docs/049_email.txt",
+  "truth": {
+   "vendor": "Nova Supply Partners",
+   "invoice_number": "INV-4682",
+   "date": "2026-08-25",
+   "due_date": "2026-09-09",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetA",
+     "quantity": 9,
+     "unit_price": "250.00"
+    }
+   ],
+   "subtotal": "2250.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "120",
+   "total": "2370.00"
+  }
+ },
+ {
+  "id": 50,
+  "style": "cells",
+  "file": "docs/050_cells.txt",
+  "truth": {
+   "vendor": "Global Supply Chain Partners",
+   "invoice_number": "91498",
+   "date": "2026-09-18",
+   "due_date": "2026-10-18",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "GadgetX",
+     "quantity": 11,
+     "unit_price": "750.00"
+    },
+    {
+     "item": "WidgetA",
+     "quantity": 1,
+     "unit_price": "250.00"
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 11,
+     "unit_price": "510.00"
+    }
+   ],
+   "subtotal": "14110.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "120",
+   "total": "14230.00"
+  }
+ },
+ {
+  "id": 52,
+  "style": "terse",
+  "file": "docs/052_terse.txt",
+  "truth": {
+   "vendor": "Widgets Inc.",
+   "invoice_number": "72681",
+   "date": "2026-06-25",
+   "due_date": "2026-08-09",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "GadgetX",
+     "quantity": 6,
+     "unit_price": "740.00"
+    }
+   ],
+   "subtotal": "4440.00",
+   "tax_rate": 5,
+   "tax_amount": "222.00",
+   "shipping": "0",
+   "total": "4662.00"
+  }
+ },
+ {
+  "id": 53,
+  "style": "multiline",
+  "file": "docs/053_multiline.txt",
+  "truth": {
+   "vendor": "MegaWidgets Corp",
+   "invoice_number": "SI-3914",
+   "date": "2026-04-24",
+   "due_date": "2026-06-08",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "GadgetX",
+     "quantity": 4,
+     "unit_price": "750.00"
+    },
+    {
+     "item": "WidgetA",
+     "quantity": 9,
+     "unit_price": "250.00"
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 1,
+     "unit_price": "510.00"
+    }
+   ],
+   "subtotal": "5760.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "0",
+   "total": "5760.00"
+  }
+ },
+ {
+  "id": 54,
+  "style": "refs",
+  "file": "docs/054_refs.txt",
+  "truth": {
+   "vendor": "Widgets Inc.",
+   "invoice_number": "87408",
+   "date": "2026-03-14",
+   "due_date": null,
+   "currency": "USD",
+   "items": [
+    {
+     "item": "GadgetX",
+     "quantity": 3,
+     "unit_price": "750.00"
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 4,
+     "unit_price": "510.00"
+    },
+    {
+     "item": "WidgetA",
+     "quantity": 7,
+     "unit_price": "250.00"
+    }
+   ],
+   "subtotal": "6040.00",
+   "tax_rate": 5,
+   "tax_amount": "302.00",
+   "shipping": "25",
+   "total": "6367.00"
+  }
+ },
+ {
+  "id": 55,
+  "style": "bullets",
+  "file": "docs/055_bullets.txt",
+  "truth": {
+   "vendor": "MegaWidgets Corp",
+   "invoice_number": "INV-3551",
+   "date": "2026-09-25",
+   "due_date": "2026-11-09",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetB",
+     "quantity": 4,
+     "unit_price": "500.00"
+    },
+    {
+     "item": "WidgetA",
+     "quantity": 4,
+     "unit_price": "250.00"
+    },
+    {
+     "item": "GadgetX",
+     "quantity": 3,
+     "unit_price": "750.00"
+    }
+   ],
+   "subtotal": "5250.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "25",
+   "total": "5275.00"
+  }
+ },
+ {
+  "id": 56,
+  "style": "twocol",
+  "file": "docs/056_twocol.txt",
+  "truth": {
+   "vendor": "Reliable Components Inc.",
+   "invoice_number": "INV-2630",
+   "date": "2026-06-09",
+   "due_date": "2026-07-09",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetA",
+     "quantity": 9,
+     "unit_price": "250.00"
+    }
+   ],
+   "subtotal": "2250.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "0",
+   "total": "2250.00"
+  }
+ },
+ {
+  "id": 57,
+  "style": "thread",
+  "file": "docs/057_thread.txt",
+  "truth": {
+   "vendor": "Widgets Inc.",
+   "invoice_number": "INV-7580",
+   "date": "2026-05-09",
+   "due_date": "2026-06-08",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetB",
+     "quantity": 6,
+     "unit_price": "500.00"
+    },
+    {
+     "item": "WidgetA",
+     "quantity": 8,
+     "unit_price": "250.00"
+    },
+    {
+     "item": "GadgetX",
+     "quantity": 10,
+     "unit_price": "760.00"
+    }
+   ],
+   "subtotal": "12600.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "25",
+   "total": "12625.00"
+  }
+ },
+ {
+  "id": 58,
+  "style": "caps",
+  "file": "docs/058_caps.txt",
+  "truth": {
+   "vendor": "Summit Manufacturing Co.",
+   "invoice_number": "SI-6307",
+   "date": "2026-04-16",
+   "due_date": null,
+   "currency": "USD",
+   "items": [
+    {
+     "item": "WidgetA",
+     "quantity": 3,
+     "unit_price": "240.00"
+    },
+    {
+     "item": "GadgetX",
+     "quantity": 8,
+     "unit_price": "740.00"
+    }
+   ],
+   "subtotal": "6640.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "25",
+   "total": "6665.00"
+  }
+ },
+ {
+  "id": 59,
+  "style": "prose",
+  "file": "docs/059_prose.txt",
+  "truth": {
+   "vendor": "Gadgets Co.",
+   "invoice_number": "INV-3377",
+   "date": "2026-01-02",
+   "due_date": "2026-01-17",
+   "currency": "USD",
+   "items": [
+    {
+     "item": "GadgetX",
+     "quantity": 2,
+     "unit_price": "740.00"
+    },
+    {
+     "item": "WidgetA",
+     "quantity": 5,
+     "unit_price": "260.00"
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 4,
+     "unit_price": "500.00"
+    }
+   ],
+   "subtotal": "4780.00",
+   "tax_rate": 0,
+   "tax_amount": "0.00",
+   "shipping": "25",
+   "total": "4805.00"
+  }
+ }
+]

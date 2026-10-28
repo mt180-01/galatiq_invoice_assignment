@@ -1,0 +1,33 @@
+Widgets Inc.
+123 Industrial Way
+Techville, TX 75001
+
+INVOICE
+
+Invoice No.: 87408
+PO Number: PO-98765
+Order Number: ORD-112233
+Customer Number: CUST-445566
+Delivery Note No.: DN-778899
+Invoice Date: March 14, 2026
+
+Bill To:
+Acme Manufacturing
+456 Corporate Blvd
+Metropolis, NY 10001
+
+Description                  Qty     Unit Price     Amount
+GadgetX                      3       750.00        2,250.00
+WidgetB                      4       510.00        2,040.00
+WidgetA                      7       250.00        1,750.00
+
+Subtotal                                           6,040.00
+Tax (5%)                                             302.00
+Shipping                                              25.00
+
+Total                                              6,367.00
+
+Amount due: $6,367.00 USD
+Payment terms: Net 30
+
+Thank you for your business!

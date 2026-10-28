@@ -1,0 +1,35 @@
+MegaWidgets Corp
+123 Industrial Way
+Techville, TX 75001
+
+Invoice Number: INV-7061
+Invoice Date: August 9, 2026
+Due Date: August 24, 2026
+
+Bill To:
+Acme Solutions Inc.
+456 Business Park
+Metropolis, NY 10001
+
+Description                                           SKU       Qty     Unit Price    Amount
+WidgetA - Premium quality widget with advanced
+features and extended durability. Includes 2-year
+warranty.                                             WGT-A001     7       $250.00     $1,750.00
+WidgetB - Heavy duty industrial widget designed for
+high-volume applications. Multi-line note continues
+here with additional product details.                 WGT-B002     9       $500.00     $4,500.00
+GadgetX - Next generation smart gadget with IoT
+connectivity, mobile app integration, and cloud
+sync capabilities.                                    GDG-X003     8       $750.00     $6,000.00
+
+Shipping                                              SHIP-001     1        $25.00        $25.00
+
+Subtotal                                                                 $12,250.00
+Tax (5%)                                                                  $612.50
+Total                                                                    $12,887.50
+
+Notes:
+Thank you for your business. A 2% early payment discount is available if paid within 10 days.
+All amounts in USD. Payment due by August 24, 2026.
+Please remit payment to accounts@mega-widgets.com
+

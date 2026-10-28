@@ -1,0 +1,30 @@
+Precision Parts Ltd.
+123 Industrial Way
+Anytown, USA 12345
+
+Invoice Number: INV-4269
+Invoice Date: February 19, 2026
+Due Date: March 6, 2026
+
+Bill To:
+Acme Manufacturing Co.
+456 Factory Lane
+Othertown, USA 67890
+
+Description                                           SKU          Qty     Unit Price     Amount
+WidgetA - High precision industrial component         WGT-A001       6       $240.00     $1,440.00
+with reinforced steel core and anti-corrosion
+coating. Includes installation notes.
+
+Notes:
+- All parts are covered under our standard 12-month warranty.
+- 5% early payment discount available if paid within 10 days.
+
+Subtotal                                                                 $1,440.00
+Shipping                                                                 $0.00
+Tax (8%)                                                                 $115.20
+
+Total Due                                                                $1,555.20
+
+Please remit payment in USD to the account details provided below.
+Thank you for your business!

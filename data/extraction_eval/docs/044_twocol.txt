@@ -1,0 +1,26 @@
+Summit Manufacturing Co.
+123 Industrial Way
+Detroit, MI 48201
+USA
+
+Bill To:
+Acme Tech Solutions
+456 Corporate Blvd
+Suite 200
+Austin, TX 78701
+USA
+
+Invoice Number: 19858
+Invoice Date: September 21, 2026
+
+Description                          | Quantity | Unit Price | Line Total
+-------------------------------------|----------|------------|-----------
+GadgetX                              | 2        | $750.00    | $1,500.00
+
+Subtotal                                                     $1,500.00
+Tax (0%)                                                       $0.00
+Shipping                                                       $0.00
+---------------------------------------------------------------
+Total                                                        $1,500.00
+
+All amounts in USD. Payment due upon receipt.

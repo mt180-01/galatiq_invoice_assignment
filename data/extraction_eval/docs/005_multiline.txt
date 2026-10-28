@@ -1,0 +1,33 @@
+TechParts International
+123 Industrial Way, Suite 400
+Tech City, CA 94043
+United States
+
+Invoice Number: SI-5517
+Invoice Date: August 19, 2026
+Due Date: September 3, 2026
+
+Bill To:
+Acme Manufacturing Co.
+456 Factory Lane
+Industrial Park, NY 10001
+
+Description                                      SKU          Qty     Unit Price     Amount
+----------------------------------------------------------------------------------------------------
+WidgetA - Premium industrial component with
+advanced sensor integration and 2-year
+warranty. Includes installation guide.       WGT-A-4728     8       $250.00     $2,000.00
+
+Notes:
+- All parts meet ISO 9001 standards
+- Discount applied per volume agreement (reflected in unit pricing)
+- Net 15 terms. Please remit payment via ACH or wire.
+
+Shipping & Handling                                      $0.00
+Subtotal                                               $2,000.00
+Tax (8%)                                                 $160.00
+Total Due                                              $2,160.00
+
+Amount Due: $2,160.00 USD
+Please reference invoice SI-5517 on your payment.
+Thank you for your business!

@@ -1,0 +1,28 @@
+Gadgets Co.
+123 Tech Lane
+Innovation City, CA 94000
+United States
+
+Invoice Number: INV-6116
+Invoice Date: September 14, 2026
+
+Bill To:
+[Customer Name]
+[Customer Address]
+
+Description                          Qty     Unit Price     Amount
+-----------------------------------------------------------------
+GadgetX                                4       $750.00    $3,000.00
+WidgetB                               10       $500.00    $5,000.00
+WidgetA                                2       $250.00      $500.00
+
+Subtotal:                                                     $8,500.00
+Tax (0%):                                                           $0.00
+Shipping:                                                          $60.00
+-----------------------------------------------------------------
+Total:                                                        $8,560.00
+
+Amount due in USD: $8,560.00
+
+Thank you for your business!
+Gadgets Co.

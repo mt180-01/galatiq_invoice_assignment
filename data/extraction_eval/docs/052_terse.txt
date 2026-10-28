@@ -1,0 +1,13 @@
+WIDGETS INC.
+
+Invoice #72681
+Date: 6/25/2026
+Due: 8/9/2026
+
+Qty U/P Amt
+6 GadgetX 740.00 4440.00
+
+Subtotal 4440.00
+Tax (5%) 222.00
+Shipping 0.00
+Total 4662.00 USD

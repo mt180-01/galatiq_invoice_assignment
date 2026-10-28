@@ -40,7 +40,7 @@
   "findings": [],
   "approval": {
    "decision": "approve",
-   "reasoning": "Vendor approved, items exist with sufficient stock, total $5000 <= $10000, no errors/holds in findings, new vendor but policy allows",
+   "reasoning": "Vendor approved, items exist with sufficient stock, total $5000 <= $10000, no errors/holds/findings, new vendor but policy allows",
    "rounds": 1,
    "critiques": []
   },
@@ -53,8 +53,8 @@
   "timings_ms": {
    "parse": 0.0,
    "llm_extract": 0.04,
-   "validate": 1.81,
-   "approve": 1851.12,
+   "validate": 2.15,
+   "approve": 2345.87,
    "settle": 1.08
   },
   "trace": [
@@ -72,12 +72,12 @@
    {
     "agent": "Validation",
     "action": "checked against ERP and policy",
-    "ms": 1.2
+    "ms": 0.35
    },
    {
     "agent": "Reviewer",
     "action": "decided",
-    "ms": 1851.1,
+    "ms": 2345.86,
     "events": [
      {
       "kind": "model",
@@ -129,7 +129,7 @@
      },
      {
       "kind": "decision",
-      "text": "approve: Vendor approved, items exist with sufficient stock, total $5000 <= $10000, no errors/holds in findings, new vendor but policy allows"
+      "text": "approve: Vendor approved, items exist with sufficient stock, total $5000 <= $10000, no errors/holds/findings, new vendor but policy allows"
      },
      {
       "kind": "skipped",
@@ -140,7 +140,7 @@
    {
     "agent": "Payment",
     "action": "scheduled / sent",
-    "ms": 0.67
+    "ms": 0.66
    }
   ],
   "llm": {
@@ -222,9 +222,9 @@
   "timings_ms": {
    "parse": 0.0,
    "llm_extract": 0.02,
-   "validate": 0.4,
+   "validate": 0.38,
    "approve": 0.05,
-   "settle": 878.72
+   "settle": 1151.4
   },
   "trace": [
    {
@@ -241,7 +241,7 @@
    {
     "agent": "Validation",
     "action": "checked against ERP and policy",
-    "ms": 0.11
+    "ms": 0.09
    },
    {
     "agent": "Reviewer",
@@ -261,7 +261,7 @@
    {
     "agent": "Comms",
     "action": "explained in plain English",
-    "ms": 878.47,
+    "ms": 1151.15,
     "events": [
      {
       "kind": "model",
@@ -370,22 +370,22 @@
   "error": null,
   "timings_ms": {
    "parse": 0.0,
-   "llm_extract": 1537.09,
-   "validate": 0.51,
+   "llm_extract": 1352.69,
+   "validate": 0.52,
    "approve": 0.05,
-   "settle": 1095.24
+   "settle": 1202.14
   },
   "trace": [
    {
     "agent": "Intake",
     "action": "read txt via heuristic:txt",
-    "ms": 1537.08,
+    "ms": 1352.68,
     "events": [
      {
       "kind": "model",
       "as": "intake",
       "tokens": [
-       487,
+       573,
        154
       ],
       "model": "grok-4.20-0309-non-reasoning"
@@ -415,20 +415,20 @@
    {
     "agent": "Comms",
     "action": "explained in plain English",
-    "ms": 1094.98,
+    "ms": 1201.87,
     "events": [
      {
       "kind": "model",
       "as": "comms",
       "tokens": [
        404,
-       74
+       73
       ],
       "model": "grok-4.20-0309-non-reasoning"
      },
      {
       "kind": "wrote",
-      "text": "Invoice INV-1003 from Fraudster LLC for 100000 USD has been rejected. Checks found the vendor is not in the approved vendor master, it is billing for FakeItem with zero stock on hand, and it contains "
+      "text": "Invoice INV-1003 from Fraudster LLC for 100000 USD was rejected. Checks found the vendor is not in the approved vendor master, it is billing for FakeItem with zero stock on hand, and it shows multiple"
      }
     ]
    }
@@ -441,9 +441,9 @@
     "critic"
    ],
    "tools": 0,
-   "tokens_in": 891,
-   "tokens_out": 228,
-   "cost_ticks": 11461500
+   "tokens_in": 977,
+   "tokens_out": 227,
+   "cost_ticks": 13855500
   },
   "sender": null,
   "subject": null,
@@ -451,7 +451,7 @@
   "approval_request": null,
   "awaiting": null,
   "approval_card": null,
-  "explanation": "Invoice INV-1003 from Fraudster LLC for 100000 USD has been rejected. Checks found the vendor is not in the approved vendor master, it is billing for FakeItem with zero stock on hand, and it contains multiple fraud signals including pressure language, immediate payment terms, unknown vendor, and items that do not exist. Reject the invoice.",
+  "explanation": "Invoice INV-1003 from Fraudster LLC for 100000 USD was rejected. Checks found the vendor is not in the approved vendor master, it is billing for FakeItem with zero stock on hand, and it shows multiple fraud signals including pressure language, immediate payment terms, unknown vendor, and items that do not exist. Reject the invoice.",
   "status": "REJECT"
  },
  {
@@ -495,7 +495,7 @@
   "findings": [],
   "approval": {
    "decision": "approve",
-   "reasoning": "Vendor approved, items exist with sufficient stock, calculated total 1750 matches invoice ~1890 (minor variance ok), total under 10000, no errors/holds per findings and policy.",
+   "reasoning": "Vendor approved, items exist with sufficient stock, calculated total 1750 matches invoice under 10000, no errors/holds/findings, new vendor but policy allows",
    "rounds": 1,
    "critiques": []
   },
@@ -508,8 +508,8 @@
   "timings_ms": {
    "parse": 0.0,
    "llm_extract": 0.01,
-   "validate": 0.2,
-   "approve": 3093.4,
+   "validate": 0.19,
+   "approve": 1828.14,
    "settle": 0.66
   },
   "trace": [
@@ -526,7 +526,7 @@
    {
     "agent": "Reviewer",
     "action": "decided",
-    "ms": 3093.39,
+    "ms": 1828.13,
     "events": [
      {
       "kind": "model",
@@ -572,13 +572,13 @@
       "as": "reviewer",
       "tokens": [
        874,
-       51
+       45
       ],
       "model": "grok-4.20-0309-non-reasoning"
      },
      {
       "kind": "decision",
-      "text": "approve: Vendor approved, items exist with sufficient stock, calculated total 1750 matches invoice ~1890 (minor variance ok), total under 10000, no errors/holds per findings and policy."
+      "text": "approve: Vendor approved, items exist with sufficient stock, calculated total 1750 matches invoice under 10000, no errors/holds/findings, new vendor but policy allows"
      },
      {
       "kind": "skipped",
@@ -589,7 +589,7 @@
    {
     "agent": "Payment",
     "action": "scheduled / sent",
-    "ms": 0.48
+    "ms": 0.47
    }
   ],
   "llm": {
@@ -600,8 +600,8 @@
    ],
    "tools": 5,
    "tokens_in": 1501,
-   "tokens_out": 101,
-   "cost_ticks": 10535500
+   "tokens_out": 95,
+   "cost_ticks": 18449500
   },
   "sender": null,
   "subject": null,
@@ -684,7 +684,7 @@
    "llm_extract": 0.01,
    "validate": 0.18,
    "approve": 0.05,
-   "settle": 893.95
+   "settle": 832.63
   },
   "trace": [
    {
@@ -695,7 +695,7 @@
    {
     "agent": "Validation",
     "action": "checked against ERP and policy",
-    "ms": 0.07
+    "ms": 0.06
    },
    {
     "agent": "Reviewer",
@@ -715,27 +715,27 @@
    {
     "agent": "Comms",
     "action": "explained in plain English",
-    "ms": 893.17,
+    "ms": 831.68,
     "events": [
      {
       "kind": "model",
       "as": "comms",
       "tokens": [
        365,
-       50
+       48
       ],
       "model": "grok-4.20-0309-non-reasoning"
      },
      {
-      "kind": "rejected",
-      "text": "model text discarded (numbers not in the record: ['5940']); using the template"
+      "kind": "wrote",
+      "text": "Invoice INV-1004 from Precision Parts Ltd for 5940.0 USD needs your decision. Checks found that revision R1 may supersede an earlier bill. Please confirm before paying and escalate to the AP Manager."
      }
     ]
    },
    {
     "agent": "Desk",
     "action": "routed to a person",
-    "ms": 0.65
+    "ms": 0.82
    }
   ],
   "llm": {
@@ -747,16 +747,16 @@
    ],
    "tools": 0,
    "tokens_in": 365,
-   "tokens_out": 50,
-   "cost_ticks": 3124500
+   "tokens_out": 48,
+   "cost_ticks": 3074500
   },
   "sender": null,
   "subject": null,
   "followup": null,
   "approval_request": 1,
   "awaiting": "AP Manager",
-  "approval_card": "To: ap-manager@acmecorp.example\nSubject: Decision needed: USD 5940.0 to Precision Parts Ltd. (INV-1004)\n\nPay USD 5940.0 to Precision Parts Ltd.?\n\nWHY YOU\n  - revision R1: may supersede an earlier bill; confirm before paying\n\nTHE INVOICE\n  Invoice INV-1004, dated 2026-01-22, due 2026-02-22, terms Net 30\n  3 line(s): WidgetA x3, WidgetB x2, GadgetX x5\n  Read by: json (structured)\n\nSYSTEM RECOMMENDATION\n  REVIEW BEFORE APPROVING: revision R1: may supersede an earlier bill; confirm before paying\n\n  APPROVE: http://127.0.0.1:8765/decide?t=eyJyIjoxLCJhIjoiYXBwcm92ZSIsImgiOiJhZGI5MzFjMTQxZDI3MGZhIiwidyI6ImFwLW1hbmFnZXJAYWNtZWNvcnAuZXhhbXBsZSIsIngiOjE3OTM1OTMyNDh9.A0diy612cCb-MUrXhPFSHA\n  REJECT:  http://127.0.0.1:8765/decide?t=eyJyIjoxLCJhIjoicmVqZWN0IiwiaCI6ImFkYjkzMWMxNDFkMjcwZmEiLCJ3IjoiYXAtbWFuYWdlckBhY21lY29ycC5leGFtcGxlIiwieCI6MTc5MzU5MzI0OH0.aWWuJnBQvKWO2imQW6wMcA\n\nThese links were issued to you. They work once, only for this invoice as shown, and expire in 5 days. Do not forward them.\nNothing is paid until you approve; if you do not respond it will be escalated to your delegate.",
-  "explanation": null,
+  "approval_card": "To: ap-manager@acmecorp.example\nSubject: Decision needed: USD 5940.0 to Precision Parts Ltd. (INV-1004)\n\nPay USD 5940.0 to Precision Parts Ltd.?\n\nWHY YOU\n  - revision R1: may supersede an earlier bill; confirm before paying\n\nTHE INVOICE\n  Invoice INV-1004, dated 2026-01-22, due 2026-02-22, terms Net 30\n  3 line(s): WidgetA x3, WidgetB x2, GadgetX x5\n  Read by: json (structured)\n\nIN SHORT\n  Invoice INV-1004 from Precision Parts Ltd for 5940.0 USD needs your decision. Checks found that revision R1 may supersede an earlier bill. Please confirm before paying and escalate to the AP Manager.\n\nSYSTEM RECOMMENDATION\n  REVIEW BEFORE APPROVING: revision R1: may supersede an earlier bill; confirm before paying\n\n  APPROVE: http://127.0.0.1:8765/decide?t=eyJyIjoxLCJhIjoiYXBwcm92ZSIsImgiOiJhZGI5MzFjMTQxZDI3MGZhIiwidyI6ImFwLW1hbmFnZXJAYWNtZWNvcnAuZXhhbXBsZSIsIngiOjE3OTM1OTQ0MDh9.Uu7na3ke6XJ7ZboEIwAVsA\n  REJECT:  http://127.0.0.1:8765/decide?t=eyJyIjoxLCJhIjoicmVqZWN0IiwiaCI6ImFkYjkzMWMxNDFkMjcwZmEiLCJ3IjoiYXAtbWFuYWdlckBhY21lY29ycC5leGFtcGxlIiwieCI6MTc5MzU5NDQwOH0.ZODb4szcuM1gMm2un2vK3w\n\nThese links were issued to you. They work once, only for this invoice as shown, and expire in 5 days. Do not forward them.\nNothing is paid until you approve; if you do not respond it will be escalated to your delegate.",
+  "explanation": "Invoice INV-1004 from Precision Parts Ltd for 5940.0 USD needs your decision. Checks found that revision R1 may supersede an earlier bill. Please confirm before paying and escalate to the AP Manager.",
   "status": "AWAITING"
  },
  {
@@ -828,7 +828,7 @@
    "llm_extract": 0.01,
    "validate": 0.18,
    "approve": 0.04,
-   "settle": 944.18
+   "settle": 938.73
   },
   "trace": [
    {
@@ -859,7 +859,7 @@
    {
     "agent": "Comms",
     "action": "explained in plain English",
-    "ms": 943.95,
+    "ms": 938.5,
     "events": [
      {
       "kind": "model",
@@ -939,7 +939,7 @@
   "findings": [],
   "approval": {
    "decision": "approve",
-   "reasoning": "Vendor approved, items exist with sufficient stock, calculated total 2750 matches invoice, no errors/holds, under 10000 limit, new vendor but policy allows",
+   "reasoning": "Vendor approved, new vendor (0 prior bills), items exist with sufficient stock, calculated total 2750 matches invoice, within 10000 limit, no errors/holds per findings and policy.",
    "rounds": 1,
    "critiques": []
   },
@@ -952,9 +952,9 @@
   "timings_ms": {
    "parse": 0.0,
    "llm_extract": 0.01,
-   "validate": 0.2,
-   "approve": 3430.81,
-   "settle": 0.67
+   "validate": 0.17,
+   "approve": 2071.03,
+   "settle": 0.66
   },
   "trace": [
    {
@@ -970,7 +970,7 @@
    {
     "agent": "Reviewer",
     "action": "decided",
-    "ms": 3430.8,
+    "ms": 2071.02,
     "events": [
      {
       "kind": "model",
@@ -995,6 +995,12 @@
      },
      {
       "kind": "tool",
+      "name": "policy_limits",
+      "args": "{}",
+      "result": "{'result': {'auto_approve_up_to_usd': '10000', 'vp_sign_off_above_usd': '10000', 'cfo_above_usd': '50000', 'rules': 'any error finding -> reject; any hold findi"
+     },
+     {
+      "kind": "tool",
       "name": "lookup_item",
       "args": "{\"item\":\"WidgetA\"}",
       "result": "{'result': {'found': True, 'name': 'WidgetA', 'stock': 15, 'unit_price': '250.00', 'approximate_match': False}}"
@@ -1006,23 +1012,17 @@
       "result": "{'result': {'found': True, 'name': 'WidgetB', 'stock': 10, 'unit_price': '500.00', 'approximate_match': False}}"
      },
      {
-      "kind": "tool",
-      "name": "policy_limits",
-      "args": "{}",
-      "result": "{'result': {'auto_approve_up_to_usd': '10000', 'vp_sign_off_above_usd': '10000', 'cfo_above_usd': '50000', 'rules': 'any error finding -> reject; any hold findi"
-     },
-     {
       "kind": "model",
       "as": "reviewer",
       "tokens": [
        876,
-       45
+       51
       ],
       "model": "grok-4.20-0309-non-reasoning"
      },
      {
       "kind": "decision",
-      "text": "approve: Vendor approved, items exist with sufficient stock, calculated total 2750 matches invoice, no errors/holds, under 10000 limit, new vendor but policy allows"
+      "text": "approve: Vendor approved, new vendor (0 prior bills), items exist with sufficient stock, calculated total 2750 matches invoice, within 10000 limit, no errors/holds per findings and policy."
      },
      {
       "kind": "skipped",
@@ -1033,7 +1033,7 @@
    {
     "agent": "Payment",
     "action": "scheduled / sent",
-    "ms": 0.48
+    "ms": 0.46
    }
   ],
   "llm": {
@@ -1044,8 +1044,8 @@
    ],
    "tools": 5,
    "tokens_in": 1504,
-   "tokens_out": 95,
-   "cost_ticks": 11767000
+   "tokens_out": 101,
+   "cost_ticks": 18637000
   },
   "sender": null,
   "subject": null,
@@ -1133,9 +1133,9 @@
   "timings_ms": {
    "parse": 0.0,
    "llm_extract": 0.01,
-   "validate": 0.19,
+   "validate": 0.2,
    "approve": 0.05,
-   "settle": 1215.92
+   "settle": 1289.87
   },
   "trace": [
    {
@@ -1166,14 +1166,14 @@
    {
     "agent": "Comms",
     "action": "explained in plain English",
-    "ms": 1215.66,
+    "ms": 1289.63,
     "events": [
      {
       "kind": "model",
       "as": "comms",
       "tokens": [
        401,
-       94
+       95
       ],
       "model": "grok-4.20-0309-non-reasoning"
      },
@@ -1186,20 +1186,20 @@
    {
     "agent": "Comms",
     "action": "drafted vendor follow-up",
-    "ms": 1137.8,
+    "ms": 816.98,
     "events": [
      {
       "kind": "model",
       "as": "comms",
       "tokens": [
        381,
-       76
+       71
       ],
       "model": "grok-4.20-0309-non-reasoning"
      },
      {
       "kind": "wrote",
-      "text": "Dear Vendor, The line items do not add up to the invoice total (subtotal 14750.00 + tax 885.00 + shipping 0 = 15635.00, invoice total is 15525.00). Is the stated total correct, or can you send a corre"
+      "text": "The line items do not add up to the invoice total (subtotal 14750.00 + tax 885.00 + shipping 0 = 15635.00, invoice total is 15525.00). Is the stated total correct, or can you send a corrected invoice?"
      }
     ]
    }
@@ -1213,16 +1213,16 @@
    ],
    "tools": 0,
    "tokens_in": 782,
-   "tokens_out": 170,
-   "cost_ticks": 7305000
+   "tokens_out": 166,
+   "cost_ticks": 9893000
   },
   "sender": null,
   "subject": null,
-  "followup": "To: (sender unknown: file intake)\nSubject: Quick question on invoice INV-1007\n\nDear Vendor,\n\nThe line items do not add up to the invoice total (subtotal 14750.00 + tax 885.00 + shipping 0 = 15635.00, invoice total is 15525.00). Is the stated total correct, or can you send a corrected invoice?\n\nAccounts Payable, Acme Corp",
+  "followup": "To: (sender unknown: file intake)\nSubject: Quick question on invoice INV-1007\n\nThe line items do not add up to the invoice total (subtotal 14750.00 + tax 885.00 + shipping 0 = 15635.00, invoice total is 15525.00). Is the stated total correct, or can you send a corrected invoice?\n\nAccounts Payable, Acme Corp",
   "approval_request": null,
   "awaiting": null,
   "approval_card": null,
-  "explanation": "Invoice INV-1007 from MegaWidgets Corp for 15525.00 USD was rejected. Checks found WidgetA billed for 20 but only 15 in stock, WidgetB billed for 15 but only 10 in stock, and a calculation mismatch (subtotal 14750.00 + tax 885.00 + shipping 0 = 15635.00 versus the invoiced total). Review the discrepancies and decide on next steps.",
+  "explanation": "Invoice INV-1007 from MegaWidgets Corp for 15525.00 USD was rejected. Checks found WidgetA billed for 20 but only 15 in stock, WidgetB billed for 15 but only 10 in stock, and a calculation mismatch (subtotal 14750.00 + tax 885.00 + shipping 0 = 15635.00 versus the invoiced total). Please review the discrepancies and decide on next steps.",
   "status": "REJECT"
  },
  {
@@ -1300,15 +1300,15 @@
   "timings_ms": {
    "parse": 0.0,
    "llm_extract": 0.02,
-   "validate": 2969.29,
+   "validate": 2152.23,
    "approve": 0.1,
-   "settle": 1022.76
+   "settle": 1091.67
   },
   "trace": [
    {
     "agent": "Intake",
     "action": "read txt via heuristic:txt",
-    "ms": 0.01,
+    "ms": 0.02,
     "events": [
      {
       "kind": "skipped",
@@ -1319,7 +1319,7 @@
    {
     "agent": "Validation",
     "action": "checked against ERP and policy",
-    "ms": 2969.14,
+    "ms": 2152.08,
     "events": [
      {
       "kind": "model",
@@ -1371,7 +1371,7 @@
       "as": "resolver",
       "tokens": [
        468,
-       28
+       29
       ],
       "model": "grok-4.20-0309-non-reasoning"
      }
@@ -1395,7 +1395,7 @@
    {
     "agent": "Comms",
     "action": "explained in plain English",
-    "ms": 1022.51,
+    "ms": 1091.43,
     "events": [
      {
       "kind": "model",
@@ -1423,8 +1423,8 @@
    ],
    "tools": 3,
    "tokens_in": 2251,
-   "tokens_out": 133,
-   "cost_ticks": 13990500
+   "tokens_out": 134,
+   "cost_ticks": 15359500
   },
   "sender": null,
   "subject": null,
@@ -1522,7 +1522,7 @@
    "llm_extract": 0.01,
    "validate": 0.19,
    "approve": 0.02,
-   "settle": 1228.53
+   "settle": 5561.85
   },
   "trace": [
    {
@@ -1533,7 +1533,7 @@
    {
     "agent": "Validation",
     "action": "checked against ERP and policy",
-    "ms": 0.07
+    "ms": 0.06
    },
    {
     "agent": "Reviewer",
@@ -1553,27 +1553,27 @@
    {
     "agent": "Comms",
     "action": "explained in plain English",
-    "ms": 1228.29,
+    "ms": 5561.56,
     "events": [
      {
       "kind": "model",
       "as": "comms",
       "tokens": [
        410,
-       79
+       86
       ],
       "model": "grok-4.20-0309-non-reasoning"
      },
      {
       "kind": "wrote",
-      "text": "Invoice INV-1009 was rejected. Checks found a negative total of -250.0 USD, missing vendor name, negative quantity on WidgetA, line items summing to -250.0 while subtotal is 1000.0, and subtotal plus "
+      "text": "Invoice INV-1009 was rejected. Checks found that the total is negative (-250.0 USD), the vendor name is missing, WidgetA quantity is negative, line items sum to -250.0 but the subtotal is 1000.0, and "
      }
     ]
    },
    {
     "agent": "Comms",
     "action": "drafted vendor follow-up",
-    "ms": 1312.38,
+    "ms": 1333.69,
     "events": [
      {
       "kind": "model",
@@ -1600,8 +1600,8 @@
    ],
    "tools": 0,
    "tokens_in": 837,
-   "tokens_out": 196,
-   "cost_ticks": 7298500
+   "tokens_out": 203,
+   "cost_ticks": 12849500
   },
   "sender": null,
   "subject": null,
@@ -1609,7 +1609,7 @@
   "approval_request": null,
   "awaiting": null,
   "approval_card": null,
-  "explanation": "Invoice INV-1009 was rejected. Checks found a negative total of -250.0 USD, missing vendor name, negative quantity on WidgetA, line items summing to -250.0 while subtotal is 1000.0, and subtotal plus tax and shipping equaling 1000.0 instead of the invoice total. Please review the invoice and provide a decision.",
+  "explanation": "Invoice INV-1009 was rejected. Checks found that the total is negative (-250.0 USD), the vendor name is missing, WidgetA quantity is negative, line items sum to -250.0 but the subtotal is 1000.0, and subtotal plus tax and shipping equals 1000.0 while the invoice total is -250.0. Please review the invoice and decide next steps.",
   "status": "REJECT"
  },
  {
@@ -1684,17 +1684,17 @@
   "release_on": "2026-10-27",
   "error": null,
   "timings_ms": {
-   "parse": 0.0,
-   "llm_extract": 0.02,
-   "validate": 0.23,
-   "approve": 1657.21,
-   "settle": 0.64
+   "parse": 0.01,
+   "llm_extract": 0.03,
+   "validate": 0.24,
+   "approve": 1745.13,
+   "settle": 0.74
   },
   "trace": [
    {
     "agent": "Intake",
     "action": "read txt via heuristic:txt",
-    "ms": 0.01,
+    "ms": 0.02,
     "events": [
      {
       "kind": "skipped",
@@ -1705,12 +1705,12 @@
    {
     "agent": "Validation",
     "action": "checked against ERP and policy",
-    "ms": 0.08
+    "ms": 0.09
    },
    {
     "agent": "Reviewer",
     "action": "decided",
-    "ms": 1657.2,
+    "ms": 1745.12,
     "events": [
      {
       "kind": "model",
@@ -1779,7 +1779,7 @@
    {
     "agent": "Payment",
     "action": "scheduled / sent",
-    "ms": 0.47
+    "ms": 0.53
    }
   ],
   "llm": {
@@ -1792,7 +1792,7 @@
    "tools": 6,
    "tokens_in": 1645,
    "tokens_out": 107,
-   "cost_ticks": 9797500
+   "cost_ticks": 16517500
   },
   "sender": null,
   "subject": null,
@@ -1844,7 +1844,7 @@
   "findings": [],
   "approval": {
    "decision": "approve",
-   "reasoning": "Vendor approved, items exist with sufficient stock, calculated total 3000 matches invoice, no findings/errors/holds, under 10000 limit",
+   "reasoning": "Vendor approved, items exist with sufficient stock, calculated total 3000 matches invoice, no errors/holds, under 10000 limit, new vendor but policy allows",
    "rounds": 1,
    "critiques": []
   },
@@ -1857,9 +1857,9 @@
   "timings_ms": {
    "parse": 0.0,
    "llm_extract": 0.02,
-   "validate": 0.17,
-   "approve": 1796.1,
-   "settle": 0.69
+   "validate": 0.16,
+   "approve": 1581.12,
+   "settle": 0.63
   },
   "trace": [
    {
@@ -1881,7 +1881,7 @@
    {
     "agent": "Reviewer",
     "action": "decided",
-    "ms": 1796.09,
+    "ms": 1581.11,
     "events": [
      {
       "kind": "model",
@@ -1927,13 +1927,13 @@
       "as": "reviewer",
       "tokens": [
        878,
-       40
+       45
       ],
       "model": "grok-4.20-0309-non-reasoning"
      },
      {
       "kind": "decision",
-      "text": "approve: Vendor approved, items exist with sufficient stock, calculated total 3000 matches invoice, no findings/errors/holds, under 10000 limit"
+      "text": "approve: Vendor approved, items exist with sufficient stock, calculated total 3000 matches invoice, no errors/holds, under 10000 limit, new vendor but policy allows"
      },
      {
       "kind": "skipped",
@@ -1944,7 +1944,7 @@
    {
     "agent": "Payment",
     "action": "scheduled / sent",
-    "ms": 0.5
+    "ms": 0.42
    }
   ],
   "llm": {
@@ -1956,8 +1956,8 @@
    ],
    "tools": 5,
    "tokens_in": 1506,
-   "tokens_out": 92,
-   "cost_ticks": 14405000
+   "tokens_out": 97,
+   "cost_ticks": 11842000
   },
   "sender": null,
   "subject": null,
@@ -2027,7 +2027,7 @@
   "error": null,
   "timings_ms": {
    "parse": 0.0,
-   "llm_extract": 0.02
+   "llm_extract": 0.01
   },
   "trace": [
    {
@@ -2116,7 +2116,7 @@
   ],
   "approval": {
    "decision": "approve",
-   "reasoning": "Vendor approved, items exist with sufficient stock, total 9975 <= 10000, only a warning (near_threshold) which does not block per policy; no errors or holds.",
+   "reasoning": "Vendor approved, all items exist with sufficient stock, total 9975 <= 10000, only warning (near_threshold) which does not block, no error or hold findings",
    "rounds": 1,
    "critiques": []
   },
@@ -2129,9 +2129,9 @@
   "timings_ms": {
    "parse": 0.0,
    "llm_extract": 0.02,
-   "validate": 0.2,
-   "approve": 1966.35,
-   "settle": 0.65
+   "validate": 0.18,
+   "approve": 1681.12,
+   "settle": 0.66
   },
   "trace": [
    {
@@ -2153,7 +2153,7 @@
    {
     "agent": "Reviewer",
     "action": "decided",
-    "ms": 1966.34,
+    "ms": 1681.11,
     "events": [
      {
       "kind": "model",
@@ -2169,12 +2169,6 @@
       "name": "lookup_vendor",
       "args": "{\"name\":\"QuickShip Distributers\"}",
       "result": "{'result': {'found': True, 'name': 'QuickShip Distributers', 'status': 'approved'}}"
-     },
-     {
-      "kind": "tool",
-      "name": "vendor_history",
-      "args": "{\"vendor\":\"QuickShip Distributers\"}",
-      "result": "{'result': {'bills': 0}}"
      },
      {
       "kind": "tool",
@@ -2196,6 +2190,12 @@
      },
      {
       "kind": "tool",
+      "name": "vendor_history",
+      "args": "{\"vendor\":\"QuickShip Distributers\"}",
+      "result": "{'result': {'bills': 0}}"
+     },
+     {
+      "kind": "tool",
       "name": "policy_limits",
       "args": "{}",
       "result": "{'result': {'auto_approve_up_to_usd': '10000', 'vp_sign_off_above_usd': '10000', 'cfo_above_usd': '50000', 'rules': 'any error finding -> reject; any hold findi"
@@ -2205,13 +2205,13 @@
       "as": "reviewer",
       "tokens": [
        963,
-       49
+       47
       ],
       "model": "grok-4.20-0309-non-reasoning"
      },
      {
       "kind": "decision",
-      "text": "approve: Vendor approved, items exist with sufficient stock, total 9975 <= 10000, only a warning (near_threshold) which does not block per policy; no errors or holds."
+      "text": "approve: Vendor approved, all items exist with sufficient stock, total 9975 <= 10000, only warning (near_threshold) which does not block, no error or hold findings"
      },
      {
       "kind": "skipped",
@@ -2222,7 +2222,7 @@
    {
     "agent": "Payment",
     "action": "scheduled / sent",
-    "ms": 0.46
+    "ms": 0.47
    }
   ],
   "llm": {
@@ -2234,8 +2234,8 @@
    ],
    "tools": 6,
    "tokens_in": 1622,
-   "tokens_out": 112,
-   "cost_ticks": 9635000
+   "tokens_out": 110,
+   "cost_ticks": 10929000
   },
   "sender": null,
   "subject": null,
@@ -2475,8 +2475,8 @@
    "parse": 0.0,
    "llm_extract": 0.01,
    "validate": 0.21,
-   "approve": 0.04,
-   "settle": 1133.8
+   "approve": 0.05,
+   "settle": 1062.24
   },
   "trace": [
    {
@@ -2487,12 +2487,12 @@
    {
     "agent": "Validation",
     "action": "checked against ERP and policy",
-    "ms": 0.09
+    "ms": 0.1
    },
    {
     "agent": "Reviewer",
     "action": "decided",
-    "ms": 0.03,
+    "ms": 0.04,
     "events": [
      {
       "kind": "skipped",
@@ -2507,40 +2507,40 @@
    {
     "agent": "Comms",
     "action": "explained in plain English",
-    "ms": 1133.58,
+    "ms": 1062.04,
     "events": [
      {
       "kind": "model",
       "as": "comms",
       "tokens": [
        416,
-       67
+       68
       ],
       "model": "grok-4.20-0309-non-reasoning"
      },
      {
       "kind": "wrote",
-      "text": "Invoice INV-1013 from Atlas Industrial Supply for 22562.8 USD was rejected. Checks found that WidgetA, WidgetB and GadgetX were billed for more units than are in stock, and the invoice total does not "
+      "text": "Invoice INV-1013 from Atlas Industrial Supply for 22562.8 USD was rejected. Checks found WidgetA, WidgetB and GadgetX were billed for more units than are in stock, plus the invoice total does not matc"
      }
     ]
    },
    {
     "agent": "Comms",
     "action": "drafted vendor follow-up",
-    "ms": 1033.94,
+    "ms": 1053.73,
     "events": [
      {
       "kind": "model",
       "as": "comms",
       "tokens": [
        382,
-       73
+       77
       ],
       "model": "grok-4.20-0309-non-reasoning"
      },
      {
       "kind": "wrote",
-      "text": "The line items do not add up to the invoice total (subtotal 21040.0 + tax 1472.8 + shipping 0 = 22512.8, invoice total is 22562.8). Is the stated total correct, or can you send a corrected invoice? Ac"
+      "text": "Dear Vendor, The line items do not add up to the invoice total (subtotal 21040.0 + tax 1472.8 + shipping 0 = 22512.8, invoice total is 22562.8). Is the stated total correct, or can you send a correcte"
      }
     ]
    }
@@ -2554,16 +2554,16 @@
    ],
    "tools": 0,
    "tokens_in": 798,
-   "tokens_out": 140,
-   "cost_ticks": 9443000
+   "tokens_out": 145,
+   "cost_ticks": 8224000
   },
   "sender": null,
   "subject": null,
-  "followup": "To: (sender unknown: file intake)\nSubject: Quick question on invoice INV-1013\n\nThe line items do not add up to the invoice total (subtotal 21040.0 + tax 1472.8 + shipping 0 = 22512.8, invoice total is 22562.8).\nIs the stated total correct, or can you send a corrected invoice?\n\nAccounts Payable, Acme Corp",
+  "followup": "To: (sender unknown: file intake)\nSubject: Quick question on invoice INV-1013\n\nDear Vendor,\n\nThe line items do not add up to the invoice total (subtotal 21040.0 + tax 1472.8 + shipping 0 = 22512.8, invoice total is 22562.8). Is the stated total correct, or can you send a corrected invoice?\n\nAccounts Payable, Acme Corp",
   "approval_request": null,
   "awaiting": null,
   "approval_card": null,
-  "explanation": "Invoice INV-1013 from Atlas Industrial Supply for 22562.8 USD was rejected. Checks found that WidgetA, WidgetB and GadgetX were billed for more units than are in stock, and the invoice total does not match the calculated subtotal plus tax. Please review the discrepancies and decide next steps.",
+  "explanation": "Invoice INV-1013 from Atlas Industrial Supply for 22562.8 USD was rejected. Checks found WidgetA, WidgetB and GadgetX were billed for more units than are in stock, plus the invoice total does not match the calculated subtotal plus tax and shipping. Please review the discrepancies and decide next steps.",
   "status": "REJECT"
  },
  {
@@ -2666,21 +2666,21 @@
   "release_on": null,
   "error": null,
   "timings_ms": {
-   "parse": 0.01,
-   "llm_extract": 3793.54
+   "parse": 0.0,
+   "llm_extract": 2642.38
   },
   "trace": [
    {
     "agent": "Intake",
     "action": "read pdf via heuristic:pdf",
-    "ms": 3793.53,
+    "ms": 2642.37,
     "events": [
      {
       "kind": "model",
       "as": "intake",
       "tokens": [
-       644,
-       380
+       730,
+       354
       ],
       "model": "grok-4.20-0309-non-reasoning"
      }
@@ -2692,9 +2692,9 @@
    "cached": 0,
    "skipped": [],
    "tools": 0,
-   "tokens_in": 644,
-   "tokens_out": 380,
-   "cost_ticks": 10830000
+   "tokens_in": 730,
+   "tokens_out": 354,
+   "cost_ticks": 13943000
   },
   "sender": null,
   "subject": null,
@@ -2778,9 +2778,9 @@
   "timings_ms": {
    "parse": 0.0,
    "llm_extract": 0.01,
-   "validate": 0.22,
+   "validate": 0.2,
    "approve": 0.05,
-   "settle": 921.92
+   "settle": 700.6
   },
   "trace": [
    {
@@ -2791,7 +2791,7 @@
    {
     "agent": "Validation",
     "action": "checked against ERP and policy",
-    "ms": 0.07
+    "ms": 0.08
    },
    {
     "agent": "Reviewer",
@@ -2811,27 +2811,27 @@
    {
     "agent": "Comms",
     "action": "explained in plain English",
-    "ms": 921.17,
+    "ms": 699.82,
     "events": [
      {
       "kind": "model",
       "as": "comms",
       "tokens": [
        363,
-       44
+       45
       ],
       "model": "grok-4.20-0309-non-reasoning"
      },
      {
-      "kind": "rejected",
-      "text": "model text discarded (numbers not in the record: ['4125']); using the template"
+      "kind": "wrote",
+      "text": "Invoice INV-1014 from TechParts International for EUR 4125.00 was escalated because it was billed in EUR with no FX policy to settle in USD. Treasury should review and decide next steps."
      }
     ]
    },
    {
     "agent": "Desk",
     "action": "routed to a person",
-    "ms": 0.58
+    "ms": 0.6
    }
   ],
   "llm": {
@@ -2843,16 +2843,16 @@
    ],
    "tools": 0,
    "tokens_in": 363,
-   "tokens_out": 44,
-   "cost_ticks": 2949500
+   "tokens_out": 45,
+   "cost_ticks": 2974500
   },
   "sender": null,
   "subject": null,
   "followup": null,
   "approval_request": 2,
   "awaiting": "Treasury",
-  "approval_card": "To: treasury@acmecorp.example\nSubject: Decision needed: EUR 4125.00 to TechParts International (INV-1014)\n\nPay EUR 4125.00 to TechParts International?\n\nWHY YOU\n  - billed in EUR; no FX policy to settle in USD\n\nTHE INVOICE\n  Invoice INV-1014, dated 2026-01-26, due 2026-02-26, terms Net 30\n  2 line(s): WidgetA x4, WidgetB x6\n  Read by: xml (structured)\n\nSYSTEM RECOMMENDATION\n  REVIEW BEFORE APPROVING: billed in EUR; no FX policy to settle in USD\n\nNOTED (did not block)\n  - WidgetA: billed 225.00 vs catalog 250.00 (10% off)\n  - WidgetB: billed 475.00 vs catalog 500.00 (5% off)\n\n  APPROVE: http://127.0.0.1:8765/decide?t=eyJyIjoyLCJhIjoiYXBwcm92ZSIsImgiOiI4MmQ0YzA1MDE3NmYxYTY3IiwidyI6InRyZWFzdXJ5QGFjbWVjb3JwLmV4YW1wbGUiLCJ4IjoxNzkzNTkzMjczfQ.Xlku8--AjxCmTWm17Cddlw\n  REJECT:  http://127.0.0.1:8765/decide?t=eyJyIjoyLCJhIjoicmVqZWN0IiwiaCI6IjgyZDRjMDUwMTc2ZjFhNjciLCJ3IjoidHJlYXN1cnlAYWNtZWNvcnAuZXhhbXBsZSIsIngiOjE3OTM1OTMyNzN9.c482OTweQvU4Zcj06rsX1Q\n\nThese links were issued to you. They work once, only for this invoice as shown, and expire in 5 days. Do not forward them.\nNothing is paid until you approve; if you do not respond it will be escalated to your delegate.",
-  "explanation": null,
+  "approval_card": "To: treasury@acmecorp.example\nSubject: Decision needed: EUR 4125.00 to TechParts International (INV-1014)\n\nPay EUR 4125.00 to TechParts International?\n\nWHY YOU\n  - billed in EUR; no FX policy to settle in USD\n\nTHE INVOICE\n  Invoice INV-1014, dated 2026-01-26, due 2026-02-26, terms Net 30\n  2 line(s): WidgetA x4, WidgetB x6\n  Read by: xml (structured)\n\nIN SHORT\n  Invoice INV-1014 from TechParts International for EUR 4125.00 was escalated because it was billed in EUR with no FX policy to settle in USD. Treasury should review and decide next steps.\n\nSYSTEM RECOMMENDATION\n  REVIEW BEFORE APPROVING: billed in EUR; no FX policy to settle in USD\n\nNOTED (did not block)\n  - WidgetA: billed 225.00 vs catalog 250.00 (10% off)\n  - WidgetB: billed 475.00 vs catalog 500.00 (5% off)\n\n  APPROVE: http://127.0.0.1:8765/decide?t=eyJyIjoyLCJhIjoiYXBwcm92ZSIsImgiOiI4MmQ0YzA1MDE3NmYxYTY3IiwidyI6InRyZWFzdXJ5QGFjbWVjb3JwLmV4YW1wbGUiLCJ4IjoxNzkzNTk0NDM0fQ.2h3PUMucM6mkYrORpuWsLQ\n  REJECT:  http://127.0.0.1:8765/decide?t=eyJyIjoyLCJhIjoicmVqZWN0IiwiaCI6IjgyZDRjMDUwMTc2ZjFhNjciLCJ3IjoidHJlYXN1cnlAYWNtZWNvcnAuZXhhbXBsZSIsIngiOjE3OTM1OTQ0MzR9.920c2PYbvMMXvctfVGO9lg\n\nThese links were issued to you. They work once, only for this invoice as shown, and expire in 5 days. Do not forward them.\nNothing is paid until you approve; if you do not respond it will be escalated to your delegate.",
+  "explanation": "Invoice INV-1014 from TechParts International for EUR 4125.00 was escalated because it was billed in EUR with no FX policy to settle in USD. Treasury should review and decide next steps.",
   "status": "AWAITING"
  },
  {
@@ -2903,7 +2903,7 @@
   "findings": [],
   "approval": {
    "decision": "approve",
-   "reasoning": "Vendor approved, items exist with sufficient stock, calculated total 6500 matches invoice, no errors/holds, under 10000 limit",
+   "reasoning": "Vendor approved, items exist with sufficient stock, calculated total 6500 matches invoice, no errors/holds, within 10000 limit",
    "rounds": 1,
    "critiques": []
   },
@@ -2917,8 +2917,8 @@
    "parse": 0.0,
    "llm_extract": 0.01,
    "validate": 0.16,
-   "approve": 1842.1,
-   "settle": 0.66
+   "approve": 1513.59,
+   "settle": 0.6
   },
   "trace": [
    {
@@ -2934,7 +2934,7 @@
    {
     "agent": "Reviewer",
     "action": "decided",
-    "ms": 1842.09,
+    "ms": 1513.58,
     "events": [
      {
       "kind": "model",
@@ -2992,7 +2992,7 @@
      },
      {
       "kind": "decision",
-      "text": "approve: Vendor approved, items exist with sufficient stock, calculated total 6500 matches invoice, no errors/holds, under 10000 limit"
+      "text": "approve: Vendor approved, items exist with sufficient stock, calculated total 6500 matches invoice, no errors/holds, within 10000 limit"
      },
      {
       "kind": "skipped",
@@ -3003,7 +3003,7 @@
    {
     "agent": "Payment",
     "action": "scheduled / sent",
-    "ms": 0.45
+    "ms": 0.44
    }
   ],
   "llm": {
@@ -3093,9 +3093,9 @@
   "timings_ms": {
    "parse": 0.0,
    "llm_extract": 0.01,
-   "validate": 1125.29,
-   "approve": 0.11,
-   "settle": 778.79
+   "validate": 946.56,
+   "approve": 0.1,
+   "settle": 737.83
   },
   "trace": [
    {
@@ -3106,7 +3106,7 @@
    {
     "agent": "Validation",
     "action": "checked against ERP and policy",
-    "ms": 1125.17,
+    "ms": 946.45,
     "events": [
      {
       "kind": "model",
@@ -3137,7 +3137,7 @@
    {
     "agent": "Reviewer",
     "action": "decided",
-    "ms": 0.1,
+    "ms": 0.09,
     "events": [
      {
       "kind": "skipped",
@@ -3152,7 +3152,7 @@
    {
     "agent": "Comms",
     "action": "explained in plain English",
-    "ms": 778.55,
+    "ms": 737.59,
     "events": [
      {
       "kind": "model",
@@ -3172,20 +3172,20 @@
    {
     "agent": "Comms",
     "action": "drafted vendor follow-up",
-    "ms": 1474.47,
+    "ms": 839.41,
     "events": [
      {
       "kind": "model",
       "as": "comms",
       "tokens": [
        353,
-       43
+       48
       ],
       "model": "grok-4.20-0309-non-reasoning"
      },
      {
       "kind": "wrote",
-      "text": "We cannot match an item on this invoice to our catalogue ('WidgetC' not found in inventory). Which PO number and PO line does it belong to? Accounts Payable, Acme Corp"
+      "text": "Dear Vendor, We cannot match an item on this invoice to our catalogue ('WidgetC' not found in inventory). Which PO number and PO line does it belong to? Accounts Payable, Acme Corp"
      }
     ]
    }
@@ -3199,12 +3199,12 @@
    ],
    "tools": 1,
    "tokens_in": 1742,
-   "tokens_out": 103,
-   "cost_ticks": 10910000
+   "tokens_out": 108,
+   "cost_ticks": 13723000
   },
   "sender": null,
   "subject": null,
-  "followup": "To: (sender unknown: file intake)\nSubject: Quick question on invoice INV-1016\n\nWe cannot match an item on this invoice to our catalogue ('WidgetC' not found in inventory). Which PO number and PO line does it belong to?\n\nAccounts Payable, Acme Corp",
+  "followup": "To: (sender unknown: file intake)\nSubject: Quick question on invoice INV-1016\n\nDear Vendor,\n\nWe cannot match an item on this invoice to our catalogue ('WidgetC' not found in inventory). Which PO number and PO line does it belong to?\n\nAccounts Payable, Acme Corp",
   "approval_request": null,
   "awaiting": null,
   "approval_card": null,

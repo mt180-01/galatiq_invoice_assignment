@@ -1,0 +1,41 @@
+Vendor:
+Consolidated Materials Group
+
+Invoice Number:
+13644
+
+Invoice Date:
+05/06/2026
+
+Due Date:
+05/21/2026
+
+Item:
+WidgetA
+Quantity:
+10
+Unit Price:
+240.00
+
+Item:
+GadgetX
+Quantity:
+6
+Unit Price:
+740.00
+
+Item:
+WidgetB
+Quantity:
+1
+Unit Price:
+490.00
+
+Subtotal:
+7330.00
+Tax (0%):
+0.00
+Shipping:
+120.00
+Total (USD):
+7450.00

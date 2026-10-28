@@ -1,0 +1,34 @@
+Vendor:
+TechParts International
+Invoice Number:
+INV-4708
+Invoice Date:
+04/03/2026
+Due Date:
+04/18/2026
+Description:
+GadgetX
+Quantity:
+10
+Unit Price:
+750.00
+Amount:
+7500.00
+Description:
+WidgetA
+Quantity:
+9
+Unit Price:
+260.00
+Amount:
+2340.00
+Subtotal:
+9840.00
+Tax (8%):
+787.20
+Shipping:
+0.00
+Total:
+10627.20
+Currency:
+USD

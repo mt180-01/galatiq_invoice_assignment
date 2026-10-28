@@ -1,0 +1,21 @@
+Acme lndustrial Supplies
+
+Invoice # INV-866O
+
+Invoice Date: 04/24/2026
+Due Date: 05/09/2026
+
+Description                  Qty     Unit Price     Amount
+WidgetB                       8       $490.00      $3,920.00
+WidgetA                      11       $250.00      $2,750.00
+GadgetX                       2       $750.00      $1,500.00
+
+Subtotal:                                 $8,170.00
+Tax (0%):                                       0.00
+Shipping:                                       0.00
+
+Total Due:                                $8,170.00
+
+Currency: USD
+
+Thank you for your business!

@@ -1,0 +1,28 @@
+Gadgets Co.
+123 Tech Lane
+Innovation City, CA 94000
+United States
+
+Invoice Number: INV-9778
+Invoice Date: April 6, 2026
+Due Date: May 6, 2026
+
+Bill To:
+Customer Name
+Customer Address
+City, State ZIP
+
+Description                  Qty     Unit Price     Amount
+------------------------------------------------------------
+WidgetA                        2       $250.00      $500.00
+WidgetB                        7       $490.00     $3430.00
+
+Subtotal:                                           $3930.00
+Tax (0%):                                                 $0.00
+Shipping:                                                 $0.00
+------------------------------------------------------------
+Total:                                              $3930.00
+
+Amount due in USD: $3930.00
+
+Thank you for your business!

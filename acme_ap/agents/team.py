@@ -63,7 +63,7 @@ CHARTERS = [
 ]
 
 
-def _event(e: tuple) -> dict:
+def event_dict(e: tuple) -> dict:
     kind, agent, tin, tout, _ticks, detail = e
     if kind == "tool":
         return {"kind": "tool", "name": detail["name"], "args": detail["args"], "result": detail["result"]}
@@ -83,7 +83,7 @@ async def step(out: Outcome, agent: str, action: str):
         yield
     finally:
         entry = {"agent": agent, "action": action, "ms": round((time.perf_counter() - t) * 1000, 2)}
-        events = [_event(e) for e in (ledger[start:] if ledger is not None else [])]
+        events = [event_dict(e) for e in (ledger[start:] if ledger is not None else [])]
         if events:
             entry["events"] = events  # what the model was asked, which tools it called, what it concluded
         out.trace.append(entry)

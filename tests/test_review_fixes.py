@@ -283,3 +283,35 @@ def test_stock_policy_flag_reaches_the_database_from_the_cli(tmp_path):
     out = cli(tmp_path, "--stock-policy", "reserve", path="data/invoices/invoice_1001.txt")
     assert "PAID=1" in out
     assert sqlite3.connect(tmp_path / "l.db").execute("SELECT v FROM erp_settings WHERE k='stock_policy'").fetchone()[0] == "reserve"
+
+
+# ---- the outcome store writes in batches (measured: one commit per outcome cost ~23% of serial throughput) -----------------
+def test_the_store_batches_writes_but_readers_never_miss_one(tmp_path):
+    from acme_ap.models import Outcome
+    from acme_ap.store import OutcomeStore
+    db = tmp_path / "o.db"
+    store = OutcomeStore(db, flush_every=4)
+    other = sqlite3.connect(db)                                           # a separate reader, as the web interface is
+    count = lambda: other.execute("SELECT COUNT(*) FROM outcomes").fetchone()[0]  # noqa: E731
+    for i in range(3):
+        store.save(Outcome(source_path=f"f{i}.txt", error="x"))
+    assert count() == 0                                                   # buffered: nothing committed yet
+    assert [o.source_path for _, o in store.all()] == ["f0.txt", "f1.txt", "f2.txt"]      # but the store's own readers flush first, so they see everything
+    assert count() == 3
+    for i in range(3, 5):
+        store.save(Outcome(source_path=f"f{i}.txt", error="x"))
+    assert count() == 3                                                   # two more are below the threshold again: still buffered
+    store.save(Outcome(source_path="f5.txt", error="x"))
+    store.save(Outcome(source_path="f6.txt", error="x"))
+    assert count() == 7                                                   # the fourth buffered outcome reached the threshold and forced a commit
+    store.flush()
+    assert count() == 7 and [i for i, _ in store.all()] == list(range(1, 8))     # ids in order, none lost or doubled
+
+
+def test_a_finished_batch_is_fully_on_disk_for_any_other_reader(tmp_path):
+    db = tmp_path / "b.db"
+    erp = MockNetSuite(db)
+    from acme_ap.store import OutcomeStore
+    store = OutcomeStore(db, reset=True, flush_every=1000)                # far larger than the batch: only the end-of-batch flush can save these
+    outs = asyncio.run(Pipeline(erp, OfflineLLM(), workers=1, store=store).run([str(p) for p in sorted(INV.iterdir())]))
+    assert sqlite3.connect(db).execute("SELECT COUNT(*) FROM outcomes").fetchone()[0] == len(outs) == 20

@@ -179,6 +179,9 @@ class MockNetSuite:
                 out.append({"key": key, "source": source, "vendor": other, "status": status, "similarity": round(score, 2)})
         return out
 
+    def vendor_names(self) -> list[str]:
+        return [n for vname, _, aliases in SEED_VENDORS for n in [vname, *[a for a in aliases.split(";") if a]]]
+
     def search_items(self, query: str, limit: int = 3) -> list[dict]:
         want, out = norm(query), []
         for key, name in self._items.items():

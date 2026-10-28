@@ -1,0 +1,19 @@
+TechParts lnternational
+
+INVOICE
+
+Invoice #: lNV-4O7O
+Invoice Date: 02/08/2026
+Due Date: 03/10/2026
+
+Description                  Qty     Unit Price     Amount
+WidgetB                       3       $500.00       $1,500.00
+
+Subtotal:                                       $1,500.00
+Tax (5%):                                          $75.00
+Shipping:                                         $120.00
+
+Total Due:                                    $1,695.00
+
+Amount due in USD. Please remit payment by due date.
+Thank you for your business!

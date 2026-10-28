@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import numpy as np
 
 from ..models import Invoice
 from . import heuristic, structured
@@ -54,9 +53,7 @@ def read_pdf(path: Path, ignore_embedded: bool = False) -> tuple[str | None, str
             if words:
                 lines.extend(_rows(words))
             elif page.get_images() and ocr.available():
-                pix = page.get_pixmap(matrix=pymupdf.Matrix(ocr.DPI / 72, ocr.DPI / 72), colorspace=pymupdf.csGRAY)
-                gray = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width)
-                lines.extend(_rows(ocr.recognise(ocr.clean_page(gray))))
+                lines.extend(_rows(ocr.read_page(page)))
                 used_ocr = True
     return None, "\n".join(lines), used_ocr
 

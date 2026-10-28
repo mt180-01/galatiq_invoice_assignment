@@ -1,0 +1,40 @@
+MegaWidgets Corp
+123 Industrial Way
+Techville, CA 94043
+
+Invoice Number: SI-3914
+Invoice Date: April 24, 2026
+Due Date: June 8, 2026
+
+Bill To:
+Acme Solutions Inc.
+456 Business Park
+Metropolis, NY 10001
+
+Description                                      SKU          Qty     Unit Price     Line Total
+----------------------------------------------------------------------------------------------------
+GadgetX - Advanced sensor module with
+integrated Bluetooth connectivity and
+2-year warranty. Includes setup guide.     GX-47291       4       $750.00      $3,000.00
+
+WidgetA - Standard automation component.
+Compatible with all major systems.         WA-38102       9       $250.00      $2,250.00
+
+WidgetB - Heavy duty industrial variant
+with reinforced casing.                    WB-49017       1       $510.00        $510.00
+
+Notes:
+- All items ship from our California warehouse.
+- 5% early payment discount if paid within 10 days.
+- Please include invoice number on remittance.
+
+Subtotal:                                           $5,760.00
+Shipping:                                                  $0.00
+Tax (0%):                                                  $0.00
+------------------------------------------------------------
+Total Due:                                          $5,760.00
+
+Please remit payment in USD to:
+MegaWidgets Corp
+Bank Transfer or Check
+Thank you for your business!

@@ -1,0 +1,30 @@
+QuickShip Distributers
+123 Logistics Way
+Shipping City, ST 12345
+Phone: (555) 123-4567
+Email: billing@quickshipdist.com
+
+Bill From:
+QuickShip Distributers
+123 Logistics Way
+Shipping City, ST 12345
+
+Bill To:
+Acme Corporation
+456 Industrial Blvd
+Business Town, CA 98765
+
+Invoice Number: 53224
+Invoice Date: April 25, 2026
+Due Date: May 25, 2026
+Currency: USD
+
+Description                          Qty     Unit Price     Line Total
+-------------------------------------------------------------------------
+WidgetB                               3       $500.00       $1,500.00
+
+Subtotal:                                                     $1,500.00
+Tax (8%):                                                       $120.00
+Shipping:                                                        $25.00
+-------------------------------------------------------------------------
+Total:                                                        $1,645.00

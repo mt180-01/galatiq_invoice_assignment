@@ -1,0 +1,72 @@
+From: accounting@widgetsinc.com
+To: billing@acmecorp.com
+Subject: Invoice INV-8488 attached
+Date: Tue, 17 Feb 2026 09:12:45 -0500
+
+Hi team,
+
+Please find our latest invoice attached for your records. Let me know if you have any questions.
+
+Best,
+Sarah
+Widgets Inc. Accounting
+
+
+-----Original Message-----
+From: procurement@acmecorp.com
+Sent: Tuesday, February 17, 2026 10:45 AM
+To: accounting@widgetsinc.com
+Subject: Re: Invoice INV-8488 attached
+
+> Hi Sarah,
+> 
+> Thanks for sending this over. Can you confirm the due date on the attached invoice?
+> 
+> > From: accounting@widgetsinc.com
+> > Sent: Tuesday, February 17, 2026 9:12 AM
+> > To: billing@acmecorp.com
+> > Subject: Invoice INV-8488 attached
+> > 
+> > Hi team,
+> > 
+> > Please find our latest invoice attached for your records. Let me know if you have any questions.
+> > 
+> > Best,
+> > Sarah
+> > Widgets Inc. Accounting
+> > 
+> > 
+> > Widgets Inc.
+> > 123 Industrial Way, Suite 400
+> > Springfield, IL 62704
+> > (217) 555-0192
+> > 
+> > INVOICE
+> > 
+> > Invoice #: INV-8488
+> > Invoice Date: February 17, 2026
+> > Due Date: March 4, 2026
+> > 
+> > Bill To:
+> > Acme Corporation
+> > 456 Corporate Blvd
+> > Metropolis, NY 10001
+> > 
+> > Description                  Qty     Unit Price     Amount
+> > GadgetX                      11      $750.00        $8,250.00
+> > WidgetB                       3      $510.00        $1,530.00
+> > 
+> > Subtotal                                      $9,780.00
+> > Tax (5%)                                        $489.00
+> > Shipping                                              $0.00
+> > 
+> > Total Due                                     $10,269.00 USD
+> > 
+> > Thank you for your business!
+> > Payment due by 03/04/2026. Please remit via ACH or check.
+> > 
+> > Widgets Inc.
+
+Thanks,
+Mike
+Procurement

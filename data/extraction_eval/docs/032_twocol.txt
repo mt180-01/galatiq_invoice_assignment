@@ -1,0 +1,24 @@
+Precision Parts Ltd.
+123 Industrial Way
+Detroit, MI 48201
+USA
+
+Bill From:                          Bill To:
+Precision Parts Ltd.                Acme Manufacturing Inc.
+123 Industrial Way                  456 Factory Lane
+Detroit, MI 48201                   Chicago, IL 60601
+USA                                 USA
+
+Invoice Number: INV-9697            Invoice Date: June 5, 2026
+Due Date: July 20, 2026
+
+Description                     Quantity    Unit Price    Line Total
+GadgetX                            8         $750.00       $6,000.00
+
+Subtotal                                                     $6,000.00
+Tax (8%)                                                       $480.00
+Shipping                                                        $60.00
+
+Total Due                                                    $6,540.00
+
+All amounts in USD. Please remit payment by the due date.

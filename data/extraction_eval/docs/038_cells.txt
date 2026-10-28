@@ -1,0 +1,36 @@
+Vendor:
+Reliable Components Inc.
+
+Invoice Number:
+SI-8435
+
+Invoice Date:
+2026-06-25
+
+Due Date:
+2026-07-10
+
+Item:
+WidgetB
+Quantity:
+4
+Unit Price:
+500.00
+
+Item:
+WidgetA
+Quantity:
+5
+Unit Price:
+240.00
+
+Subtotal:
+3200.00
+Tax (0%):
+0.00
+Shipping:
+25
+Total:
+3225.00
+Currency:
+USD

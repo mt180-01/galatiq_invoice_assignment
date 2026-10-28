@@ -1,0 +1,45 @@
+Nova Supply Partners
+123 Industrial Way
+Suite 400
+Chicago, IL 60601
+United States
+
+INVOICE
+
+Invoice Number: SI-5180
+Invoice Date: April 6, 2026
+Due Date: May 6, 2026
+PO Number: PO-78492
+Order Number: ORD-31987
+Customer Number: CUST-20451
+Delivery Note Number: DN-67234
+
+Bill To:
+Acme Manufacturing Inc.
+456 Factory Lane
+Detroit, MI 48201
+
+Ship To:
+Acme Manufacturing Inc.
+Warehouse 3
+789 Logistics Blvd
+Detroit, MI 48202
+
+Description                  Qty     Unit Price     Amount
+WidgetA                      11      $250.00        $2,750.00
+GadgetX                       2      $750.00        $1,500.00
+WidgetB                       8      $510.00        $4,080.00
+
+Subtotal                                              $8,330.00
+Tax (0%)                                                 $0.00
+Shipping                                                 $0.00
+
+Total                                                 $8,330.00
+
+Amount Due (USD)                                      $8,330.00
+
+Thank you for your business.
+Payment due by May 6, 2026.
+Please remit payment to accounts@novasupply.com
+
+Nova Supply Partners

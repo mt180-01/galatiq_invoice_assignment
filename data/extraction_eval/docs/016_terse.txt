@@ -1,0 +1,16 @@
+BRIGHTLINE FABRICATION
+
+INV-6936
+
+Date: 05/04/2026
+Due: 06/03/2026
+
+Qty   Item      U/P      Amt
+4     WidgetB   510.00   2040.00
+8     WidgetA   240.00   1920.00
+11    GadgetX   750.00   8250.00
+
+Subtotal: 12210.00
+Tax (5%): 610.50
+Shipping: 60.00
+Total: 12880.50 USD

@@ -1,0 +1,14 @@
+GLOBAL SUPPLY CHAIN PARTNERS
+
+INV-2927
+04/12/2026
+
+QTY   ITEM      U/P      AMT
+4     GadgetX   750.00   3000.00
+
+SUBTOTAL          3000.00
+TAX (0%)             0.00
+SHIPPING           120.00
+TOTAL             3120.00
+
+USD

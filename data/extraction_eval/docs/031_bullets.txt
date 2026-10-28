@@ -1,0 +1,15 @@
+Reliable Components Inc.
+Invoice Number: INV-4197
+Invoice Date: September 4, 2026
+Due Date: September 19, 2026
+
+- 5 x WidgetB @ $500.00 each
+- 5 x WidgetA @ $250.00 each
+- 4 x GadgetX @ $750.00 each
+
+Subtotal: $6,750.00
+Tax: $0.00 (0%)
+Shipping: $25.00
+Total: $6,775.00
+
+Currency: USD

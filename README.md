@@ -21,12 +21,13 @@ The command line is first-class too: [`docs/img/demo.svg`](docs/img/demo.svg) is
 | What | Result | Evidence |
 |---|---|---|
 | The 17 provided invoices | **17 / 17 end as labelled**, 8 / 8 on the outcomes the brief itself states, 0 wrongly paid: 7 paid, 8 rejected, 2 sent to a person, 3 duplicates blocked | **[docs/EVALUATION.md](docs/EVALUATION.md)**: every invoice, decision and reason, rules-only and LLM-on reported separately |
-| Same run on **live Grok** | 17 / 17, 0 errors, 36 model calls and 42 tool calls, **$0.017 total (about $0.0010 per invoice)** as reported by xAI | [`docs/live_runs/`](docs/live_runs/): recorded transcript, JSON, and a **recording you can replay offline for free** (`--replay-llm`) |
+| Same run on **live Grok** | 17 / 17, 0 errors, 36 model calls and 42 tool calls, **$0.021 total (about $0.0012 per invoice)** as reported by xAI | [`docs/live_runs/`](docs/live_runs/): recorded transcript, JSON, and a **recording you can replay offline for free** (`--replay-llm`) |
+| Reading messy documents (independent test) | 58 invoices in 12 layouts written by Grok, answers fixed beforehand: the regex rules alone read **48%** fully right, with Grok when in doubt **58 / 58**; 0 wrong invoices would have been approved either way. Degraded **scans** (30, through OCR): rules 63%, with Grok **83%** | [docs/EXTRACTION_EVAL.md](docs/EXTRACTION_EVAL.md), [docs/SCAN_EVAL.md](docs/SCAN_EVAL.md), replayable for free |
 | Errors caught before payment | stock shortfalls, unknown items, arithmetic that doesn't add up, a fraud pattern, a changed bank account, duplicates across formats | `data/invoices`, `tests/test_brief.py` |
 | Robustness to garbage | 2,000 randomly corrupted invoices: **0 approved with a wrong value** (a stray "see invoice 31337" once got through; found and fixed) | `scripts/stress_extraction.py` |
 | Speed | a clean invoice spends about 10-15 ms in the system, against "5 days" in the brief; about 2,200 documents/s on 14 cores | `main.py --bench`, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §4 |
 | Waiting on a person | never silent: reminder at 24 h, escalation at 48 h, expiry at 5 days | `approve.py tick`, `make e2e` |
-| Tests | **248 tests** plus a **56-check end-to-end run** from a fresh clone; a test fails the build if a credential is ever committed | `make test`, `make e2e` |
+| Tests | **300 tests** plus a **58-check end-to-end run** from a fresh clone; a test fails the build if a credential is ever committed | `make test`, `make e2e` |
 
 ## Business impact
 
@@ -34,7 +35,7 @@ The command line is first-class too: [`docs/img/demo.svg`](docs/img/demo.svg) is
 |---|---|---|---|
 | **Error rate** | 30% of invoices | on the provided set, all 10 problem invoices were stopped or sent to a person before any money moved, **0 wrong payments** (the brief itself names 5 of them: a stock mismatch, out-of-stock/fraud, two unknown items, invalid data) | `docs/EVALUATION.md`; 2,000-invoice stress test |
 | **Time per invoice** | 5 days | clean invoices: milliseconds, no human. Invoices needing a person: a prepared one-click card, with a clock that reminds at 24 h and escalates at 48 h | `main.py` impact block, `approve.py tick` |
-| **Cost per invoice (model)** | n/a | **about $0.0010** measured live, roughly **$101 a year at 100,000 invoices**; free by default | `docs/live_runs/`, `scripts/roi.py` |
+| **Cost per invoice (model)** | n/a | **about $0.0012** measured live, roughly **$122 a year at 100,000 invoices**; free by default | `docs/live_runs/`, `scripts/roi.py` |
 | **People's time** | 12 min of keying and chasing (assumed) | only the invoices that need a decision, and those arrive summarised | `scripts/roi.py` (your inputs) |
 
 The savings side depends on Acme's volume and wages, which the brief does not give, so `python scripts/roi.py` takes your numbers and shows the structure and a sensitivity table. With *placeholder*
@@ -108,7 +109,7 @@ More: `approve.py` and `pay.py` (approver and treasury command lines), `main.py 
 
 | Criterion | Where to look |
 |---|---|
-| **Functionality** | 17/17 end to end, offline and on live Grok; `make e2e` (56 checks from a fresh clone) |
+| **Functionality** | 17/17 end to end, offline and on live Grok; `make e2e` (58 checks from a fresh clone) |
 | **Code quality** | typed models, one responsibility per module, error handling at every boundary (a failing model step never fails an invoice), structured logs, 248 tests |
 | **Agentic sophistication** | the table above: tool use, strict structured output, five self-correction loops, six agents with charters, guards; recorded, replayable live runs and a per-invoice evaluation |
 | **Shipping mindset** | simulated what must be (bank, ERP, email) behind adapters; cut what doesn't earn its keep (no framework, no database server, no auth system); limits stated in §5 of the architecture doc |
@@ -133,5 +134,4 @@ More: `approve.py` and `pay.py` (approver and treasury command lines), `main.py 
 
 The bank, ERP and email are simulated behind adapters; no email is sent. A decision link is issued to one approver's mailbox and whoever holds it acts as that person; a real deployment must deliver it by email
 and put single sign-on in front of the page. Stock is checked per invoice by default (the brief's own sample table requires that). On the provided invoices Grok agrees with the rules, so the evaluation shows
-what the model adds (second opinions, notes, emails) rather than different decisions; where it changes outcomes is `data/self_correction/`, which is the developer's own sample set. Grok's accuracy on messy scans is
-unmeasured. Not tested on Windows itself. Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (ERP choice, vendor strategy, CPU design, approval and payment design, hardening, live verification, review fixes, limits).
+what the model adds (second opinions, notes, emails) rather than different decisions; where it changes outcomes is `data/self_correction/`, which is the developer's own sample set. The extraction corpus was written by a model, not collected from real suppliers, so real-world accuracy will differ; scans reach 83% with Grok, not 100%, which is why a doubtful reading goes to a person. Not tested on Windows itself. Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (ERP choice, vendor strategy, CPU design, approval and payment design, hardening, live verification, review fixes, limits).

@@ -1,6 +1,6 @@
 """What does this cost, and what could it save? Two kinds of number, kept apart on purpose:
 
-  MEASURED   (from this repo's runs): the model cost per invoice (the recorded live run: $0.0171 for 17 invoices, with the default non-reasoning model) and the share of invoices that needed no human
+  MEASURED   (from this repo's runs): the model cost per invoice (the recorded live run: $0.0208 for 17 invoices, with the default non-reasoning model) and the share of invoices that needed no human
              (7 of 17 on the provided sample, which is deliberately full of problem invoices, so real mailboxes should do better).
   ASSUMED    (yours to replace): how many invoices Acme processes, how long a person spends on one, what an hour costs, what an error costs to fix.
              The defaults below are illustrative placeholders, not Acme's numbers; the brief gives only the headline "$2M a year" and "30% error rate".
@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import argparse
 
-MODEL_COST_PER_INVOICE = 0.0171 / 17   # measured: the recorded live Grok run (docs/live_runs), 17 invoices, as reported by xAI
+MODEL_COST_PER_INVOICE = 0.0208 / 17   # measured: the recorded live Grok run (docs/live_runs), 17 invoices, as reported by xAI
 
 
 def annual(a: argparse.Namespace, hands_off: float, error_rate_before: float, residual: float) -> tuple[float, float, float]:

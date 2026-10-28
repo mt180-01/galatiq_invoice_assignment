@@ -58,11 +58,18 @@ def _parse_date(raw: str) -> str | None:
     return None
 
 
+_INV_FORM = re.compile(r"^#?\s*(?:INV(?:OICE)?)?[\s\-_.#:]*(\d{3,})$", re.I)
+
+
 def normalize_invoice_number(raw: str | None) -> str | None:
+    """INV 1012, inv-1012, #INV1012 and a bare 1012 -> INV-1012. Anything with its own letters is kept as printed (SI-1024, A/2041): rewriting another
+    vendor's numbering scheme would change the invoice's identity, which duplicate detection and payment references depend on."""
     if not raw:
         return None
-    m = re.search(r"(\d{3,})", raw)
-    return f"INV-{m.group(1)}" if m else raw.strip()
+    text = str(raw).strip()
+    if m := _INV_FORM.match(text):
+        return f"INV-{m.group(1)}"
+    return re.sub(r"\s+", "", text.lstrip("#")).upper() or None
 
 
 def detect_currency(text: str) -> str:

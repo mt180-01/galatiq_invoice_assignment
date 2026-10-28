@@ -37,6 +37,8 @@ class ErpAdapter(Protocol):
         nothing) if any line cannot be covered; an empty list means reserved. Under the default `cap` policy this does nothing and returns []."""
     def release_stock(self, key: str) -> None:
         """Give back a bill's reservation (its payment failed for good)."""
+    def vendor_names(self) -> list[str]:
+        """Every name the vendor master knows a vendor by (legal names and aliases): the readers use it to find a vendor that no label announces."""
     def search_items(self, query: str, limit: int = 3) -> list[dict]:
         """Catalogue items with names resembling `query`: [{'name', 'stock', 'unit_price', 'similarity'}], best first."""
     def search_vendors(self, query: str, limit: int = 3) -> list[dict]:

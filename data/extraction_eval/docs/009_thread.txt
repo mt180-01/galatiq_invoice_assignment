@@ -1,0 +1,47 @@
+From: accounting@hartwellandsons.com
+To: billing@acmecorp.com
+Subject: FW: Invoice INV-4459 for your review
+
+Hi team,
+
+Just forwarding the latest invoice from Hartwell & Sons. Let me know if everything looks good or if we need to follow up on anything.
+
+Thanks,
+Sarah
+
+
+-----Original Message-----
+From: invoices@hartwellandsons.com
+Sent: Monday, August 24, 2026 9:15 AM
+To: accounting@hartwellandsons.com
+Subject: Invoice INV-4459
+
+> Hartwell & Sons Ltd
+> 123 Industrial Way, Suite 400
+> London, UK
+> VAT: GB 987654321
+>
+> Invoice
+>
+> Invoice Number: INV-4459
+> Invoice Date: August 23, 2026
+> Due Date: September 22, 2026
+>
+> Bill To:
+> Acme Corporation
+> 456 Business Park
+> New York, NY 10001
+>
+> Description                  Qty     Unit Price     Amount
+> 6 x GadgetX                 6       $750.00       $4,500.00
+> 10 x WidgetA               10      $250.00       $2,500.00
+>
+> Subtotal                                      $7,000.00
+> Tax (5%)                                        $350.00
+> Shipping                                        $120.00
+> Total                                          $7,470.00
+>
+> Please remit payment in USD to our account by the due date.
+> Thank you for your business!
+>
+> Hartwell & Sons Ltd

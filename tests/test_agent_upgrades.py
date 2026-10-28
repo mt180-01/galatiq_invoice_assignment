@@ -175,3 +175,25 @@ def test_a_surprise_inside_an_optional_ai_step_never_fails_the_invoice(tmp_path)
     (o,) = run(MockNetSuite(tmp_path / "s.db"), llm, [INVOICES / "invoice_1007.csv"])
     assert o.status == "REJECT" and not o.error and "Thanks for your invoice INV-1007" in o.followup   # the rules' answer, and the template follow-up, still arrive
     assert llm.unexpected
+
+
+def test_the_note_and_the_vendor_email_are_written_at_the_same_time(tmp_path):
+    """Both depend only on the decision. With a model that takes 0.3 s per call, writing them one after the other would take 0.6 s; together, about 0.3 s."""
+    import time
+
+    class Slow(Fixed):
+        async def chat_json(self, system, user):
+            await asyncio.sleep(0.3)
+            return await super().chat_json(system, user)
+
+    llm = Slow(**{"You_write_a_plain-English_note": {"summary": "Invoice INV-1007 was rejected: its line items do not add up to the total. Ask the vendor for a corrected invoice."},
+                  "You_write_short,_polite_emails": {"body": "Hello, thanks for invoice INV-1007. The line items do not add up to the total (subtotal 14750.00 + tax 885.00 + shipping 0 = 15635.00, invoice total is 15525.00); could you send a corrected invoice? Thanks, Accounts Payable"},
+                  "The_vendor_on_an_invoice": {"match": None}, "You_resolve_item_names": {"corrections": []}})
+    started = time.perf_counter()
+    (o,) = run(MockNetSuite(tmp_path / "c.db"), llm, [INVOICES / "invoice_1007.csv"])
+    took = time.perf_counter() - started
+    assert o.explanation and "To: " in (o.followup or "") and took < 0.55, f"{took:.2f}s: the two writing jobs ran one after the other"
+    comms = [t for t in o.trace if t["agent"] == "Comms"]
+    assert [t["action"] for t in comms] == ["explained in plain English", "drafted vendor follow-up"]                 # fixed order in the trace
+    assert all([e["kind"] for e in t["events"]] == ["wrote"] for t in comms)                                             # each job keeps its own record, and only its own
+    assert sum(e["kind"] == "wrote" for t in comms for e in t["events"]) == 2                                           # nothing is counted twice or lost

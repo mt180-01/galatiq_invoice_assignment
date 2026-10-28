@@ -1,0 +1,16 @@
+RELIABLE COMPONENTS INC.
+
+INV-2966
+
+DATE: 07/15/2026
+DUE: 08/29/2026
+
+QTY   ITEM      U/P      AMT
+9     GadgetX   760.00   6840.00
+4     WidgetA   250.00   1000.00
+
+SUBTOTAL          7840.00
+TAX (8%)           627.20
+SHIPPING             0.00
+TOTAL             8467.20 USD
+

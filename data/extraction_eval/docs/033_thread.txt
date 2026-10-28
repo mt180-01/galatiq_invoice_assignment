@@ -1,0 +1,48 @@
+From: accounting@summitmanufacturing.com
+To: ap@clientcorp.com
+Subject: Invoice SI-5275 - April 2026
+Date: April 6, 2026
+
+Hi team,
+
+Please find our invoice attached for the recent order. Let me know if you have any questions.
+
+Thanks,
+Sarah
+Summit Manufacturing Co.
+
+
+-----Original Message-----
+From: ap@clientcorp.com
+Sent: April 6, 2026 9:12 AM
+To: accounting@summitmanufacturing.com
+Subject: Re: Invoice SI-5275 - April 2026
+
+> Hi Sarah,
+> 
+> Thanks for sending this over. Can you confirm the details below look correct?
+> 
+> > Invoice from Summit Manufacturing Co.
+> > Invoice #: SI-5275
+> > Invoice Date: April 5, 2026
+> > Due Date: May 5, 2026
+> > 
+> > Description                  Qty     Unit Price     Amount
+> > WidgetB                      3       $500.00       $1,500.00
+> > WidgetA                     12       $250.00       $3,000.00
+> > 
+> > Subtotal: $4,500.00
+> > Tax (0%): $0.00
+> > Shipping: $0.00
+> > Total Due: $4,500.00 USD
+> > 
+> > Please remit payment by the due date.
+> > Thank you for your business!
+> > Summit Manufacturing Co.
+> 
+> Looks good? We'll process this week.
+
+Yes, everything is correct. Thanks!
+
+Best,
+Sarah

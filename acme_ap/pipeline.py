@@ -17,11 +17,11 @@ import time
 from concurrent.futures import ProcessPoolExecutor
 from decimal import Decimal
 
-from .agents.team import CommsAgent, DeskAgent, IntakeAgent, PaymentAgent, ReviewerAgent, ValidationAgent, step
+from .agents.team import CommsAgent, DeskAgent, IntakeAgent, PaymentAgent, ReviewerAgent, ValidationAgent, event_dict, step
 from .erp import ErpAdapter
 from .approvals.tokens import evidence_hash
 from .identity import bill_key
-from .ingestion import parse_file
+from .ingestion import heuristic, parse_file
 from .intake import Origin
 from .llm import LLM, invoice_ledger
 from .payments import default_payments
@@ -32,8 +32,9 @@ decision_log = logging.getLogger("acme.decision")  # one line per invoice: shown
 PDFS_PER_WORKER = 100
 
 
-def _warm() -> None:  # pre-import heavy modules once per worker
+def _warm(vendors: list[str] | None = None) -> None:  # pre-import heavy modules once per worker, and hand it the vendor master
     import pymupdf  # noqa: F401
+    heuristic.set_known_vendors(vendors or [])
 
 
 def _parse_chunk(paths: list[str], want_text: bool) -> list[tuple[str, object]]:
@@ -53,6 +54,7 @@ class Pipeline:
                  origins: dict[str, Origin] | None = None, approvals=None, payments=None, bank_concurrency: int = 8,
                  llm_policy: str = "gated", store=None, sequential: bool = False):
         self.erp, self.llm = erp, llm
+        heuristic.set_known_vendors(erp.vendor_names())  # for documents parsed in this process; each worker process is given the same list
         self.origins = origins or {}
         self.approvals = approvals
         self.sequential = sequential  # one document at a time, in the order given: slower, but repeatable (which copy of a duplicate is blocked, what a recording replays)
@@ -77,7 +79,7 @@ class Pipeline:
         want_text = self.llm.available
         heavy = [p for p in paths if p.lower().endswith(".pdf")]  # CPU-heavy: layout analysis
         workers = self._plan_workers(len(heavy))
-        pool = ProcessPoolExecutor(workers, initializer=_warm) if workers > 1 and heavy else None
+        pool = ProcessPoolExecutor(workers, initializer=_warm, initargs=(self.erp.vendor_names(),)) if workers > 1 and heavy else None
         self.pool_workers = workers if pool else 1
         # Cheap formats (txt/csv/json/xml, ~0.05 ms each) are parsed inline: shipping them to a worker
         # would cost more in IPC than the parse itself.
@@ -98,18 +100,34 @@ class Pipeline:
                 return [await self._process(p, *futures[p]) for p in paths]
             return list(await asyncio.gather(*(self._process(p, *futures[p]) for p in paths)))
         finally:
+            if self.store is not None:
+                await asyncio.to_thread(self.store.flush)  # a batch is not over until everything in it is on disk
             if pool:
                 pool.shutdown(wait=True)
 
-    async def _comms(self, out: Outcome, action: str, write):
-        """Run a writing task; keep it in the trace only if it did something (a model call, or text produced)."""
-        mark = len(out.trace)
-        async with step(out, "Comms", action):
+    async def _write_together(self, out: Outcome) -> tuple[str | None, str | None]:
+        """Run the plain-English note and the vendor email at the same time. Each job keeps its own record of model use (a task's context is its own),
+        merged in a fixed order afterwards, so the trace shows exactly whose calls were whose and a replay is unaffected by which finished first."""
+        async def job(action: str, write):
+            mine: list = []
+            invoice_ledger.set(mine)
+            started = time.perf_counter()
             async with self.llm_sem:
                 text = await write(out)
-        if text is None and not out.trace[mark].get("events"):
-            out.trace.pop(mark)
-        return text
+            return action, text, mine, round((time.perf_counter() - started) * 1000, 2)
+
+        jobs = [("drafted vendor follow-up", self.comms.followup)]
+        if out.approval.decision is not Decision.APPROVE:
+            jobs.insert(0, ("explained in plain English", self.comms.explain))
+        parent, texts = invoice_ledger.get(), {}
+        for action, text, mine, ms in await asyncio.gather(*(job(a, w) for a, w in jobs)):
+            events = [event_dict(e) for e in mine]
+            if parent is not None:
+                parent.extend(mine)
+            if text is not None or events:  # in the trace only if it did something: a model call, or text produced
+                out.trace.append({"agent": "Comms", "action": action, "ms": ms, **({"events": events} if events else {})})
+            texts[action] = text
+        return texts.get("explained in plain English"), texts.get("drafted vendor follow-up")
 
     async def _process(self, path: str, parse_future: asyncio.Future, idx: int) -> Outcome:
         """One invoice start to finish. The finishing touches (what the model cost, the stored record) happen for every outcome,
@@ -123,7 +141,7 @@ class Pipeline:
                    "cost_ticks": sum(e[4] for e in ledger)} if ledger else {}
         if self.store is not None and (out.invoice is not None or out.error):
             try:
-                await asyncio.to_thread(self.store.save, out, bill_key(out.invoice, self.erp) if out.invoice else None)
+                self.store.save(out, bill_key(out.invoice, self.erp) if out.invoice else None)  # buffered: an append, not a database write
             except Exception:  # noqa: BLE001 - keeping a record must never fail an invoice
                 log.exception("could not store the outcome")
         return out
@@ -193,8 +211,9 @@ class Pipeline:
                 if res.submitted:
                     out.paid, out.payment_ref, out.payment_amount = True, res.ref, res.amount
                     payment_row = (inv.vendor or "", res.amount, res.ref)
-            if out.approval.decision is not Decision.APPROVE and self.llm.available:
-                out.explanation = await self._comms(out, "explained in plain English", self.comms.explain)
+            if self.llm.available:
+                # The note for the people who must act and the email to the vendor depend only on the decision, so they are written together.
+                out.explanation, out.followup = await self._write_together(out)
             request = None
             if out.approval.decision is Decision.ESCALATE and self.approvals is not None:
                 async with step(out, "Desk", "routed to a person"):
@@ -202,7 +221,8 @@ class Pipeline:
             status = pay_status or ("pending_approval" if request else out.approval.decision.value)
             await asyncio.to_thread(self.erp.settle_bill, key, status, out.approval.reasoning, payment_row)
             lap("settle")
-            out.followup = await self._comms(out, "drafted vendor follow-up", self.comms.followup) if self.llm.available else await self.comms.followup(out)
+            if not self.llm.available:
+                out.followup = await self.comms.followup(out)
         except Exception as exc:  # noqa: BLE001 - one bad invoice never stops the batch
             out.error = f"{type(exc).__name__}: {exc}"
             log.exception("unhandled error", extra={"trace": trace, "stage": "pipeline", "detail": out.error})

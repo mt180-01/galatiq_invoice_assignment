@@ -1,0 +1,48 @@
+From: accounting@techparts.com
+To: billing@acmecorp.com
+Subject: FW: Invoice INV-3805 for your review
+Date: July 16, 2026
+
+Hi team,
+
+Please see the attached invoice below. Let me know if you have any questions.
+
+Thanks,
+Sarah
+
+
+-----Original Message-----
+From: invoices@techparts.com
+Sent: Wednesday, July 15, 2026 4:12 PM
+To: accounting@techparts.com
+Subject: Invoice INV-3805
+
+> TechParts International
+> 123 Industrial Way, Suite 400
+> Tech City, TX 75001
+> VAT: US-987654321
+> 
+> Invoice
+> 
+> Invoice Number: INV-3805
+> Invoice Date: July 15, 2026
+> Due Date: August 29, 2026
+> 
+> Bill To:
+> Acme Corporation
+> 456 Corporate Blvd
+> Metropolis, NY 10001
+> 
+> Description                  Qty     Unit Price     Amount
+> 5 x WidgetA                 5       $250.00       $1,250.00
+> 
+> Subtotal:                                      $1,250.00
+> Tax (0%):                                           $0.00
+> Shipping:                                             $60.00
+> 
+> Total Due:                                    $1,310.00
+> 
+> Please remit payment in USD to our account.
+> Thank you for your business!
+> 
+> TechParts International

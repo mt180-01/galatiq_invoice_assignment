@@ -1,0 +1,35 @@
+Reliable Components Inc.
+123 Industrial Way
+Suite 400
+Detroit, MI 48201
+USA
+
+Bill From:
+Reliable Components Inc.
+123 Industrial Way
+Suite 400
+Detroit, MI 48201
+USA
+
+Bill To:
+Acme Manufacturing Co.
+456 Factory Lane
+Cleveland, OH 44101
+USA
+
+Invoice Number: INV-2630
+Invoice Date: June 9, 2026
+Due Date: July 9, 2026
+Currency: USD
+
+Description                          Qty     Unit Price     Line Total
+-------------------------------------------------------------------------
+WidgetA                               9       $250.00       $2,250.00
+
+Subtotal:                                                     $2,250.00
+Tax (0%):                                                           $0.00
+Shipping:                                                           $0.00
+-------------------------------------------------------------------------
+Total:                                                        $2,250.00
+
+Thank you for your business!

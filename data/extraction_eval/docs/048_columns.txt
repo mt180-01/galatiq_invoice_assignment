@@ -1,0 +1,24 @@
+TechParts International
+123 Industrial Way
+Tech City, TC 12345
+United States
+
+Invoice Number: INV-4176
+Invoice Date: June 1, 2026
+
+Bill To:
+Customer Company
+456 Business Ave
+Client City, CC 67890
+
+Description                  Qty     Unit Price     Amount
+------------------------------------------------------------
+WidgetA                      10      $250.00      $2,500.00
+
+Subtotal                                           $2,500.00
+Tax (8%)                                             $200.00
+Shipping                                             $120.00
+------------------------------------------------------------
+Total                                              $2,820.00
+
+Amount due in USD: $2,820.00

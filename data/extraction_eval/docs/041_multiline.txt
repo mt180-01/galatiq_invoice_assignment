@@ -1,0 +1,22 @@
+Vendor: Gadgets Co.
+Invoice Number: SI-1594
+Invoice Date: September 8, 2026
+
+Description                          SKU       Qty     Unit Price    Amount
+WidgetB - Premium model with
+extended battery life and
+wireless connectivity            WGT-B2      2       $490.00     $980.00
+WidgetA - Standard entry level
+version, includes basic
+accessories                      WGT-A1     10       $260.00    $2600.00
+GadgetX - Advanced multi-tool
+with 5-year warranty             GDG-X3      3       $750.00    $2250.00
+
+Subtotal                                                     $5830.00
+Shipping                                                     $0.00
+Tax (5%)                                                     $291.50
+
+Total Due                                                    $6121.50
+
+Notes:
+Thank you for your business. All sales are final. Includes 10% volume discount applied to GadgetX line. Payment terms net 30. Please remit in USD.
