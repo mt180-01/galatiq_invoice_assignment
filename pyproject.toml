@@ -1,0 +1,22 @@
+[tool.ruff]
+line-length = 160
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "UP"]
+ignore = [
+    "E501",   # long lines are allowed (line-length is advisory)
+    "E402",   # scripts add the repo root to sys.path before importing it
+    "E731",   # short lambdas are used as callbacks
+    "B905",   # zip() over equal-length sequences
+    "UP031",  # %-formatting in logging calls
+    "UP042",  # plain (str, Enum) is fine here
+    "E741",   # `l` for a line in short comprehensions
+    "E702",   # compact one-line statements in the small command-line tools
+]
+
+[tool.mypy]
+ignore_missing_imports = true
+check_untyped_defs = false
+warn_unused_ignores = false
+# The code is typed where it helps readers; mypy runs as a smoke check, not a gate.

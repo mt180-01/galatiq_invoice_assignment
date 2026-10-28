@@ -164,7 +164,7 @@ async def extract(text: str, baseline: Invoice, llm: LLM, gate: bool = False) ->
         return baseline
     feedback = ""
     text = compact(text) if COMPACT_PROMPTS else text
-    for attempt in range(1, MAX_ATTEMPTS + 1):
+    for attempt in range(1, MAX_ATTEMPTS + 1):  # noqa: B007 - read after the loop
         try:
             with as_agent("intake"):
                 inv = _build(await llm.chat_json(SYSTEM, f"Invoice text:\n{text}\n{feedback}"))

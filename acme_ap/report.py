@@ -41,7 +41,6 @@ def show(outcomes: list[Outcome]) -> None:
 
 def payment_summary(db: str) -> None:
     """What the treasury side looks like after this run (read from the payment ledger)."""
-    from decimal import Decimal
     erp = MockNetSuite(db, keep_ledger=True)
     rows = PaymentService(db, erp, MockBank(db + ".bank"), reset=False).rows()
     if not rows:

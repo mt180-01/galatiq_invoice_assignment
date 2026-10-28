@@ -3,7 +3,12 @@
     python scripts/e2e_check.py            # this checkout
     python scripts/e2e_check.py /path/to/other/checkout     (e.g. a fresh clone with its own .venv)
 Nothing in the checkout is modified (databases and outboxes go to a temp folder). Needs `tesseract` for the scanned-PDF step."""
-import json, os, re, subprocess, sys, tempfile
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
 
 REPO = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent.parent
@@ -124,7 +129,11 @@ check("every PAID invoice had a model second opinion before the money moved",
       all(any(e["kind"] == "model" for t in o["trace"] if t["agent"] == "Reviewer" for e in t.get("events", [])) for o in sres if o["status"] == "PAID"))
 
 # 4d. the web interface, over real HTTP, as a separate process
-import socket, time, urllib.parse, urllib.request, urllib.error
+import socket
+import time
+import urllib.parse
+import urllib.request
+import urllib.error
 with socket.socket() as sk:
     sk.bind(("127.0.0.1", 0)); port = sk.getsockname()[1]
 ui = subprocess.Popen([PY, "main.py", "serve", "--demo", "--db", str(tmp / "ui.db"), "--port", str(port)], cwd=REPO, env=ENV, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

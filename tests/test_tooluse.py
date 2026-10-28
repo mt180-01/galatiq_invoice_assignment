@@ -10,8 +10,8 @@ import pytest
 from acme_ap.agents import approval
 from acme_ap.agents.tools import reviewer_tools
 from acme_ap.erp import MockNetSuite
-from acme_ap.llm import GrokClient, LLM, LLMUnavailable, Meter, Tool, as_agent, make_llm, run_tool, structured
-from acme_ap.models import Decision, Finding, Invoice, LineItem, Severity
+from acme_ap.llm import GrokClient, LLM, LLMUnavailable, Tool, as_agent, make_llm, run_tool, structured
+from acme_ap.models import Decision, Finding, Invoice, Severity
 from acme_ap.pipeline import Pipeline
 from tests.test_pipeline import EXPECTED, by_number
 

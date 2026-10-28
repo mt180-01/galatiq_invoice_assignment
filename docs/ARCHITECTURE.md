@@ -390,3 +390,5 @@ model answers, and the sample is small and mostly clean.
 - OCR needs a local `tesseract` binary; without it a scanned PDF is held as unreadable. On degraded scans the model gets 25/30 right (rules 19/30); the rest go to a person. The extraction corpus is model-written, not real supplier mail.
 - Email intake reads `.eml` files; there is no live mailbox connection (IMAP/Graph), no sending, no reply parsing, and no OCR for scanned images.
 - No authentication or real NetSuite connectivity.
+- The agents run in a fixed order. None decides what runs next or hands work back to another (for example, the Reviewer cannot ask Intake for a re-read); that would be the next step in agentic depth.
+- PyMuPDF is pinned below 2.0: 2.x installs onnxruntime and layout models this system does not use (+250 MB, twice the start-up time on a PDF).

@@ -174,7 +174,6 @@ def explain_failures(manifest, invoices) -> list[str]:
         inv, ok = invoices[m["id"]], compare(m["truth"], invoices[m["id"]])
         for k in CRITICAL + ["date", "due_date"]:
             if not ok[k]:
-                key = f"{k} ({m['style']})"
                 causes[(k, m["style"])] += 1
                 examples.setdefault((k, m["style"]), (m["file"], getattr(inv, {"vendor": "vendor", "invoice_number": "invoice_number", "date": "date", "due_date": "due_date", "total": "total", "items": "line_items"}[k])))
     lines = []

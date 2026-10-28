@@ -10,7 +10,7 @@ from acme_ap.erp import MockNetSuite
 from acme_ap.ingestion import heuristic, parse_file
 from acme_ap.ingestion.parsing import parse_date, parse_money
 from acme_ap.llm import GrokClient, OfflineLLM
-from acme_ap.models import Approval, Decision, Finding, Invoice, LineItem, Severity
+from acme_ap.models import Decision, Finding, Invoice, LineItem, Severity
 from acme_ap.pipeline import Pipeline
 
 DATA = Path(__file__).resolve().parent.parent / "data" / "invoices"

@@ -2,7 +2,6 @@
 Results are kept small, because every byte comes back to us as tokens."""
 from __future__ import annotations
 
-from decimal import Decimal
 
 from ..erp import ErpAdapter
 from ..llm import Tool

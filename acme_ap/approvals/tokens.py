@@ -13,7 +13,7 @@ import base64
 import hashlib
 import hmac
 import json
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from decimal import Decimal
 
 from ..models import Invoice
@@ -61,4 +61,4 @@ def read_token(secret: bytes, token: str, now: datetime) -> dict:
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)

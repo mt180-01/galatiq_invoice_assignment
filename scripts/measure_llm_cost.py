@@ -43,7 +43,7 @@ def run(policy: str, compact: bool) -> tuple[Meter, dict[str, str]]:
 
 def main() -> None:
     rows = [("always, raw prompts", *run("always", False)), ("always, compact prompts", *run("always", True)), ("gated (default)", *run("gated", True))]
-    base_calls, base_tokens = rows[0][1].total_calls, sum(rows[0][1].tokens_in.values()) + sum(rows[0][1].tokens_out.values())
+    base_tokens = sum(rows[0][1].tokens_in.values()) + sum(rows[0][1].tokens_out.values())
     print(f"{len(CORPUS)} documents\n")
     print(f"{'policy':<26}{'calls':>7}{'intake':>8}{'reviewer':>9}{'critic':>7}{'resolver':>9}{'comms':>7}{'tokens in':>11}{'tokens out':>11}{'total':>9}{'vs original':>13}")
     for name, m, _ in rows:

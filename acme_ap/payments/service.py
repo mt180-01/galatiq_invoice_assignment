@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import Callable
+from collections.abc import Callable
 
 from ..erp import ErpAdapter
 from ..erp.mock_netsuite import SEED_VENDORS, norm

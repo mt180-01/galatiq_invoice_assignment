@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from acme_ap.erp import MockNetSuite
-from acme_ap.ingestion import heuristic, llm_extract
+from acme_ap.ingestion import llm_extract
 from acme_ap.ingestion.heuristic import NON_ITEM, _clean_name, extract, join_label_lines, set_known_vendors, vendor_from_context
 from acme_ap.ingestion.parsing import normalize_invoice_number
 from acme_ap.llm import LLM, Meter

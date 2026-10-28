@@ -12,7 +12,7 @@ import sqlite3
 import threading
 import time
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 from typing import Protocol

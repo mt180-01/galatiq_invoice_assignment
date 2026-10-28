@@ -1,6 +1,5 @@
 """Regressions for the problems found in review: the ledger's memory, the duplicate rules, worker planning, Windows, approvals' identity, stock."""
 import asyncio
-import builtins
 import json
 import os
 import sqlite3
@@ -64,7 +63,7 @@ def test_a_benchmark_and_a_demo_server_never_touch_the_real_ledger(tmp_path):
 # ---- 5. the worker planner is live ---------------------------------------------------------------------
 def test_a_few_pdfs_do_not_start_a_process_pool(tmp_path, monkeypatch):
     started = []
-    monkeypatch.setattr("acme_ap.pipeline.ProcessPoolExecutor", lambda *a, **k: started.append(a) or (_ for _ in ()).throw(AssertionError("pool started")))
+    monkeypatch.setattr("acme_ap.parsepool.ProcessPoolExecutor", lambda *a, **k: started.append(a) or (_ for _ in ()).throw(AssertionError("pool started")))
     erp = MockNetSuite(tmp_path / "w.db")
     pipe = Pipeline(erp, OfflineLLM())                                                   # no explicit workers: auto
     outs = asyncio.run(pipe.run([str(p) for p in sorted(INV.glob("*.pdf"))]))

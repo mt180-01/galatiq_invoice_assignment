@@ -16,7 +16,6 @@ from acme_ap.erp import MockNetSuite
 from acme_ap.llm import LLM, Meter, make_llm
 from acme_ap.models import Approval, Decision, Finding, Invoice, LineItem, Outcome, Severity
 from acme_ap.pipeline import Pipeline
-from acme_ap.report import show_trace
 
 ROOT = Path(__file__).resolve().parent.parent
 SELF = ROOT / "data" / "self_correction"

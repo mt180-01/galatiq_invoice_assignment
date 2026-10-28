@@ -2,7 +2,6 @@ import asyncio
 from decimal import Decimal
 from pathlib import Path
 
-import pymupdf
 import pytest
 
 from acme_ap import intake, outreach
@@ -53,7 +52,7 @@ def test_cii_invoice_parsed():
 
 def test_xml_entity_bomb_is_rejected():
     bomb = '<?xml version="1.0"?><!DOCTYPE x [<!ENTITY a "aaaa"><!ENTITY b "&a;&a;&a;&a;">]><invoice>&b;</invoice>'
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):  # defusedxml refuses entity declarations
         structured.from_xml(bomb)
 
 

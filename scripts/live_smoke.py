@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from acme_ap.agents import approval  # noqa: E402
-from acme_ap.ingestion import heuristic, llm_extract, parse_file  # noqa: E402
+from acme_ap.ingestion import llm_extract, parse_file  # noqa: E402
 from acme_ap.llm import GrokClient, LLMUnavailable, Tool, as_agent, read_api_key, structured  # noqa: E402
 
 KEY = read_api_key()

@@ -3,8 +3,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import contextlib
-import io
 import json
 import logging
 import os
@@ -147,7 +145,8 @@ def main() -> None:
         for name in ("acme.decision", "acme.payment"):
             logging.getLogger(name).setLevel(logging.ERROR)
         try:
-            import io, contextlib
+            import io
+            import contextlib
             rows = []
             for label, w in (("serial (1 process)", 1), (f"parallel ({ncpu} workers)", ncpu), ("auto (PDFs to pool if it pays)", None)):
                 with contextlib.redirect_stdout(io.StringIO()):  # silence mock bank prints

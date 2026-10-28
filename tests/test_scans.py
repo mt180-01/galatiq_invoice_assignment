@@ -132,6 +132,5 @@ def test_a_scan_with_a_blank_second_page_still_reads_the_first(tmp_path):
     doc.new_page()                                                                                    # a blank back side, as scanners produce
     out = tmp_path / "two_pages.pdf"
     doc.save(out)
-    from acme_ap.ingestion import parse_file
     inv, _ = parse_file(str(out))
     assert inv.invoice_number == "INV-1011" and any("ocr" in w for w in inv.parse_warnings)

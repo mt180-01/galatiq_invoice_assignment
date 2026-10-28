@@ -2,7 +2,7 @@
 
 Acme Corp loses about **$2M a year** to manual invoice processing: a 30% error rate, five-day delays, frustrated stakeholders. This is a working prototype that
 reads invoices in any format, checks them against the ERP, gets the right person's decision where one is needed, pays on the due date, and tells everyone what
-happened. Six agents with distinct jobs; Grok does the reasoning where reasoning helps, and plain rules do the work where a mistake costs money. Built for the case in
+happened. Six agents with distinct jobs: Intake, Validation, Reviewer and Comms use Grok where reasoning helps (with tools and self-checks); Desk and Payment are deliberately rules-only, because a mistake there costs money. The order of the stages is fixed; the agents do not plan or delegate to each other. Built for the case in
 [docs/ASSIGNMENT.md](docs/ASSIGNMENT.md).
 
 <p align="center"><img src="docs/img/dashboard.png" alt="Dashboard: invoices, who is waiting, payments" width="720"></p>
@@ -96,14 +96,14 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt      # set up
 .venv/bin/python main.py --replay-llm docs/live_runs/provided-invoices.cassette.jsonl --invoice_path=data/invoices   # a real Grok run, replayed offline for free
 .venv/bin/python main.py --trace --invoice_path=data/self_correction    # watch the agents work
 .venv/bin/python main.py --grok --invoice_path=data/invoices            # real Grok: billed per token, capped per run
-make test        make e2e        make ui
+make test        make lint        make e2e        make ui
 ```
 
 **Cost safety.** Everything above except `--grok` and `--record-llm` is free. They use the real xAI API, billed per token; they need `XAI_API_KEY` or a key saved alone in
 `~/.config/acme_ap/xai_key` (`chmod 600`), and a key never gets used just because it exists. Each run stops asking the model at `XAI_BUDGET_USD` (default $0.25) and the report shows the exact
 amount xAI says it charged. The key is never written to the repo, logs or outputs; `tests/test_no_secrets.py` fails the build if one is committed.
 
-More: `approve.py` and `pay.py` (approver and treasury command lines), `main.py agents` (the roster), `--bench 20000`, `scripts/evaluate.py`, `scripts/measure_quality.py`, `scripts/stress_extraction.py`.
+Contributing and a map of the code: [CONTRIBUTING.md](CONTRIBUTING.md). More: `approve.py` and `pay.py` (approver and treasury command lines), `main.py agents` (the roster), `--bench 20000`, `scripts/evaluate.py`, `scripts/measure_quality.py`, `scripts/stress_extraction.py`.
 
 ## The brief's evaluation criteria
 
@@ -124,7 +124,7 @@ More: `approve.py` and `pay.py` (approver and treasury command lines), `main.py 
 | `main.py` | command line: a batch, `demo`, `serve`, `agents`, `--bench`, `--record-llm` / `--replay-llm` |
 | `acme_ap/web.py`, `store.py` | the web interface (standard library only) and the record it reads |
 | `acme_ap/agents/` | `team.py` (the six agents), `validation`, `resolver`, `approval`, `comms`, `tools` |
-| `acme_ap/pipeline.py` | the flow per invoice through the agents; CPU and I/O scheduling |
+| `acme_ap/pipeline.py`, `parsepool.py` | the stages one invoice goes through (ingest, validate, decide, pay, notify, settle); reading documents on a process pool |
 | `acme_ap/llm.py`, `cassette.py`, `sim_llm.py` | Grok client (tools, schema output, retries, cache, budget), record/replay, and the local stand-in |
 | `acme_ap/ingestion/` | any file into an `Invoice`: PDF/OCR, JSON/XML/UBL/CSV, regex and Grok extraction |
 | `acme_ap/approvals/`, `payments/`, `erp/` | routing and signed links; scheduling, bank adapter, reconciliation; the ERP interface and its SQLite mock |

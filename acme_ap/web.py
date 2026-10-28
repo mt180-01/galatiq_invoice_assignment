@@ -17,7 +17,6 @@ import urllib.parse
 from email import policy
 from email.parser import BytesParser
 from types import SimpleNamespace
-from datetime import datetime
 from decimal import Decimal
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path

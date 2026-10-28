@@ -1,6 +1,5 @@
 """Nothing here may ever spend real money by accident."""
 import asyncio
-import json
 import os
 import subprocess
 import sys
@@ -9,7 +8,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from acme_ap.llm import GrokClient, LLMUnavailable, Meter, as_agent, make_llm
+from acme_ap.llm import GrokClient, LLMUnavailable, as_agent, make_llm
 from acme_ap.metrics import llm_usage
 from acme_ap.models import Outcome
 

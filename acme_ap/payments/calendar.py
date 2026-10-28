@@ -3,7 +3,7 @@ Banks do not move money on other days, so ACH lead time and settlement are count
 from __future__ import annotations
 
 from datetime import date, timedelta
-from functools import lru_cache
+from functools import cache
 
 
 def _nth_weekday(year: int, month: int, weekday: int, n: int) -> date:
@@ -16,7 +16,7 @@ def _last_monday(year: int, month: int) -> date:
     return last - timedelta(days=last.weekday())
 
 
-@lru_cache(maxsize=None)
+@cache
 def holidays(year: int) -> frozenset[date]:
     fixed = [date(year, 1, 1), date(year, 6, 19), date(year, 7, 4), date(year, 11, 11), date(year, 12, 25)]
     observed = {d - timedelta(days=1) if d.weekday() == 5 else d + timedelta(days=1) if d.weekday() == 6 else d for d in fixed}
