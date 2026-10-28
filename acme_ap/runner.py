@@ -30,15 +30,16 @@ def cpu_seconds() -> float:
 
 
 async def run_batch(paths: list[str], args: argparse.Namespace, workers: int | None, origins=None) -> tuple[list[Outcome], float, float]:
-    erp = MockNetSuite(args.db, keep_ledger=args.keep_ledger, stock_policy=getattr(args, "stock_policy", None))
-    payments = PaymentService(args.db, erp, MockBank(args.db + ".bank", reset=not args.keep_ledger), reset=not args.keep_ledger)
-    approvals = ApprovalService(args.db, erp, reset=not args.keep_ledger, payments=payments)
+    keep = getattr(args, "keep_ledger", True)  # a caller that says nothing keeps the ledger
+    erp = MockNetSuite(args.db, keep_ledger=keep, stock_policy=getattr(args, "stock_policy", None))
+    payments = PaymentService(args.db, erp, MockBank(args.db + ".bank", reset=not keep), reset=not keep)
+    approvals = ApprovalService(args.db, erp, reset=not keep, payments=payments)
     llm = make_llm(args.offline, cache_path=None if args.offline else args.db + ".llmcache", simulate=getattr(args, "simulate", False), live=getattr(args, "grok", False),
                    record_to=getattr(args, "record_llm", None), replay_from=getattr(args, "replay_llm", None))
     before = cpu_seconds()
     t0 = time.perf_counter()
     outcomes = await Pipeline(erp, llm, workers=workers, llm_concurrency=args.llm_concurrency, origins=origins,
-                                approvals=approvals, payments=payments, store=None if getattr(args, "no_store", False) else OutcomeStore(args.db, reset=not args.keep_ledger),
+                                approvals=approvals, payments=payments, store=None if getattr(args, "no_store", False) else OutcomeStore(args.db, reset=not keep),
                               llm_policy=getattr(args, "llm_policy", "gated"), sequential=getattr(args, "sequential", False)).run(paths)
     wall = time.perf_counter() - t0
     cpu = cpu_seconds() - before

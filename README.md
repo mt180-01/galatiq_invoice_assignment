@@ -28,7 +28,7 @@ The command line is first-class too: [`docs/img/demo.svg`](docs/img/demo.svg) is
 | Robustness to garbage | 2,000 randomly corrupted invoices: **0 approved with a wrong value** (a stray "see invoice 31337" once got through; found and fixed) | `scripts/stress_extraction.py` |
 | Speed | a clean invoice spends about 10-15 ms in the system, against "5 days" in the brief; about 2,200 documents/s on 14 cores | `main.py --bench`, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §4 |
 | Waiting on a person | never silent: reminder at 24 h, escalation at 48 h, expiry at 5 days | `approve.py tick`, `make e2e` |
-| Tests | **339 tests** plus a **60-check end-to-end run** from a fresh clone; a test fails the build if a credential is ever committed | `make test`, `make e2e` |
+| Tests | **345 tests** plus a **60-check end-to-end run** from a fresh clone; a test fails the build if a credential is ever committed | `make test`, `make e2e` |
 
 ## Business impact
 
@@ -52,7 +52,7 @@ the cost side is measured.
 3. **A custom orchestrator, not LangGraph/CrewAI.** CPU-bound PDF work and I/O-bound model and bank calls need different scheduling, and six agents with charters did not need a framework. *Trade-off:* more code of our own.
 4. **Free by default, live on request, capped.** A local stand-in model (labelled as such) runs the same protocol; `--grok` is opt-in with a per-run budget; the default model is a plain one, not a reasoning one, because a
    reasoning model was ~3x the cost and several times slower for this work (measured).
-5. **The ledger is the system's memory and it is kept between runs**, so nothing is ever paid twice, with idempotency keys on every payment. Duplicates use the vendor's master name; a changed resubmission of a rejected invoice is allowed.
+5. **The ledger is the system's memory and every way in keeps it** (the command line, the web page, the demo, and the classes' own defaults; only `--reset` or a scratch database made for one run starts empty), so nothing is ever paid twice, with idempotency keys on every payment. Duplicates use the vendor's master name; a changed resubmission of a rejected invoice is allowed.
 6. **Stock is a per-invoice cap by default** (the brief's own table lists three invoices as "within stock" that together exceed it); `--stock-policy reserve` is the cumulative alternative, and `--stock-policy decrement` takes the units off the shelf for good when an invoice is paid (kept between runs; `main.py stock` shows what is left).
 7. **Payments are scheduled, not instant**: due date minus bank lead time (business days), early-pay discounts captured, an account on the invoice that differs from the one on file is held, new accounts need two people.
 8. **Approvals are signed links issued to one mailbox**, single-use, expiring, bound to the invoice as shown, with the signing key outside the database. *Trade-off:* a forwarded link acts as its addressee; real use needs email delivery and SSO.

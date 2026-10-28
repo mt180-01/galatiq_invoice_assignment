@@ -96,7 +96,7 @@ def _day(value: str | None) -> date | None:
 
 
 class PaymentService:
-    def __init__(self, db_path: str | Path, erp: ErpAdapter, bank: BankAdapter, reset: bool = True,
+    def __init__(self, db_path: str | Path, erp: ErpAdapter, bank: BankAdapter, reset: bool = False,
                  today: Callable[[], date] = date.today, sleep: Callable[[float], None] = time.sleep,
                  daily_limit: Decimal = DAILY_LIMIT):
         self.erp, self.bank, self.today, self._sleep, self.daily_limit = erp, bank, today, sleep, daily_limit

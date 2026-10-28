@@ -69,7 +69,7 @@ class Result:
 
 
 class ApprovalService:
-    def __init__(self, db_path: str | Path, erp: ErpAdapter, reset: bool = True, payments=None):
+    def __init__(self, db_path: str | Path, erp: ErpAdapter, reset: bool = False, payments=None):
         self.erp = erp
         self.payments = payments or default_payments(erp)
         self._lock = threading.RLock()

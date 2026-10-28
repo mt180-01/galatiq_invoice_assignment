@@ -47,10 +47,12 @@ def norm(s: str) -> str:
 class MockNetSuite:
     """Thread-safe: one connection per thread (WAL mode), writes serialised by a lock."""
 
-    def __init__(self, path: str | Path = "inventory.db", keep_ledger: bool = False, stock_policy: str | None = None):
+    def __init__(self, path: str | Path = "inventory.db", keep_ledger: bool = True, stock_policy: str | None = None):
         """stock_policy: 'cap' (default) checks each invoice against stock on hand; 'reserve' also counts what earlier approved invoices have
         already claimed. The choice is stored with the database, so every later tool (approve.py, pay.py, the web interface) follows it."""
         self.path = str(path)
+        # keep_ledger=True is the default for every caller: opening the database must never forget what was paid. Only an explicit "do not keep" (`--reset`,
+        # a scratch database made for one run) starts from an empty ledger.
         self.ledger_reset = not keep_ledger
         self._local = threading.local()
         self._write = threading.Lock()

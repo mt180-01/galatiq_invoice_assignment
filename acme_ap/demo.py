@@ -34,7 +34,7 @@ def demo() -> None:
         (src / "invoice_3003.json").write_text(json.dumps(dict(one, invoice_number="INV-3003", payment_terms="2/10 Net 30",
                                                                due_date=(today + timedelta(days=30)).isoformat())))  # discount
         db = str(root / "demo.db")
-        args = SimpleNamespace(db=db, keep_ledger=False, llm_concurrency=8, offline=False, simulate=True)
+        args = SimpleNamespace(db=db, keep_ledger=True, llm_concurrency=8, offline=False, simulate=True)  # a new temporary folder: empty by construction, so nothing needs wiping
         step = lambda n, text: console.print(f"\n[bold cyan]Step {n}.[/] {text}")  # noqa: E731
 
         step(1, "Invoices arrive in all sorts of formats; each is read, checked against the ERP and routed.")

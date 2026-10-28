@@ -28,7 +28,7 @@ def test_stock_is_kept_between_runs_and_restored_by_reset(tmp_path):
     assert on_hand(erp)["on_hand"] == 5
     again = MockNetSuite(tmp_path / "s.db", keep_ledger=True)                  # the next run: nothing re-seeded, nothing paid twice
     assert on_hand(again)["on_hand"] == 5 and again.stock_policy == "decrement"
-    fresh = MockNetSuite(tmp_path / "s.db")                                    # --reset: an empty ledger starts from the opening stock
+    fresh = MockNetSuite(tmp_path / "s.db", keep_ledger=False)                                    # --reset: an empty ledger starts from the opening stock
     assert on_hand(fresh)["on_hand"] == 15
 
 

@@ -67,13 +67,16 @@ def serve_ui(argv: list[str]) -> None:
     ap.add_argument("--db", default=None, help="default: inventory.db, or ui_demo.db with --demo (so a demo never overwrites your ledger)")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--grok", action="store_true", help="process uploads with the real Grok API (billed, capped per run); default is the free local model")
-    ap.add_argument("--demo", action="store_true", help="first process the sample invoices (provided, self-correction, approval demo) into --db with the free local model; replaces what --db holds")
+    ap.add_argument("--demo", action="store_true", help="first process the sample invoices (provided, self-correction, approval demo) into --db with the free local model. The default demo file is recreated each time; any other --db is kept and only added to")
     a = ap.parse_args(argv)
     a.db = a.db or ("ui_demo.db" if a.demo else "inventory.db")
     if a.demo:
         from types import SimpleNamespace
         paths = collect("data/invoices") + collect("data/self_correction") + collect("data/approvals_demo")
-        args = SimpleNamespace(db=a.db, keep_ledger=False, llm_concurrency=8, offline=False, simulate=True, grok=False)
+        if a.db == "ui_demo.db":  # our own scratch file: every demo starts fresh. Any other database is somebody's ledger and is only added to
+            for leftover in Path(".").glob("ui_demo.db*"):
+                leftover.unlink()
+        args = SimpleNamespace(db=a.db, keep_ledger=True, llm_concurrency=8, offline=False, simulate=True, grok=False)
         outcomes, _, _ = asyncio.run(run_batch(paths, args, 1))
         console.print(f"[dim]loaded {len(outcomes)} sample documents into {a.db}[/]")
     serve(a.db, port=a.port, grok=a.grok)
