@@ -14,6 +14,7 @@ import re
 
 from pydantic import BaseModel, Field
 
+from ..approvals.routing import route
 from ..llm import LLM, LLMUnavailable, as_agent, structured
 from ..models import Outcome
 from ..outreach import followup_context, render_followup
@@ -91,8 +92,11 @@ class Comms:
         inv, appr = outcome.invoice, outcome.approval
         if not self.llm.available or inv is None or appr is None or outcome.error or appr.decision.value == "approve" or outcome.status == "DUPLICATE":
             return None
+        routed = route(outcome)  # who will have to decide, and why, is known from the rules before the Desk agent runs
+        reasons = [f.message for f in outcome.findings if f.severity.value != "warn"][:6] or (routed.reasons if routed else [])
+        owner = outcome.awaiting or (routed.role if routed and routed.approvable else None)
         facts = {"invoice": inv.invoice_number, "vendor": inv.vendor, "total": str(inv.total), "currency": inv.currency, "decision": appr.decision.value,
-                 "findings": [f.message for f in outcome.findings if f.severity.value != "warn"][:6], **({"next_owner": outcome.awaiting} if outcome.awaiting else {})}
+                 "findings": reasons, **({"next_owner": owner} if owner else {})}
         return await self._ask(
             "You write a plain-English note for a busy finance person about an invoice that was rejected or needs their decision. In at most three "
             "sentences say what the invoice is, what the checks found, and what to do next. Use ONLY the facts given; add no numbers, names or "

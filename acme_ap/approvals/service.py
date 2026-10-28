@@ -7,6 +7,7 @@ the mail system and expose `respond` behind an authenticated HTTPS endpoint.
 from __future__ import annotations
 
 import json
+import os
 import secrets
 import sqlite3
 import threading
@@ -27,7 +28,7 @@ ESCALATE_AFTER = timedelta(hours=48)
 EXPIRE_AFTER = timedelta(days=5)
 # Facts a person cannot waive by clicking approve, even when validation downgraded them (e.g. OCR-sourced invoices).
 HARD_FACTS = {"unknown_item", "out_of_stock", "insufficient_stock", "vendor_blocked", "invalid_quantity", "negative_total", "zero_total", "fraud_indicators", "bank_account_changed"}
-LINK_BASE = "https://ap.acmecorp.example/decide?t="  # fictional: no server exists in this prototype
+LINK_BASE = os.environ.get("ACME_BASE_URL", "http://127.0.0.1:8765").rstrip("/") + "/decide?t="  # the local web interface (`python main.py serve`)
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
@@ -232,6 +233,18 @@ class ApprovalService:
                         "next": nxt[0], "next_in_hours": max(0.0, nxt[1].total_seconds() / 3600),
                         "escalated_from": row["escalated_from"]})
         return out
+
+    def inspect(self, token: str, now: datetime | None = None) -> dict:
+        """Everything the approval page shows for a valid, unexpired link. Raises TokenError otherwise."""
+        now = now or utcnow()
+        data = read_token(self._secret, token, now)
+        row = self._row(data["r"])
+        if row is None:
+            raise TokenError("unknown request")
+        return {"id": row["id"], "action": data["a"], "status": row["status"], "role": row["role"], "reasons": json.loads(row["reasons"]),
+                "invoice": Invoice.model_validate_json(row["invoice_json"]), "outcome": Outcome.model_validate_json(row["outcome_json"]),
+                "approvers": sorted(authorized(row["role"], row["escalated_from"])), "primary": DIRECTORY[row["role"]]["email"], "tokens": self.tokens_for(row["id"], now),
+                "decided_by": row["decided_by"], "comment": row["comment"]}
 
     def tokens_for(self, rid: int, now: datetime | None = None) -> dict[str, str]:
         row = self._row(rid)

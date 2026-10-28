@@ -94,6 +94,37 @@ check("--trace shows tool calls, corrections and conclusions", all(s in out for 
 check("every PAID invoice had a model second opinion before the money moved",
       all(any(e["kind"] == "model" for t in o["trace"] if t["agent"] == "Reviewer" for e in t.get("events", [])) for o in sres if o["status"] == "PAID"))
 
+# 4d. the web interface, over real HTTP, as a separate process
+import socket, time, urllib.parse, urllib.request, urllib.error
+with socket.socket() as sk:
+    sk.bind(("127.0.0.1", 0)); port = sk.getsockname()[1]
+ui = subprocess.Popen([PY, "main.py", "serve", "--demo", "--db", str(tmp / "ui.db"), "--port", str(port)], cwd=REPO, env=ENV, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+try:
+    base, page = f"http://127.0.0.1:{port}", ""
+    for _ in range(120):
+        try:
+            page = urllib.request.urlopen(base + "/", timeout=2).read().decode(); break
+        except OSError:
+            time.sleep(0.5)
+    check("web interface starts and the dashboard shows the invoices, the queue and payments", "Waiting for a decision" in page and "INV-3001" in page and "Payments" in page and "duplicates blocked" in page)
+    link = re.search(r'href="(/decide\?t=[^"]+)"[^>]*>INV-3001', page).group(1).replace("&amp;", "&")
+    decision = urllib.request.urlopen(base + link, timeout=10).read().decode()
+    check("the approval link opens a real page (not a made-up domain) with the summary and buttons", "Approve and pay" in decision and "Why this needs you" in decision and "In short" in decision)
+    form = dict(zip(("t_approve", "t_reject"), re.findall(r'name="t_(?:approve|reject)" value="([^"]+)"', decision)))
+    def post(**f):
+        try:
+            return urllib.request.urlopen(urllib.request.Request(base + "/decide", data=urllib.parse.urlencode(f).encode(), method="POST"), timeout=10).read().decode()
+        except urllib.error.HTTPError as err:
+            return err.read().decode()
+    check("a stranger cannot decide through the page", "not authorized" in post(decision="approve", who="attacker@evil.example", **form))
+    check("the VP approves in the browser flow and the invoice is paid", "paid" in post(decision="approve", who="vp-finance@acmecorp.example", **form))
+    check("a second click is refused", "already approved" in post(decision="approve", who="vp-finance@acmecorp.example", **form))
+    inv_id = re.search(r'href="/invoice/(\d+)">INV-3201<', urllib.request.urlopen(base + "/", timeout=10).read().decode()).group(1)
+    detail = urllib.request.urlopen(base + f"/invoice/{inv_id}", timeout=10).read().decode()
+    check("the invoice page shows the agents' trace with the tool call and the correction", "What each agent did" in detail and "search_items" in detail and "corrected" in detail)
+finally:
+    ui.terminate()
+
 # 5. human-in-the-loop: second run on the approval demo (adds the over-limit and changed-bank-account invoices)
 db2 = str(tmp / "hitl.db")
 rc, out = py("main.py", "--offline", "--db", db2, "--outbox", outbox + "2", "--invoice_path", "data/approvals_demo")

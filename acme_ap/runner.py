@@ -14,6 +14,7 @@ from .models import Outcome
 from .notices import digest, draft_notice
 from .payments import MockBank, PaymentService
 from .pipeline import Pipeline
+from .store import OutcomeStore
 
 
 async def run_batch(paths: list[str], args: argparse.Namespace, workers: int | None, origins=None) -> tuple[list[Outcome], float, float]:
@@ -26,7 +27,7 @@ async def run_batch(paths: list[str], args: argparse.Namespace, workers: int | N
     kids_before = k.ru_utime + k.ru_stime
     t0 = time.perf_counter()
     outcomes = await Pipeline(erp, llm, workers=workers, llm_concurrency=args.llm_concurrency, origins=origins,
-                                approvals=approvals, payments=payments,
+                                approvals=approvals, payments=payments, store=None if getattr(args, "no_store", False) else OutcomeStore(args.db, reset=not args.keep_ledger),
                               llm_policy=getattr(args, "llm_policy", "gated")).run(paths)
     wall = time.perf_counter() - t0
     own = resource.getrusage(resource.RUSAGE_SELF)

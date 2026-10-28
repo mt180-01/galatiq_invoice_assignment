@@ -61,6 +61,24 @@ def make_bench_corpus(src: list[str], n: int, pdf_share: float) -> tuple[list[st
     return out, tmp
 
 
+def serve_ui(argv: list[str]) -> None:
+    """`python main.py serve [--db inventory.db] [--port 8765] [--demo]`: the local web interface."""
+    from acme_ap.web import serve
+
+    ap = argparse.ArgumentParser(prog="main.py serve")
+    ap.add_argument("--db", default="inventory.db")
+    ap.add_argument("--port", type=int, default=8765)
+    ap.add_argument("--demo", action="store_true", help="first process the sample invoices (provided, self-correction, approval demo) into --db with the free local model")
+    a = ap.parse_args(argv)
+    if a.demo:
+        from types import SimpleNamespace
+        paths = collect("data/invoices") + collect("data/self_correction") + collect("data/approvals_demo")
+        args = SimpleNamespace(db=a.db, keep_ledger=False, llm_concurrency=8, offline=False, simulate=True, grok=False)
+        outcomes, _, _ = asyncio.run(run_batch(paths, args, 1))
+        console.print(f"[dim]loaded {len(outcomes)} sample documents into {a.db}[/]")
+    serve(a.db, port=a.port)
+
+
 def agents() -> None:
     """`python main.py agents`: who does what, and when each may spend model tokens."""
     from acme_ap.agents.team import CHARTERS
@@ -78,6 +96,8 @@ def main() -> None:
         return demo()
     if len(sys.argv) > 1 and sys.argv[1] == "agents":
         return agents()
+    if len(sys.argv) > 1 and sys.argv[1] == "serve":
+        return serve_ui(sys.argv[2:])
     ap = argparse.ArgumentParser(description="Acme AP invoice automation")
     ap.add_argument("--invoice_path", default="data/invoices", help="invoice file or directory")
     ap.add_argument("--db", default="inventory.db")
@@ -111,6 +131,7 @@ def main() -> None:
 
     if args.bench:
         corpus, tmp = make_bench_corpus(paths, args.bench, args.pdf_share)
+        args.no_store = True  # a benchmark does not need 20,000 records kept
         logging.getLogger().setLevel(logging.ERROR)
         for name in ("acme.decision", "acme.payment"):
             logging.getLogger(name).setLevel(logging.ERROR)

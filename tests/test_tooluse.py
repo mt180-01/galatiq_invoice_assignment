@@ -108,18 +108,62 @@ def test_a_model_that_cannot_produce_valid_output_falls_back_to_policy():
     assert out.decision is Decision.APPROVE and "Within auto-approval limit" in out.reasoning
 
 
-def test_json_mode_is_dropped_for_good_if_the_endpoint_rejects_it(monkeypatch):
-    monkeypatch.setattr(GrokClient, "_json_mode", True)
+def formats_asked(monkeypatch, reject):
+    """Run structured requests against a stub that rejects the listed response formats; return what was asked, in order."""
+    monkeypatch.setattr(GrokClient, "_format_mode", "json_schema")
     seen = []
 
     def handler(request):
         body = json.loads(request.content)
-        seen.append("response_format" in body)
-        return httpx.Response(400, text='{"error": "unknown parameter response_format"}') if "response_format" in body else message('{"ok": 1}')
+        rf = (body.get("response_format") or {}).get("type", "none")
+        seen.append(rf)
+        if rf in reject:
+            return httpx.Response(400, text=f'{{"error": "unsupported response_format type {rf}"}}')
+        return message('{"decision": "approve", "reasoning": "All checks passed within the limit."}')
     llm = GrokClient("k", transport=httpx.MockTransport(handler))
-    assert asyncio.run(llm.chat_json("s", "u")) == {"ok": 1}
-    assert asyncio.run(llm.chat_json("s", "u2")) == {"ok": 1}
-    assert seen == [True, False, False]                                                      # asked once, retried without, never asked again
+    for _ in range(2):
+        assert asyncio.run(structured(llm, "s", "u", approval.ReviewDecision)).decision == "approve"
+    return seen
+
+
+def test_a_structured_reply_asks_for_a_json_schema_first(monkeypatch):
+    assert formats_asked(monkeypatch, reject=()) == ["json_schema", "json_schema"]
+
+
+def test_the_format_steps_down_once_and_stays_down_if_the_endpoint_refuses(monkeypatch):
+    assert formats_asked(monkeypatch, reject=("json_schema",)) == ["json_schema", "json_object", "json_object"]
+    assert formats_asked(monkeypatch, reject=("json_schema", "json_object")) == ["json_schema", "json_object", "none", "none"]
+
+
+def test_the_schema_sent_is_the_strict_dialect():
+    from acme_ap.llm import strict_schema
+    schema = strict_schema(approval.ReviewDecision)
+    assert schema["additionalProperties"] is False and schema["required"] == ["decision", "reasoning"]
+    assert "minLength" not in json.dumps(schema) and "title" not in json.dumps(schema)           # keywords strict mode rejects
+    assert schema["properties"]["decision"]["enum"] == ["approve", "reject", "escalate"]
+    from acme_ap.agents.resolver import Corrections
+    nested = strict_schema(Corrections)
+    assert nested["$defs"]["Correction"]["additionalProperties"] is False
+
+
+@pytest.mark.parametrize("reply,expected", [
+    ('{"a": 1}', {"a": 1}),
+    ('Sure! Here you go:\n```json\n{"a": 2}\n```\nHope that helps.', {"a": 2}),
+    ('The answer is {"a": 3} and that is final.', {"a": 3}),
+    ('first {"a": 4} then {"b": 5}', {"a": 4}),                                                  # a greedy pattern would glue these into invalid JSON
+    ('{"a": "has } and { braces", "n": {"x": 1}}', {"a": "has } and { braces", "n": {"x": 1}}),
+    ('noise {not json} then {"a": 6}', {"a": 6}),
+])
+def test_json_is_found_by_parsing_not_by_a_greedy_pattern(reply, expected):
+    from acme_ap.llm import parse_json_object
+    assert parse_json_object(reply) == expected
+
+
+@pytest.mark.parametrize("reply", ["", None, "I cannot help with that.", "[1, 2, 3]", "{unterminated"])
+def test_no_object_means_unavailable_not_a_crash(reply):
+    from acme_ap.llm import parse_json_object
+    with pytest.raises(LLMUnavailable):
+        parse_json_object(reply)
 
 
 # ---- the reviewer's tools against the real ERP ---------------------------------------------------------

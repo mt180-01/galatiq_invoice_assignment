@@ -1,0 +1,2908 @@
+[
+ {
+  "source_path": "data/invoices/invoice_1001.txt",
+  "invoice": {
+   "invoice_number": "INV-1001",
+   "revision": null,
+   "vendor": "Widgets Inc.",
+   "date": "2026-01-15",
+   "due_date": "2026-02-01",
+   "currency": "USD",
+   "line_items": [
+    {
+     "item": "WidgetA",
+     "quantity": 10,
+     "unit_price": "250.00",
+     "amount": null,
+     "note": null
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 5,
+     "unit_price": "500.00",
+     "amount": null,
+     "note": null
+    }
+   ],
+   "subtotal": "5000.00",
+   "tax_amount": "0.00",
+   "shipping": null,
+   "total": "5000.00",
+   "payment_terms": "Net 15",
+   "bank_account": null,
+   "notes": null,
+   "source_path": "data/invoices/invoice_1001.txt",
+   "source_format": "txt",
+   "channel": "unstructured",
+   "extractor": "heuristic:txt",
+   "parse_warnings": []
+  },
+  "findings": [],
+  "approval": {
+   "decision": "approve",
+   "reasoning": "Total 5000 USD <=10000, empty findings (no error/hold)",
+   "rounds": 1,
+   "critiques": []
+  },
+  "paid": true,
+  "payment_ref": "ACH-53527E5C82",
+  "payment_amount": "5000.00",
+  "payment_state": "submitted",
+  "release_on": "2026-10-27",
+  "error": null,
+  "timings_ms": {
+   "parse": 0.01,
+   "llm_extract": 0.05,
+   "validate": 16.06,
+   "approve": 5971.36,
+   "settle": 1.81
+  },
+  "trace": [
+   {
+    "agent": "Intake",
+    "action": "read txt via heuristic:txt",
+    "ms": 0.03,
+    "events": [
+     {
+      "kind": "skipped",
+      "as": "intake"
+     }
+    ]
+   },
+   {
+    "agent": "Validation",
+    "action": "checked against ERP and policy",
+    "ms": 0.21
+   },
+   {
+    "agent": "Reviewer",
+    "action": "decided",
+    "ms": 5971.36,
+    "events": [
+     {
+      "kind": "model",
+      "as": "reviewer",
+      "tokens": [
+       634,
+       29
+      ],
+      "model": "grok-4.3"
+     },
+     {
+      "kind": "decision",
+      "text": "approve: Total 5000 USD <=10000, empty findings (no error/hold)"
+     },
+     {
+      "kind": "skipped",
+      "as": "critic"
+     }
+    ]
+   },
+   {
+    "agent": "Payment",
+    "action": "scheduled / sent",
+    "ms": 1.57
+   }
+  ],
+  "llm": {
+   "calls": 1,
+   "cached": 0,
+   "skipped": [
+    "intake",
+    "critic"
+   ],
+   "tools": 0,
+   "tokens_in": 634,
+   "tokens_out": 29,
+   "cost_ticks": 15881000
+  },
+  "sender": null,
+  "subject": null,
+  "followup": null,
+  "approval_request": null,
+  "awaiting": null,
+  "approval_card": null,
+  "explanation": null,
+  "status": "PAID"
+ },
+ {
+  "source_path": "data/invoices/invoice_1002.txt",
+  "invoice": {
+   "invoice_number": "INV-1002",
+   "revision": null,
+   "vendor": "Gadgets Co.",
+   "date": "2026-01-30",
+   "due_date": "2026-01-30",
+   "currency": "USD",
+   "line_items": [
+    {
+     "item": "GadgetX",
+     "quantity": 20,
+     "unit_price": "750",
+     "amount": null,
+     "note": null
+    }
+   ],
+   "subtotal": null,
+   "tax_amount": null,
+   "shipping": null,
+   "total": "15000.00",
+   "payment_terms": "Net 30",
+   "bank_account": null,
+   "notes": null,
+   "source_path": "data/invoices/invoice_1002.txt",
+   "source_format": "txt",
+   "channel": "unstructured",
+   "extractor": "heuristic:txt",
+   "parse_warnings": []
+  },
+  "findings": [
+   {
+    "code": "terms_mismatch",
+    "severity": "warn",
+    "message": "due date equals invoice date but terms are 'Net 30'"
+   },
+   {
+    "code": "insufficient_stock",
+    "severity": "error",
+    "message": "GadgetX: 20 billed but only 5 in stock"
+   }
+  ],
+  "approval": {
+   "decision": "reject",
+   "reasoning": "Rejected: GadgetX: 20 billed but only 5 in stock",
+   "rounds": 1,
+   "critiques": []
+  },
+  "paid": false,
+  "payment_ref": null,
+  "payment_amount": null,
+  "payment_state": null,
+  "release_on": null,
+  "error": null,
+  "timings_ms": {
+   "parse": 0.0,
+   "llm_extract": 0.02,
+   "validate": 16.95,
+   "approve": 0.06,
+   "settle": 19330.36
+  },
+  "trace": [
+   {
+    "agent": "Intake",
+    "action": "read txt via heuristic:txt",
+    "ms": 0.01,
+    "events": [
+     {
+      "kind": "skipped",
+      "as": "intake"
+     }
+    ]
+   },
+   {
+    "agent": "Validation",
+    "action": "checked against ERP and policy",
+    "ms": 0.08
+   },
+   {
+    "agent": "Reviewer",
+    "action": "decided",
+    "ms": 0.05,
+    "events": [
+     {
+      "kind": "skipped",
+      "as": "reviewer"
+     },
+     {
+      "kind": "skipped",
+      "as": "critic"
+     }
+    ]
+   },
+   {
+    "agent": "Comms",
+    "action": "explained in plain English",
+    "ms": 19329.73,
+    "events": [
+     {
+      "kind": "model",
+      "as": "comms",
+      "tokens": [
+       365,
+       41
+      ],
+      "model": "grok-4.3"
+     },
+     {
+      "kind": "wrote",
+      "text": "The invoice INV-1002 from Gadgets Co. for 15000.00 USD was rejected. Checks found GadgetX: 20 billed but only 5 in stock."
+     }
+    ]
+   }
+  ],
+  "llm": {
+   "calls": 1,
+   "cached": 0,
+   "skipped": [
+    "intake",
+    "reviewer",
+    "critic"
+   ],
+   "tools": 0,
+   "tokens_in": 365,
+   "tokens_out": 41,
+   "cost_ticks": 29518500
+  },
+  "sender": null,
+  "subject": null,
+  "followup": null,
+  "approval_request": null,
+  "awaiting": null,
+  "approval_card": null,
+  "explanation": "The invoice INV-1002 from Gadgets Co. for 15000.00 USD was rejected. Checks found GadgetX: 20 billed but only 5 in stock.",
+  "status": "REJECT"
+ },
+ {
+  "source_path": "data/invoices/invoice_1003.txt",
+  "invoice": {
+   "invoice_number": "INV-1003",
+   "revision": null,
+   "vendor": "Fraudster LLC",
+   "date": "2026-01-20",
+   "due_date": null,
+   "currency": "USD",
+   "line_items": [
+    {
+     "item": "FakeItem",
+     "quantity": 100,
+     "unit_price": "1000.0",
+     "amount": null,
+     "note": null
+    }
+   ],
+   "subtotal": null,
+   "tax_amount": null,
+   "shipping": null,
+   "total": "100000.0",
+   "payment_terms": "Immediate",
+   "bank_account": null,
+   "notes": "URGENT - Pay immediately to avoid penalties!!! Wire transfer preferred.",
+   "source_path": "data/invoices/invoice_1003.txt",
+   "source_format": "txt",
+   "channel": "unstructured",
+   "extractor": "grok+regex-check (attempt 1)",
+   "parse_warnings": [
+    "unparseable due date 'yesterday'"
+   ]
+  },
+  "findings": [
+   {
+    "code": "extraction_warning",
+    "severity": "warn",
+    "message": "unparseable due date 'yesterday'"
+   },
+   {
+    "code": "unknown_vendor",
+    "severity": "hold",
+    "message": "vendor 'Fraudster LLC' is not in the approved vendor master"
+   },
+   {
+    "code": "out_of_stock",
+    "severity": "error",
+    "message": "FakeItem: zero stock on hand, 100 billed"
+   },
+   {
+    "code": "fraud_indicators",
+    "severity": "error",
+    "message": "multiple fraud signals: pressure language (immediately, penalt, urgent, wire transfer); immediate payment terms; unknown vendor; billing for items that do not exist / have no stock"
+   }
+  ],
+  "approval": {
+   "decision": "reject",
+   "reasoning": "Rejected: FakeItem: zero stock on hand, 100 billed; multiple fraud signals: pressure language (immediately, penalt, urgent, wire transfer); immediate payment terms; unknown vendor; billing for items that do not exist / have no stock",
+   "rounds": 1,
+   "critiques": []
+  },
+  "paid": false,
+  "payment_ref": null,
+  "payment_amount": null,
+  "payment_state": null,
+  "release_on": null,
+  "error": null,
+  "timings_ms": {
+   "parse": 0.0,
+   "llm_extract": 19858.29,
+   "validate": 0.61,
+   "approve": 3686.72,
+   "settle": 23823.2
+  },
+  "trace": [
+   {
+    "agent": "Intake",
+    "action": "read txt via heuristic:txt",
+    "ms": 19858.28,
+    "events": [
+     {
+      "kind": "model",
+      "as": "intake",
+      "tokens": [
+       495,
+       156
+      ],
+      "model": "grok-4.3"
+     }
+    ]
+   },
+   {
+    "agent": "Validation",
+    "action": "checked against ERP and policy",
+    "ms": 0.06
+   },
+   {
+    "agent": "Reviewer",
+    "action": "decided",
+    "ms": 3686.71,
+    "events": [
+     {
+      "kind": "skipped",
+      "as": "reviewer"
+     },
+     {
+      "kind": "skipped",
+      "as": "critic"
+     }
+    ]
+   },
+   {
+    "agent": "Comms",
+    "action": "explained in plain English",
+    "ms": 23822.99,
+    "events": [
+     {
+      "kind": "model",
+      "as": "comms",
+      "tokens": [
+       414,
+       63
+      ],
+      "model": "grok-4.3"
+     },
+     {
+      "kind": "wrote",
+      "text": "The invoice was rejected. Checks found the vendor is not in the approved vendor master, the item has zero stock on hand despite being billed, and multiple fraud signals including pressure language, im"
+     }
+    ]
+   }
+  ],
+  "llm": {
+   "calls": 2,
+   "cached": 0,
+   "skipped": [
+    "reviewer",
+    "critic"
+   ],
+   "tools": 0,
+   "tokens_in": 909,
+   "tokens_out": 219,
+   "cost_ticks": 72974500
+  },
+  "sender": null,
+  "subject": null,
+  "followup": null,
+  "approval_request": null,
+  "awaiting": null,
+  "approval_card": null,
+  "explanation": "The invoice was rejected. Checks found the vendor is not in the approved vendor master, the item has zero stock on hand despite being billed, and multiple fraud signals including pressure language, immediate payment terms, unknown vendor status, and billing for items that do not exist. No further action is required.",
+  "status": "REJECT"
+ },
+ {
+  "source_path": "data/invoices/invoice_1004.json",
+  "invoice": {
+   "invoice_number": "INV-1004",
+   "revision": null,
+   "vendor": "Precision Parts Ltd.",
+   "date": "2026-01-22",
+   "due_date": "2026-02-22",
+   "currency": "USD",
+   "line_items": [
+    {
+     "item": "WidgetA",
+     "quantity": 3,
+     "unit_price": "250.0",
+     "amount": null,
+     "note": null
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 2,
+     "unit_price": "500.0",
+     "amount": null,
+     "note": null
+    }
+   ],
+   "subtotal": "1750.0",
+   "tax_amount": "140.0",
+   "shipping": null,
+   "total": "1890.0",
+   "payment_terms": "Net 30",
+   "bank_account": null,
+   "notes": null,
+   "source_path": "data/invoices/invoice_1004.json",
+   "source_format": "json",
+   "channel": "structured",
+   "extractor": "json",
+   "parse_warnings": []
+  },
+  "findings": [],
+  "approval": {
+   "decision": "approve",
+   "reasoning": "Total 1890 USD <=10000, no errors/holds in findings, per policy",
+   "rounds": 1,
+   "critiques": []
+  },
+  "paid": true,
+  "payment_ref": "ACH-A26445B14E",
+  "payment_amount": "1890.0",
+  "payment_state": "submitted",
+  "release_on": "2026-10-27",
+  "error": null,
+  "timings_ms": {
+   "parse": 0.0,
+   "llm_extract": 0.02,
+   "validate": 4.06,
+   "approve": 6130.08,
+   "settle": 1.48
+  },
+  "trace": [
+   {
+    "agent": "Intake",
+    "action": "read json via json",
+    "ms": 0.0
+   },
+   {
+    "agent": "Validation",
+    "action": "checked against ERP and policy",
+    "ms": 0.03
+   },
+   {
+    "agent": "Reviewer",
+    "action": "decided",
+    "ms": 6130.07,
+    "events": [
+     {
+      "kind": "model",
+      "as": "reviewer",
+      "tokens": [
+       635,
+       30
+      ],
+      "model": "grok-4.3"
+     },
+     {
+      "kind": "decision",
+      "text": "approve: Total 1890 USD <=10000, no errors/holds in findings, per policy"
+     },
+     {
+      "kind": "skipped",
+      "as": "critic"
+     }
+    ]
+   },
+   {
+    "agent": "Payment",
+    "action": "scheduled / sent",
+    "ms": 1.28
+   }
+  ],
+  "llm": {
+   "calls": 1,
+   "cached": 0,
+   "skipped": [
+    "critic"
+   ],
+   "tools": 0,
+   "tokens_in": 635,
+   "tokens_out": 30,
+   "cost_ticks": 16268500
+  },
+  "sender": null,
+  "subject": null,
+  "followup": null,
+  "approval_request": null,
+  "awaiting": null,
+  "approval_card": null,
+  "explanation": null,
+  "status": "PAID"
+ },
+ {
+  "source_path": "data/invoices/invoice_1004_revised.json",
+  "invoice": {
+   "invoice_number": "INV-1004",
+   "revision": "R1",
+   "vendor": "Precision Parts Ltd.",
+   "date": "2026-01-22",
+   "due_date": "2026-02-22",
+   "currency": "USD",
+   "line_items": [
+    {
+     "item": "WidgetA",
+     "quantity": 3,
+     "unit_price": "250.0",
+     "amount": null,
+     "note": null
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 2,
+     "unit_price": "500.0",
+     "amount": null,
+     "note": null
+    },
+    {
+     "item": "GadgetX",
+     "quantity": 5,
+     "unit_price": "750.0",
+     "amount": null,
+     "note": null
+    }
+   ],
+   "subtotal": "5500.0",
+   "tax_amount": "440.0",
+   "shipping": null,
+   "total": "5940.0",
+   "payment_terms": "Net 30",
+   "bank_account": null,
+   "notes": "Revised invoice - additional items added per PO amendment",
+   "source_path": "data/invoices/invoice_1004_revised.json",
+   "source_format": "json",
+   "channel": "structured",
+   "extractor": "json",
+   "parse_warnings": []
+  },
+  "findings": [
+   {
+    "code": "revision",
+    "severity": "hold",
+    "message": "revision R1: may supersede an earlier bill; confirm before paying"
+   }
+  ],
+  "approval": {
+   "decision": "escalate",
+   "reasoning": "Needs human review: revision R1: may supersede an earlier bill; confirm before paying",
+   "rounds": 2,
+   "critiques": [
+    "policy requires at least escalate, draft says approve",
+    "approval conflicts with blocking findings"
+   ]
+  },
+  "paid": false,
+  "payment_ref": null,
+  "payment_amount": null,
+  "payment_state": null,
+  "release_on": null,
+  "error": null,
+  "timings_ms": {
+   "parse": 0.0,
+   "llm_extract": 0.01,
+   "validate": 7.43,
+   "approve": 7042.85,
+   "settle": 24262.26
+  },
+  "trace": [
+   {
+    "agent": "Intake",
+    "action": "read json via json",
+    "ms": 0.0
+   },
+   {
+    "agent": "Validation",
+    "action": "checked against ERP and policy",
+    "ms": 0.04
+   },
+   {
+    "agent": "Reviewer",
+    "action": "decided",
+    "ms": 7042.85,
+    "events": [
+     {
+      "kind": "skipped",
+      "as": "reviewer"
+     },
+     {
+      "kind": "skipped",
+      "as": "critic"
+     }
+    ]
+   },
+   {
+    "agent": "Comms",
+    "action": "explained in plain English",
+    "ms": 24261.52,
+    "events": [
+     {
+      "kind": "model",
+      "as": "comms",
+      "tokens": [
+       373,
+       40
+      ],
+      "model": "grok-4.3"
+     },
+     {
+      "kind": "wrote",
+      "text": "The invoice INV-1004 from Precision Parts Ltd. has a finding that revision R1 may supersede an earlier bill. Confirm before paying. Escalate to the AP Manager."
+     }
+    ]
+   },
+   {
+    "agent": "Desk",
+    "action": "routed to a person",
+    "ms": 0.55
+   }
+  ],
+  "llm": {
+   "calls": 1,
+   "cached": 0,
+   "skipped": [
+    "reviewer",
+    "critic"
+   ],
+   "tools": 0,
+   "tokens_in": 373,
+   "tokens_out": 40,
+   "cost_ticks": 23793500
+  },
+  "sender": null,
+  "subject": null,
+  "followup": null,
+  "approval_request": 2,
+  "awaiting": "AP Manager",
+  "approval_card": "To: ap-manager@acmecorp.example\nSubject: Decision needed: USD 5940.0 to Precision Parts Ltd. (INV-1004)\n\nPay USD 5940.0 to Precision Parts Ltd.?\n\nWHY YOU\n  - revision R1: may supersede an earlier bill; confirm before paying\n\nTHE INVOICE\n  Invoice INV-1004, dated 2026-01-22, due 2026-02-22, terms Net 30\n  3 line(s): WidgetA x3, WidgetB x2, GadgetX x5\n  Read by: json (structured)\n\nIN SHORT\n  The invoice INV-1004 from Precision Parts Ltd. has a finding that revision R1 may supersede an earlier bill. Confirm before paying. Escalate to the AP Manager.\n\nSYSTEM RECOMMENDATION\n  REVIEW BEFORE APPROVING: revision R1: may supersede an earlier bill; confirm before paying\n\n  APPROVE: http://127.0.0.1:8765/decide?t=eyJyIjoyLCJhIjoiYXBwcm92ZSIsImgiOiIwNWEwYWQ1MmRjNTE0YmRjIiwieCI6MTc5MzU4OTk0Nn0.jlF3SYCvai9Xpv4gWvN70w\n  REJECT:  http://127.0.0.1:8765/decide?t=eyJyIjoyLCJhIjoicmVqZWN0IiwiaCI6IjA1YTBhZDUyZGM1MTRiZGMiLCJ4IjoxNzkzNTg5OTQ2fQ.9ygb-LYyde5IR_V26BBMJQ\n\nThese links work once, only for this invoice as shown, and expire in 5 days.\nNothing is paid until you approve; if you do not respond it will be escalated to your delegate.",
+  "explanation": "The invoice INV-1004 from Precision Parts Ltd. has a finding that revision R1 may supersede an earlier bill. Confirm before paying. Escalate to the AP Manager.",
+  "status": "AWAITING"
+ },
+ {
+  "source_path": "data/invoices/invoice_1005.json",
+  "invoice": {
+   "invoice_number": "INV-1005",
+   "revision": null,
+   "vendor": "Global Supply Chain Partners",
+   "date": "2026-01-18",
+   "due_date": "2026-03-18",
+   "currency": "USD",
+   "line_items": [
+    {
+     "item": "WidgetA",
+     "quantity": 14,
+     "unit_price": "250.0",
+     "amount": null,
+     "note": null
+    },
+    {
+     "item": "GadgetX",
+     "quantity": 8,
+     "unit_price": "750.0",
+     "amount": null,
+     "note": null
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 10,
+     "unit_price": "500.0",
+     "amount": null,
+     "note": null
+    }
+   ],
+   "subtotal": "14500.0",
+   "tax_amount": "725.0",
+   "shipping": null,
+   "total": "15225.0",
+   "payment_terms": "Net 60",
+   "bank_account": null,
+   "notes": null,
+   "source_path": "data/invoices/invoice_1005.json",
+   "source_format": "json",
+   "channel": "structured",
+   "extractor": "json",
+   "parse_warnings": []
+  },
+  "findings": [
+   {
+    "code": "insufficient_stock",
+    "severity": "error",
+    "message": "GadgetX: 8 billed but only 5 in stock"
+   }
+  ],
+  "approval": {
+   "decision": "reject",
+   "reasoning": "Rejected: GadgetX: 8 billed but only 5 in stock",
+   "rounds": 1,
+   "critiques": []
+  },
+  "paid": false,
+  "payment_ref": null,
+  "payment_amount": null,
+  "payment_state": null,
+  "release_on": null,
+  "error": null,
+  "timings_ms": {
+   "parse": 0.0,
+   "llm_extract": 0.01,
+   "validate": 2.82,
+   "approve": 0.05,
+   "settle": 23528.61
+  },
+  "trace": [
+   {
+    "agent": "Intake",
+    "action": "read json via json",
+    "ms": 0.0
+   },
+   {
+    "agent": "Validation",
+    "action": "checked against ERP and policy",
+    "ms": 0.06
+   },
+   {
+    "agent": "Reviewer",
+    "action": "decided",
+    "ms": 0.04,
+    "events": [
+     {
+      "kind": "skipped",
+      "as": "reviewer"
+     },
+     {
+      "kind": "skipped",
+      "as": "critic"
+     }
+    ]
+   },
+   {
+    "agent": "Comms",
+    "action": "explained in plain English",
+    "ms": 23527.88,
+    "events": [
+     {
+      "kind": "model",
+      "as": "comms",
+      "tokens": [
+       365,
+       29
+      ],
+      "model": "grok-4.3"
+     },
+     {
+      "kind": "wrote",
+      "text": "The invoice was rejected. Checks found GadgetX: 8 billed but only 5 in stock. Confirm the rejection."
+     }
+    ]
+   }
+  ],
+  "llm": {
+   "calls": 1,
+   "cached": 0,
+   "skipped": [
+    "reviewer",
+    "critic"
+   ],
+   "tools": 0,
+   "tokens_in": 365,
+   "tokens_out": 29,
+   "cost_ticks": 44093500
+  },
+  "sender": null,
+  "subject": null,
+  "followup": null,
+  "approval_request": null,
+  "awaiting": null,
+  "approval_card": null,
+  "explanation": "The invoice was rejected. Checks found GadgetX: 8 billed but only 5 in stock. Confirm the rejection.",
+  "status": "REJECT"
+ },
+ {
+  "source_path": "data/invoices/invoice_1006.csv",
+  "invoice": {
+   "invoice_number": "INV-1006",
+   "revision": null,
+   "vendor": "Acme Industrial Supplies",
+   "date": "2026-01-25",
+   "due_date": "2026-02-10",
+   "currency": "USD",
+   "line_items": [
+    {
+     "item": "WidgetA",
+     "quantity": 5,
+     "unit_price": "250.00",
+     "amount": null,
+     "note": null
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 3,
+     "unit_price": "500.00",
+     "amount": null,
+     "note": null
+    }
+   ],
+   "subtotal": "2750.00",
+   "tax_amount": "0.00",
+   "shipping": null,
+   "total": "2750.00",
+   "payment_terms": "Net 15",
+   "bank_account": null,
+   "notes": null,
+   "source_path": "data/invoices/invoice_1006.csv",
+   "source_format": "csv",
+   "channel": "structured",
+   "extractor": "csv",
+   "parse_warnings": []
+  },
+  "findings": [],
+  "approval": {
+   "decision": "approve",
+   "reasoning": "Total 2750 USD <=10000, no errors/holds in findings, meets policy",
+   "rounds": 1,
+   "critiques": []
+  },
+  "paid": true,
+  "payment_ref": "ACH-5501CBF948",
+  "payment_amount": "2750.00",
+  "payment_state": "submitted",
+  "release_on": "2026-10-27",
+  "error": null,
+  "timings_ms": {
+   "parse": 0.0,
+   "llm_extract": 0.01,
+   "validate": 4.28,
+   "approve": 6632.54,
+   "settle": 1.5
+  },
+  "trace": [
+   {
+    "agent": "Intake",
+    "action": "read csv via csv",
+    "ms": 0.0
+   },
+   {
+    "agent": "Validation",
+    "action": "checked against ERP and policy",
+    "ms": 0.06
+   },
+   {
+    "agent": "Reviewer",
+    "action": "decided",
+    "ms": 6632.53,
+    "events": [
+     {
+      "kind": "model",
+      "as": "reviewer",
+      "tokens": [
+       636,
+       30
+      ],
+      "model": "grok-4.3"
+     },
+     {
+      "kind": "decision",
+      "text": "approve: Total 2750 USD <=10000, no errors/holds in findings, meets policy"
+     },
+     {
+      "kind": "skipped",
+      "as": "critic"
+     }
+    ]
+   },
+   {
+    "agent": "Payment",
+    "action": "scheduled / sent",
+    "ms": 1.31
+   }
+  ],
+  "llm": {
+   "calls": 1,
+   "cached": 0,
+   "skipped": [
+    "critic"
+   ],
+   "tools": 0,
+   "tokens_in": 636,
+   "tokens_out": 30,
+   "cost_ticks": 16481000
+  },
+  "sender": null,
+  "subject": null,
+  "followup": null,
+  "approval_request": null,
+  "awaiting": null,
+  "approval_card": null,
+  "explanation": null,
+  "status": "PAID"
+ },
+ {
+  "source_path": "data/invoices/invoice_1007.csv",
+  "invoice": {
+   "invoice_number": "INV-1007",
+   "revision": null,
+   "vendor": "MegaWidgets Corp",
+   "date": "2026-01-28",
+   "due_date": "2026-02-28",
+   "currency": "USD",
+   "line_items": [
+    {
+     "item": "WidgetA",
+     "quantity": 20,
+     "unit_price": "250.00",
+     "amount": "5000.00",
+     "note": null
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 15,
+     "unit_price": "500.00",
+     "amount": "7500.00",
+     "note": null
+    },
+    {
+     "item": "GadgetX",
+     "quantity": 3,
+     "unit_price": "750.00",
+     "amount": "2250.00",
+     "note": null
+    }
+   ],
+   "subtotal": "14750.00",
+   "tax_amount": "885.00",
+   "shipping": null,
+   "total": "15525.00",
+   "payment_terms": null,
+   "bank_account": null,
+   "notes": null,
+   "source_path": "data/invoices/invoice_1007.csv",
+   "source_format": "csv",
+   "channel": "structured",
+   "extractor": "csv",
+   "parse_warnings": []
+  },
+  "findings": [
+   {
+    "code": "insufficient_stock",
+    "severity": "error",
+    "message": "WidgetA: 20 billed but only 15 in stock"
+   },
+   {
+    "code": "insufficient_stock",
+    "severity": "error",
+    "message": "WidgetB: 15 billed but only 10 in stock"
+   },
+   {
+    "code": "total_math",
+    "severity": "error",
+    "message": "subtotal 14750.00 + tax 885.00 + shipping 0 = 15635.00, invoice total is 15525.00"
+   }
+  ],
+  "approval": {
+   "decision": "reject",
+   "reasoning": "Rejected: WidgetA: 20 billed but only 15 in stock; WidgetB: 15 billed but only 10 in stock; subtotal 14750.00 + tax 885.00 + shipping 0 = 15635.00, invoice total is 15525.00",
+   "rounds": 1,
+   "critiques": []
+  },
+  "paid": false,
+  "payment_ref": null,
+  "payment_amount": null,
+  "payment_state": null,
+  "release_on": null,
+  "error": null,
+  "timings_ms": {
+   "parse": 0.0,
+   "llm_extract": 0.01,
+   "validate": 4.64,
+   "approve": 0.04,
+   "settle": 16563.34
+  },
+  "trace": [
+   {
+    "agent": "Intake",
+    "action": "read csv via csv",
+    "ms": 0.0
+   },
+   {
+    "agent": "Validation",
+    "action": "checked against ERP and policy",
+    "ms": 0.05
+   },
+   {
+    "agent": "Reviewer",
+    "action": "decided",
+    "ms": 0.03,
+    "events": [
+     {
+      "kind": "skipped",
+      "as": "reviewer"
+     },
+     {
+      "kind": "skipped",
+      "as": "critic"
+     }
+    ]
+   },
+   {
+    "agent": "Comms",
+    "action": "explained in plain English",
+    "ms": 16562.69,
+    "events": [
+     {
+      "kind": "model",
+      "as": "comms",
+      "tokens": [
+       409,
+       66
+      ],
+      "model": "grok-4.3"
+     },
+     {
+      "kind": "wrote",
+      "text": "The invoice INV-1007 from MegaWidgets Corp for 15525.00 USD was rejected. Checks found WidgetA billed for 20 but only 15 in stock, WidgetB billed for 15 but only 10 in stock, and subtotal plus tax plu"
+     }
+    ]
+   },
+   {
+    "agent": "Comms",
+    "action": "drafted vendor follow-up",
+    "ms": 28978.57,
+    "events": [
+     {
+      "kind": "model",
+      "as": "comms",
+      "tokens": [
+       389,
+       78
+      ],
+      "model": "grok-4.3"
+     },
+     {
+      "kind": "wrote",
+      "text": "Regarding invoice INV-1007, the line items do not add up to the invoice total (subtotal 14750.00 + tax 885.00 + shipping 0 = 15635.00, invoice total is 15525.00). Is the stated total correct, or can y"
+     }
+    ]
+   }
+  ],
+  "llm": {
+   "calls": 2,
+   "cached": 0,
+   "skipped": [
+    "reviewer",
+    "critic"
+   ],
+   "tools": 0,
+   "tokens_in": 798,
+   "tokens_out": 144,
+   "cost_ticks": 64162000
+  },
+  "sender": null,
+  "subject": null,
+  "followup": "To: (sender unknown: file intake)\nSubject: Quick question on invoice INV-1007\n\nRegarding invoice INV-1007, the line items do not add up to the invoice total (subtotal 14750.00 + tax 885.00 + shipping 0 = 15635.00, invoice total is 15525.00). Is the stated total correct, or can you send a corrected invoice?\nAccounts Payable, Acme Corp",
+  "approval_request": null,
+  "awaiting": null,
+  "approval_card": null,
+  "explanation": "The invoice INV-1007 from MegaWidgets Corp for 15525.00 USD was rejected. Checks found WidgetA billed for 20 but only 15 in stock, WidgetB billed for 15 but only 10 in stock, and subtotal plus tax plus shipping does not match the invoice total.",
+  "status": "REJECT"
+ },
+ {
+  "source_path": "data/invoices/invoice_1008.txt",
+  "invoice": {
+   "invoice_number": "INV-1008",
+   "revision": null,
+   "vendor": "NoProd Industries",
+   "date": "2026-01-10",
+   "due_date": "2026-01-20",
+   "currency": "USD",
+   "line_items": [
+    {
+     "item": "SuperGizmo",
+     "quantity": 12,
+     "unit_price": "400.00",
+     "amount": null,
+     "note": null
+    },
+    {
+     "item": "MegaSprocket",
+     "quantity": 6,
+     "unit_price": "850.00",
+     "amount": null,
+     "note": null
+    }
+   ],
+   "subtotal": null,
+   "tax_amount": null,
+   "shipping": null,
+   "total": "9900.00",
+   "payment_terms": null,
+   "bank_account": null,
+   "notes": null,
+   "source_path": "data/invoices/invoice_1008.txt",
+   "source_format": "txt",
+   "channel": "unstructured",
+   "extractor": "heuristic:txt",
+   "parse_warnings": []
+  },
+  "findings": [
+   {
+    "code": "unknown_vendor",
+    "severity": "hold",
+    "message": "vendor 'NoProd Industries' is not in the approved vendor master"
+   },
+   {
+    "code": "unknown_item",
+    "severity": "error",
+    "message": "'SuperGizmo' not found in inventory"
+   },
+   {
+    "code": "unknown_item",
+    "severity": "error",
+    "message": "'MegaSprocket' not found in inventory"
+   },
+   {
+    "code": "near_threshold",
+    "severity": "warn",
+    "message": "total 9900.00 sits just under the 10000 review threshold"
+   }
+  ],
+  "approval": {
+   "decision": "reject",
+   "reasoning": "Rejected: 'SuperGizmo' not found in inventory; 'MegaSprocket' not found in inventory",
+   "rounds": 1,
+   "critiques": []
+  },
+  "paid": false,
+  "payment_ref": null,
+  "payment_amount": null,
+  "payment_state": null,
+  "release_on": null,
+  "error": null,
+  "timings_ms": {
+   "parse": 0.0,
+   "llm_extract": 0.02,
+   "validate": 12880.61,
+   "approve": 6451.89,
+   "settle": 20889.27
+  },
+  "trace": [
+   {
+    "agent": "Intake",
+    "action": "read txt via heuristic:txt",
+    "ms": 0.02,
+    "events": [
+     {
+      "kind": "skipped",
+      "as": "intake"
+     }
+    ]
+   },
+   {
+    "agent": "Validation",
+    "action": "checked against ERP and policy",
+    "ms": 12875.66,
+    "events": [
+     {
+      "kind": "model",
+      "as": "resolver",
+      "tokens": [
+       478,
+       24
+      ],
+      "model": "grok-4.3"
+     },
+     {
+      "kind": "tool",
+      "name": "search_items",
+      "args": "{\"query\":\"SuperGizmo\"}",
+      "result": "{'result': []}"
+     },
+     {
+      "kind": "tool",
+      "name": "search_items",
+      "args": "{\"query\":\"MegaSprocket\"}",
+      "result": "{'result': []}"
+     },
+     {
+      "kind": "model",
+      "as": "resolver",
+      "tokens": [
+       521,
+       6
+      ],
+      "model": "grok-4.3"
+     },
+     {
+      "kind": "model",
+      "as": "resolver",
+      "tokens": [
+       431,
+       13
+      ],
+      "model": "grok-4.3"
+     },
+     {
+      "kind": "tool",
+      "name": "search_vendors",
+      "args": "{\"query\":\"NoProd Industries\"}",
+      "result": "{'result': [{'name': 'Acme Industrial Supplies', 'status': 'approved', 'similarity': 0.53}]}"
+     },
+     {
+      "kind": "model",
+      "as": "resolver",
+      "tokens": [
+       476,
+       25
+      ],
+      "model": "grok-4.3"
+     }
+    ]
+   },
+   {
+    "agent": "Reviewer",
+    "action": "decided",
+    "ms": 6451.88,
+    "events": [
+     {
+      "kind": "skipped",
+      "as": "reviewer"
+     },
+     {
+      "kind": "skipped",
+      "as": "critic"
+     }
+    ]
+   },
+   {
+    "agent": "Comms",
+    "action": "explained in plain English",
+    "ms": 20889.07,
+    "events": [
+     {
+      "kind": "model",
+      "as": "comms",
+      "tokens": [
+       385,
+       54
+      ],
+      "model": "grok-4.3"
+     },
+     {
+      "kind": "wrote",
+      "text": "The invoice INV-1008 from NoProd Industries was rejected. Checks found the vendor is not in the approved vendor master, SuperGizmo not found in inventory, and MegaSprocket not found in inventory. Plea"
+     }
+    ]
+   }
+  ],
+  "llm": {
+   "calls": 5,
+   "cached": 0,
+   "skipped": [
+    "intake",
+    "reviewer",
+    "critic"
+   ],
+   "tools": 3,
+   "tokens_in": 2291,
+   "tokens_out": 122,
+   "cost_ticks": 62654500
+  },
+  "sender": null,
+  "subject": null,
+  "followup": null,
+  "approval_request": null,
+  "awaiting": null,
+  "approval_card": null,
+  "explanation": "The invoice INV-1008 from NoProd Industries was rejected. Checks found the vendor is not in the approved vendor master, SuperGizmo not found in inventory, and MegaSprocket not found in inventory. Please review and decide next steps.",
+  "status": "REJECT"
+ },
+ {
+  "source_path": "data/invoices/invoice_1009.json",
+  "invoice": {
+   "invoice_number": "INV-1009",
+   "revision": null,
+   "vendor": null,
+   "date": "2026-01-15",
+   "due_date": null,
+   "currency": "USD",
+   "line_items": [
+    {
+     "item": "WidgetA",
+     "quantity": -5,
+     "unit_price": "250.0",
+     "amount": null,
+     "note": null
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 2,
+     "unit_price": "500.0",
+     "amount": null,
+     "note": null
+    }
+   ],
+   "subtotal": "1000.0",
+   "tax_amount": "0.0",
+   "shipping": null,
+   "total": "-250.0",
+   "payment_terms": null,
+   "bank_account": null,
+   "notes": null,
+   "source_path": "data/invoices/invoice_1009.json",
+   "source_format": "json",
+   "channel": "structured",
+   "extractor": "json",
+   "parse_warnings": []
+  },
+  "findings": [
+   {
+    "code": "negative_total",
+    "severity": "error",
+    "message": "total is negative (-250.0)"
+   },
+   {
+    "code": "missing_vendor",
+    "severity": "error",
+    "message": "vendor name is missing"
+   },
+   {
+    "code": "missing_due_date",
+    "severity": "warn",
+    "message": "no due date"
+   },
+   {
+    "code": "invalid_quantity",
+    "severity": "error",
+    "message": "WidgetA: quantity -5 is not positive"
+   },
+   {
+    "code": "subtotal_math",
+    "severity": "error",
+    "message": "line items sum to -250.0 but subtotal is 1000.0"
+   },
+   {
+    "code": "total_math",
+    "severity": "error",
+    "message": "subtotal 1000.0 + tax 0 + shipping 0 = 1000.0, invoice total is -250.0"
+   }
+  ],
+  "approval": {
+   "decision": "reject",
+   "reasoning": "Rejected: total is negative (-250.0); vendor name is missing; WidgetA: quantity -5 is not positive; line items sum to -250.0 but subtotal is 1000.0; subtotal 1000.0 + tax 0 + shipping 0 = 1000.0, invoice total is -250.0",
+   "rounds": 1,
+   "critiques": []
+  },
+  "paid": false,
+  "payment_ref": null,
+  "payment_amount": null,
+  "payment_state": null,
+  "release_on": null,
+  "error": null,
+  "timings_ms": {
+   "parse": 0.0,
+   "llm_extract": 0.01,
+   "validate": 6.21,
+   "approve": 5966.2,
+   "settle": 28370.39
+  },
+  "trace": [
+   {
+    "agent": "Intake",
+    "action": "read json via json",
+    "ms": 0.0
+   },
+   {
+    "agent": "Validation",
+    "action": "checked against ERP and policy",
+    "ms": 0.07
+   },
+   {
+    "agent": "Reviewer",
+    "action": "decided",
+    "ms": 5966.18,
+    "events": [
+     {
+      "kind": "skipped",
+      "as": "reviewer"
+     },
+     {
+      "kind": "skipped",
+      "as": "critic"
+     }
+    ]
+   },
+   {
+    "agent": "Comms",
+    "action": "explained in plain English",
+    "ms": 28370.16,
+    "events": [
+     {
+      "kind": "model",
+      "as": "comms",
+      "tokens": [
+       418,
+       53
+      ],
+      "model": "grok-4.3"
+     },
+     {
+      "kind": "wrote",
+      "text": "Invoice INV-1009 was rejected. Checks found that the total is negative, the vendor name is missing, a quantity is not positive, the line items sum does not match the subtotal, and the calculated total"
+     }
+    ]
+   },
+   {
+    "agent": "Comms",
+    "action": "drafted vendor follow-up",
+    "ms": 94083.85
+   }
+  ],
+  "llm": {
+   "calls": 1,
+   "cached": 0,
+   "skipped": [
+    "reviewer",
+    "critic"
+   ],
+   "tools": 0,
+   "tokens_in": 418,
+   "tokens_out": 53,
+   "cost_ticks": 37056000
+  },
+  "sender": null,
+  "subject": null,
+  "followup": "To: (sender unknown: file intake)\nSubject: Quick question on invoice INV-1009\n\nHello,\n\nThanks for your invoice INV-1009. We can pay it as soon as we confirm these (a one-line reply is fine, no forms or portal needed):\n\n  1. A quantity or the total is negative or zero. Is this a credit note, or should it be a corrected invoice? (reply 'credit note' or send the corrected one)\n  2. What is the legal name of the company issuing this invoice?\n  3. The line items do not add up to the invoice total (subtotal 1000.0 + tax 0 + shipping 0 = 1000.0, invoice total is -250.0). Is the stated total correct, or can you send a corrected invoice?\n\nThank you,\nAccounts Payable, Acme Corp",
+  "approval_request": null,
+  "awaiting": null,
+  "approval_card": null,
+  "explanation": "Invoice INV-1009 was rejected. Checks found that the total is negative, the vendor name is missing, a quantity is not positive, the line items sum does not match the subtotal, and the calculated total does not match the invoice total.",
+  "status": "REJECT"
+ },
+ {
+  "source_path": "data/invoices/invoice_1010.txt",
+  "invoice": {
+   "invoice_number": "INV-1010",
+   "revision": null,
+   "vendor": "Consolidated Materials Group",
+   "date": "2026-01-27",
+   "due_date": "2026-02-26",
+   "currency": "USD",
+   "line_items": [
+    {
+     "item": "WidgetA",
+     "quantity": 8,
+     "unit_price": "250.00",
+     "amount": "2000.00",
+     "note": null
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 4,
+     "unit_price": "500.00",
+     "amount": "2000.00",
+     "note": null
+    },
+    {
+     "item": "GadgetX",
+     "quantity": 2,
+     "unit_price": "750.00",
+     "amount": "1500.00",
+     "note": null
+    },
+    {
+     "item": "WidgetA",
+     "quantity": 4,
+     "unit_price": "300.00",
+     "amount": "1200.00",
+     "note": "rush order"
+    }
+   ],
+   "subtotal": "6700.00",
+   "tax_amount": "335.00",
+   "shipping": "150.00",
+   "total": "7185.00",
+   "payment_terms": "Net 30",
+   "bank_account": null,
+   "notes": null,
+   "source_path": "data/invoices/invoice_1010.txt",
+   "source_format": "txt",
+   "channel": "unstructured",
+   "extractor": "heuristic:txt",
+   "parse_warnings": []
+  },
+  "findings": [
+   {
+    "code": "price_variance",
+    "severity": "warn",
+    "message": "WidgetA: billed 300.00 vs catalog 250.00 (20% off) [rush order]"
+   }
+  ],
+  "approval": {
+   "decision": "approve",
+   "reasoning": "Total 7185 <=10000, only warning (price variance, rush), no error/hold per policy",
+   "rounds": 1,
+   "critiques": []
+  },
+  "paid": true,
+  "payment_ref": "ACH-E7FC17B0CF",
+  "payment_amount": "7185.00",
+  "payment_state": "submitted",
+  "release_on": "2026-10-27",
+  "error": null,
+  "timings_ms": {
+   "parse": 0.0,
+   "llm_extract": 0.02,
+   "validate": 6.29,
+   "approve": 12725.49,
+   "settle": 1.58
+  },
+  "trace": [
+   {
+    "agent": "Intake",
+    "action": "read txt via heuristic:txt",
+    "ms": 0.01,
+    "events": [
+     {
+      "kind": "skipped",
+      "as": "intake"
+     }
+    ]
+   },
+   {
+    "agent": "Validation",
+    "action": "checked against ERP and policy",
+    "ms": 0.12
+   },
+   {
+    "agent": "Reviewer",
+    "action": "decided",
+    "ms": 12725.48,
+    "events": [
+     {
+      "kind": "model",
+      "as": "reviewer",
+      "tokens": [
+       680,
+       34
+      ],
+      "model": "grok-4.3"
+     },
+     {
+      "kind": "decision",
+      "text": "approve: Total 7185 <=10000, only warning (price variance, rush), no error/hold per policy"
+     },
+     {
+      "kind": "skipped",
+      "as": "critic"
+     }
+    ]
+   },
+   {
+    "agent": "Payment",
+    "action": "scheduled / sent",
+    "ms": 1.2
+   }
+  ],
+  "llm": {
+   "calls": 1,
+   "cached": 0,
+   "skipped": [
+    "intake",
+    "critic"
+   ],
+   "tools": 0,
+   "tokens_in": 680,
+   "tokens_out": 34,
+   "cost_ticks": 16556000
+  },
+  "sender": null,
+  "subject": null,
+  "followup": null,
+  "approval_request": null,
+  "awaiting": null,
+  "approval_card": null,
+  "explanation": null,
+  "status": "PAID"
+ },
+ {
+  "source_path": "data/invoices/invoice_1011.pdf",
+  "invoice": {
+   "invoice_number": "INV-1011",
+   "revision": null,
+   "vendor": "Summit Manufacturing Co.",
+   "date": "2026-01-20",
+   "due_date": "2026-02-20",
+   "currency": "USD",
+   "line_items": [
+    {
+     "item": "WidgetA",
+     "quantity": 6,
+     "unit_price": "250.00",
+     "amount": "1500.00",
+     "note": null
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 3,
+     "unit_price": "500.00",
+     "amount": "1500.00",
+     "note": null
+    }
+   ],
+   "subtotal": null,
+   "tax_amount": null,
+   "shipping": null,
+   "total": "3000.00",
+   "payment_terms": null,
+   "bank_account": null,
+   "notes": null,
+   "source_path": "data/invoices/invoice_1011.pdf",
+   "source_format": "pdf",
+   "channel": "unstructured",
+   "extractor": "heuristic:pdf",
+   "parse_warnings": []
+  },
+  "findings": [
+   {
+    "code": "duplicate_invoice",
+    "severity": "error",
+    "message": "already received from invoice_1011.txt; not processed twice"
+   }
+  ],
+  "approval": {
+   "decision": "reject",
+   "reasoning": "already received from invoice_1011.txt; not processed twice",
+   "rounds": 1,
+   "critiques": []
+  },
+  "paid": false,
+  "payment_ref": null,
+  "payment_amount": null,
+  "payment_state": null,
+  "release_on": null,
+  "error": null,
+  "timings_ms": {
+   "parse": 383.12,
+   "llm_extract": 6666.83
+  },
+  "trace": [
+   {
+    "agent": "Intake",
+    "action": "read pdf via heuristic:pdf",
+    "ms": 6666.81,
+    "events": [
+     {
+      "kind": "skipped",
+      "as": "intake"
+     }
+    ]
+   }
+  ],
+  "llm": {
+   "calls": 0,
+   "cached": 0,
+   "skipped": [
+    "intake"
+   ],
+   "tools": 0,
+   "tokens_in": 0,
+   "tokens_out": 0,
+   "cost_ticks": 0
+  },
+  "sender": null,
+  "subject": null,
+  "followup": null,
+  "approval_request": null,
+  "awaiting": null,
+  "approval_card": null,
+  "explanation": null,
+  "status": "DUPLICATE"
+ },
+ {
+  "source_path": "data/invoices/invoice_1011.txt",
+  "invoice": {
+   "invoice_number": "INV-1011",
+   "revision": null,
+   "vendor": "Summit Manufacturing Co.",
+   "date": "2026-01-20",
+   "due_date": "2026-02-20",
+   "currency": "USD",
+   "line_items": [
+    {
+     "item": "WidgetA",
+     "quantity": 6,
+     "unit_price": "250.00",
+     "amount": "1500.00",
+     "note": null
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 3,
+     "unit_price": "500.00",
+     "amount": "1500.00",
+     "note": null
+    }
+   ],
+   "subtotal": "3000.00",
+   "tax_amount": "0.00",
+   "shipping": null,
+   "total": "3000.00",
+   "payment_terms": "Net 30",
+   "bank_account": null,
+   "notes": null,
+   "source_path": "data/invoices/invoice_1011.txt",
+   "source_format": "txt",
+   "channel": "unstructured",
+   "extractor": "heuristic:txt",
+   "parse_warnings": []
+  },
+  "findings": [],
+  "approval": {
+   "decision": "approve",
+   "reasoning": "Total 3000 USD <=10000, findings empty (no error/hold)",
+   "rounds": 1,
+   "critiques": []
+  },
+  "paid": true,
+  "payment_ref": "ACH-F9B12848DF",
+  "payment_amount": "3000.00",
+  "payment_state": "submitted",
+  "release_on": "2026-10-27",
+  "error": null,
+  "timings_ms": {
+   "parse": 0.0,
+   "llm_extract": 0.01,
+   "validate": 6.25,
+   "approve": 12866.31,
+   "settle": 2.96
+  },
+  "trace": [
+   {
+    "agent": "Intake",
+    "action": "read txt via heuristic:txt",
+    "ms": 0.01,
+    "events": [
+     {
+      "kind": "skipped",
+      "as": "intake"
+     }
+    ]
+   },
+   {
+    "agent": "Validation",
+    "action": "checked against ERP and policy",
+    "ms": 0.03
+   },
+   {
+    "agent": "Reviewer",
+    "action": "decided",
+    "ms": 12866.3,
+    "events": [
+     {
+      "kind": "model",
+      "as": "reviewer",
+      "tokens": [
+       636,
+       29
+      ],
+      "model": "grok-4.3"
+     },
+     {
+      "kind": "decision",
+      "text": "approve: Total 3000 USD <=10000, findings empty (no error/hold)"
+     },
+     {
+      "kind": "skipped",
+      "as": "critic"
+     }
+    ]
+   },
+   {
+    "agent": "Payment",
+    "action": "scheduled / sent",
+    "ms": 1.49
+   }
+  ],
+  "llm": {
+   "calls": 1,
+   "cached": 0,
+   "skipped": [
+    "intake",
+    "critic"
+   ],
+   "tools": 0,
+   "tokens_in": 636,
+   "tokens_out": 29,
+   "cost_ticks": 14874000
+  },
+  "sender": null,
+  "subject": null,
+  "followup": null,
+  "approval_request": null,
+  "awaiting": null,
+  "approval_card": null,
+  "explanation": null,
+  "status": "PAID"
+ },
+ {
+  "source_path": "data/invoices/invoice_1012.pdf",
+  "invoice": {
+   "invoice_number": "INV-1012",
+   "revision": null,
+   "vendor": "QuickShip Distributers",
+   "date": "2026-01-26",
+   "due_date": "2026-02-25",
+   "currency": "USD",
+   "line_items": [
+    {
+     "item": "Widget A",
+     "quantity": 12,
+     "unit_price": "250",
+     "amount": "3000.00",
+     "note": null
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 7,
+     "unit_price": "500",
+     "amount": "3500.00",
+     "note": null
+    },
+    {
+     "item": "Gadget X",
+     "quantity": 4,
+     "unit_price": "750",
+     "amount": "3000.00",
+     "note": null
+    }
+   ],
+   "subtotal": "9500.00",
+   "tax_amount": "475.00",
+   "shipping": null,
+   "total": "9975.00",
+   "payment_terms": "Net 30",
+   "bank_account": null,
+   "notes": "Ref PO-20260115. Deliver to; formerly FastShip Ltd.",
+   "source_path": "data/invoices/invoice_1012.pdf",
+   "source_format": "pdf",
+   "channel": "unstructured",
+   "extractor": "heuristic:pdf",
+   "parse_warnings": []
+  },
+  "findings": [
+   {
+    "code": "duplicate_invoice",
+    "severity": "error",
+    "message": "already received from invoice_1012.txt; not processed twice"
+   }
+  ],
+  "approval": {
+   "decision": "reject",
+   "reasoning": "already received from invoice_1012.txt; not processed twice",
+   "rounds": 1,
+   "critiques": []
+  },
+  "paid": false,
+  "payment_ref": null,
+  "payment_amount": null,
+  "payment_state": null,
+  "release_on": null,
+  "error": null,
+  "timings_ms": {
+   "parse": 383.56,
+   "llm_extract": 6666.42
+  },
+  "trace": [
+   {
+    "agent": "Intake",
+    "action": "read pdf via heuristic:pdf",
+    "ms": 6666.41,
+    "events": [
+     {
+      "kind": "skipped",
+      "as": "intake"
+     }
+    ]
+   }
+  ],
+  "llm": {
+   "calls": 0,
+   "cached": 0,
+   "skipped": [
+    "intake"
+   ],
+   "tools": 0,
+   "tokens_in": 0,
+   "tokens_out": 0,
+   "cost_ticks": 0
+  },
+  "sender": null,
+  "subject": null,
+  "followup": null,
+  "approval_request": null,
+  "awaiting": null,
+  "approval_card": null,
+  "explanation": null,
+  "status": "DUPLICATE"
+ },
+ {
+  "source_path": "data/invoices/invoice_1012.txt",
+  "invoice": {
+   "invoice_number": "INV-1012",
+   "revision": null,
+   "vendor": "QuickShip Distributers",
+   "date": "2026-01-26",
+   "due_date": "2026-02-25",
+   "currency": "USD",
+   "line_items": [
+    {
+     "item": "Widget A",
+     "quantity": 12,
+     "unit_price": "250",
+     "amount": "3000.00",
+     "note": null
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 7,
+     "unit_price": "500",
+     "amount": "3500.00",
+     "note": null
+    },
+    {
+     "item": "Gadget X",
+     "quantity": 4,
+     "unit_price": "750",
+     "amount": "3000.00",
+     "note": null
+    }
+   ],
+   "subtotal": "9500.00",
+   "tax_amount": "475.00",
+   "shipping": null,
+   "total": "9975.00",
+   "payment_terms": "Net 30",
+   "bank_account": null,
+   "notes": "Ref PO-20260115. Deliver to; formerly FastShip Ltd.",
+   "source_path": "data/invoices/invoice_1012.txt",
+   "source_format": "txt",
+   "channel": "unstructured",
+   "extractor": "heuristic:txt",
+   "parse_warnings": []
+  },
+  "findings": [
+   {
+    "code": "near_threshold",
+    "severity": "warn",
+    "message": "total 9975.00 sits just under the 10000 review threshold"
+   }
+  ],
+  "approval": {
+   "decision": "approve",
+   "reasoning": "Total 9975 <= 10000, only a warn (no error/hold), warnings do not block per policy",
+   "rounds": 1,
+   "critiques": []
+  },
+  "paid": true,
+  "payment_ref": "ACH-5B0E84036F",
+  "payment_amount": "9975.00",
+  "payment_state": "submitted",
+  "release_on": "2026-10-27",
+  "error": null,
+  "timings_ms": {
+   "parse": 0.0,
+   "llm_extract": 0.01,
+   "validate": 6.35,
+   "approve": 13803.08,
+   "settle": 1.5
+  },
+  "trace": [
+   {
+    "agent": "Intake",
+    "action": "read txt via heuristic:txt",
+    "ms": 0.0,
+    "events": [
+     {
+      "kind": "skipped",
+      "as": "intake"
+     }
+    ]
+   },
+   {
+    "agent": "Validation",
+    "action": "checked against ERP and policy",
+    "ms": 0.05
+   },
+   {
+    "agent": "Reviewer",
+    "action": "decided",
+    "ms": 13803.07,
+    "events": [
+     {
+      "kind": "model",
+      "as": "reviewer",
+      "tokens": [
+       667,
+       36
+      ],
+      "model": "grok-4.3"
+     },
+     {
+      "kind": "decision",
+      "text": "approve: Total 9975 <= 10000, only a warn (no error/hold), warnings do not block per policy"
+     },
+     {
+      "kind": "skipped",
+      "as": "critic"
+     }
+    ]
+   },
+   {
+    "agent": "Payment",
+    "action": "scheduled / sent",
+    "ms": 1.28
+   }
+  ],
+  "llm": {
+   "calls": 1,
+   "cached": 0,
+   "skipped": [
+    "intake",
+    "critic"
+   ],
+   "tools": 0,
+   "tokens_in": 667,
+   "tokens_out": 36,
+   "cost_ticks": 16843500
+  },
+  "sender": null,
+  "subject": null,
+  "followup": null,
+  "approval_request": null,
+  "awaiting": null,
+  "approval_card": null,
+  "explanation": null,
+  "status": "PAID"
+ },
+ {
+  "source_path": "data/invoices/invoice_1013.json",
+  "invoice": {
+   "invoice_number": "INV-1013",
+   "revision": null,
+   "vendor": "Atlas Industrial Supply",
+   "date": "2026-01-24",
+   "due_date": "2026-03-24",
+   "currency": "USD",
+   "line_items": [
+    {
+     "item": "WidgetA",
+     "quantity": 15,
+     "unit_price": "250.0",
+     "amount": "3750.0",
+     "note": null
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 10,
+     "unit_price": "500.0",
+     "amount": "5000.0",
+     "note": null
+    },
+    {
+     "item": "GadgetX",
+     "quantity": 5,
+     "unit_price": "750.0",
+     "amount": "3750.0",
+     "note": null
+    },
+    {
+     "item": "WidgetA",
+     "quantity": 5,
+     "unit_price": "240.0",
+     "amount": "1200.0",
+     "note": "Volume discount"
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 8,
+     "unit_price": "480.0",
+     "amount": "3840.0",
+     "note": "Volume discount"
+    },
+    {
+     "item": "GadgetX",
+     "quantity": 3,
+     "unit_price": "750.0",
+     "amount": "2250.0",
+     "note": "Expedited"
+    },
+    {
+     "item": "WidgetA",
+     "quantity": 2,
+     "unit_price": "250.0",
+     "amount": "500.0",
+     "note": "Replacement"
+    },
+    {
+     "item": "GadgetX",
+     "quantity": 1,
+     "unit_price": "750.0",
+     "amount": "750.0",
+     "note": "Sample"
+    }
+   ],
+   "subtotal": "21040.0",
+   "tax_amount": "1472.8",
+   "shipping": null,
+   "total": "22562.8",
+   "payment_terms": "Net 60",
+   "bank_account": null,
+   "notes": null,
+   "source_path": "data/invoices/invoice_1013.json",
+   "source_format": "json",
+   "channel": "structured",
+   "extractor": "json",
+   "parse_warnings": []
+  },
+  "findings": [
+   {
+    "code": "price_variance",
+    "severity": "warn",
+    "message": "WidgetA: billed 240.0 vs catalog 250.00 (4% off) [Volume discount]"
+   },
+   {
+    "code": "price_variance",
+    "severity": "warn",
+    "message": "WidgetB: billed 480.0 vs catalog 500.00 (4% off) [Volume discount]"
+   },
+   {
+    "code": "insufficient_stock",
+    "severity": "error",
+    "message": "WidgetA: 22 billed but only 15 in stock"
+   },
+   {
+    "code": "insufficient_stock",
+    "severity": "error",
+    "message": "WidgetB: 18 billed but only 10 in stock"
+   },
+   {
+    "code": "insufficient_stock",
+    "severity": "error",
+    "message": "GadgetX: 9 billed but only 5 in stock"
+   },
+   {
+    "code": "total_math",
+    "severity": "error",
+    "message": "subtotal 21040.0 + tax 1472.8 + shipping 0 = 22512.8, invoice total is 22562.8"
+   }
+  ],
+  "approval": {
+   "decision": "reject",
+   "reasoning": "Rejected: WidgetA: 22 billed but only 15 in stock; WidgetB: 18 billed but only 10 in stock; GadgetX: 9 billed but only 5 in stock; subtotal 21040.0 + tax 1472.8 + shipping 0 = 22512.8, invoice total is 22562.8",
+   "rounds": 1,
+   "critiques": []
+  },
+  "paid": false,
+  "payment_ref": null,
+  "payment_amount": null,
+  "payment_state": null,
+  "release_on": null,
+  "error": null,
+  "timings_ms": {
+   "parse": 0.0,
+   "llm_extract": 0.01,
+   "validate": 6.58,
+   "approve": 7042.89,
+   "settle": 23137.25
+  },
+  "trace": [
+   {
+    "agent": "Intake",
+    "action": "read json via json",
+    "ms": 0.0
+   },
+   {
+    "agent": "Validation",
+    "action": "checked against ERP and policy",
+    "ms": 0.13
+   },
+   {
+    "agent": "Reviewer",
+    "action": "decided",
+    "ms": 7042.88,
+    "events": [
+     {
+      "kind": "skipped",
+      "as": "reviewer"
+     },
+     {
+      "kind": "skipped",
+      "as": "critic"
+     }
+    ]
+   },
+   {
+    "agent": "Comms",
+    "action": "explained in plain English",
+    "ms": 23136.83,
+    "events": [
+     {
+      "kind": "model",
+      "as": "comms",
+      "tokens": [
+       424,
+       62
+      ],
+      "model": "grok-4.3"
+     },
+     {
+      "kind": "wrote",
+      "text": "The invoice was rejected after checks found inconsistencies between billed quantities and available stock for multiple items, along with a mismatch between the calculated total and the invoiced amount"
+     }
+    ]
+   },
+   {
+    "agent": "Comms",
+    "action": "drafted vendor follow-up",
+    "ms": 14440.15,
+    "events": [
+     {
+      "kind": "model",
+      "as": "comms",
+      "tokens": [
+       390,
+       36
+      ],
+      "model": "grok-4.3"
+     },
+     {
+      "kind": "rejected",
+      "text": "model text discarded (required figures missing: ['0', '1472.8', '21040.0']); using the template"
+     }
+    ]
+   }
+  ],
+  "llm": {
+   "calls": 2,
+   "cached": 0,
+   "skipped": [
+    "reviewer",
+    "critic"
+   ],
+   "tools": 0,
+   "tokens_in": 814,
+   "tokens_out": 98,
+   "cost_ticks": 62037000
+  },
+  "sender": null,
+  "subject": null,
+  "followup": "To: (sender unknown: file intake)\nSubject: Quick question on invoice INV-1013\n\nHello,\n\nThanks for your invoice INV-1013. We can pay it as soon as we confirm this (a one-line reply is fine, no forms or portal needed):\n\n  1. The line items do not add up to the invoice total (subtotal 21040.0 + tax 1472.8 + shipping 0 = 22512.8, invoice total is 22562.8). Is the stated total correct, or can you send a corrected invoice?\n\nThank you,\nAccounts Payable, Acme Corp",
+  "approval_request": null,
+  "awaiting": null,
+  "approval_card": null,
+  "explanation": "The invoice was rejected after checks found inconsistencies between billed quantities and available stock for multiple items, along with a mismatch between the calculated total and the invoiced amount. These findings point to potential overbilling and an error in the invoice totals. Review the details and determine next steps for resolution.",
+  "status": "REJECT"
+ },
+ {
+  "source_path": "data/invoices/invoice_1013.pdf",
+  "invoice": {
+   "invoice_number": "INV-1013",
+   "revision": null,
+   "vendor": "Atlas Industrial Supply",
+   "date": "2026-01-24",
+   "due_date": "2026-03-24",
+   "currency": "USD",
+   "line_items": [
+    {
+     "item": "WidgetA",
+     "quantity": 15,
+     "unit_price": "250.0",
+     "amount": "3750.0",
+     "note": null
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 10,
+     "unit_price": "500.0",
+     "amount": "5000.0",
+     "note": null
+    },
+    {
+     "item": "GadgetX",
+     "quantity": 5,
+     "unit_price": "750.0",
+     "amount": "3750.0",
+     "note": null
+    },
+    {
+     "item": "WidgetA",
+     "quantity": 5,
+     "unit_price": "240.0",
+     "amount": "1200.0",
+     "note": null
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 8,
+     "unit_price": "480.0",
+     "amount": "3840.0",
+     "note": null
+    },
+    {
+     "item": "GadgetX",
+     "quantity": 3,
+     "unit_price": "750.0",
+     "amount": "2250.0",
+     "note": null
+    },
+    {
+     "item": "WidgetA",
+     "quantity": 2,
+     "unit_price": "250.0",
+     "amount": "500.0",
+     "note": null
+    },
+    {
+     "item": "GadgetX",
+     "quantity": 1,
+     "unit_price": "750.0",
+     "amount": "750.0",
+     "note": null
+    }
+   ],
+   "subtotal": "21040.0",
+   "tax_amount": "1472.8",
+   "shipping": null,
+   "total": "22562.8",
+   "payment_terms": "Net 60",
+   "bank_account": null,
+   "notes": null,
+   "source_path": "data/invoices/invoice_1013.pdf",
+   "source_format": "pdf",
+   "channel": "unstructured",
+   "extractor": "grok+regex-check (attempt 1)",
+   "parse_warnings": []
+  },
+  "findings": [
+   {
+    "code": "duplicate_invoice",
+    "severity": "error",
+    "message": "already received from invoice_1013.json; not processed twice"
+   }
+  ],
+  "approval": {
+   "decision": "reject",
+   "reasoning": "already received from invoice_1013.json; not processed twice",
+   "rounds": 1,
+   "critiques": []
+  },
+  "paid": false,
+  "payment_ref": null,
+  "payment_amount": null,
+  "payment_state": null,
+  "release_on": null,
+  "error": null,
+  "timings_ms": {
+   "parse": 385.3,
+   "llm_extract": 19970.12
+  },
+  "trace": [
+   {
+    "agent": "Intake",
+    "action": "read pdf via heuristic:pdf",
+    "ms": 19970.1,
+    "events": [
+     {
+      "kind": "model",
+      "as": "intake",
+      "tokens": [
+       652,
+       380
+      ],
+      "model": "grok-4.3"
+     }
+    ]
+   }
+  ],
+  "llm": {
+   "calls": 1,
+   "cached": 0,
+   "skipped": [],
+   "tools": 0,
+   "tokens_in": 652,
+   "tokens_out": 380,
+   "cost_ticks": 27931000
+  },
+  "sender": null,
+  "subject": null,
+  "followup": null,
+  "approval_request": null,
+  "awaiting": null,
+  "approval_card": null,
+  "explanation": null,
+  "status": "DUPLICATE"
+ },
+ {
+  "source_path": "data/invoices/invoice_1014.xml",
+  "invoice": {
+   "invoice_number": "INV-1014",
+   "revision": null,
+   "vendor": "TechParts International",
+   "date": "2026-01-26",
+   "due_date": "2026-02-26",
+   "currency": "EUR",
+   "line_items": [
+    {
+     "item": "WidgetA",
+     "quantity": 4,
+     "unit_price": "225.00",
+     "amount": null,
+     "note": null
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 6,
+     "unit_price": "475.00",
+     "amount": null,
+     "note": null
+    }
+   ],
+   "subtotal": "3750.00",
+   "tax_amount": "375.00",
+   "shipping": null,
+   "total": "4125.00",
+   "payment_terms": "Net 30",
+   "bank_account": null,
+   "notes": null,
+   "source_path": "data/invoices/invoice_1014.xml",
+   "source_format": "xml",
+   "channel": "structured",
+   "extractor": "xml",
+   "parse_warnings": []
+  },
+  "findings": [
+   {
+    "code": "foreign_currency",
+    "severity": "hold",
+    "message": "billed in EUR; no FX policy to settle in USD"
+   },
+   {
+    "code": "price_variance",
+    "severity": "warn",
+    "message": "WidgetA: billed 225.00 vs catalog 250.00 (10% off)"
+   },
+   {
+    "code": "price_variance",
+    "severity": "warn",
+    "message": "WidgetB: billed 475.00 vs catalog 500.00 (5% off)"
+   }
+  ],
+  "approval": {
+   "decision": "escalate",
+   "reasoning": "Needs human review: billed in EUR; no FX policy to settle in USD",
+   "rounds": 2,
+   "critiques": [
+    "policy requires at least escalate, draft says approve",
+    "approval conflicts with blocking findings"
+   ]
+  },
+  "paid": false,
+  "payment_ref": null,
+  "payment_amount": null,
+  "payment_state": null,
+  "release_on": null,
+  "error": null,
+  "timings_ms": {
+   "parse": 0.0,
+   "llm_extract": 0.01,
+   "validate": 6.72,
+   "approve": 7042.83,
+   "settle": 19965.6
+  },
+  "trace": [
+   {
+    "agent": "Intake",
+    "action": "read xml via xml",
+    "ms": 0.0
+   },
+   {
+    "agent": "Validation",
+    "action": "checked against ERP and policy",
+    "ms": 0.09
+   },
+   {
+    "agent": "Reviewer",
+    "action": "decided",
+    "ms": 7042.82,
+    "events": [
+     {
+      "kind": "skipped",
+      "as": "reviewer"
+     },
+     {
+      "kind": "skipped",
+      "as": "critic"
+     }
+    ]
+   },
+   {
+    "agent": "Comms",
+    "action": "explained in plain English",
+    "ms": 19961.97,
+    "events": [
+     {
+      "kind": "model",
+      "as": "comms",
+      "tokens": [
+       371,
+       28
+      ],
+      "model": "grok-4.3"
+     },
+     {
+      "kind": "wrote",
+      "text": "The invoice is billed in EUR. Checks found no FX policy to settle in USD. Escalate to Treasury for decision."
+     }
+    ]
+   },
+   {
+    "agent": "Desk",
+    "action": "routed to a person",
+    "ms": 3.47
+   }
+  ],
+  "llm": {
+   "calls": 1,
+   "cached": 0,
+   "skipped": [
+    "reviewer",
+    "critic"
+   ],
+   "tools": 0,
+   "tokens_in": 371,
+   "tokens_out": 28,
+   "cost_ticks": 28493500
+  },
+  "sender": null,
+  "subject": null,
+  "followup": null,
+  "approval_request": 1,
+  "awaiting": "Treasury",
+  "approval_card": "To: treasury@acmecorp.example\nSubject: Decision needed: EUR 4125.00 to TechParts International (INV-1014)\n\nPay EUR 4125.00 to TechParts International?\n\nWHY YOU\n  - billed in EUR; no FX policy to settle in USD\n\nTHE INVOICE\n  Invoice INV-1014, dated 2026-01-26, due 2026-02-26, terms Net 30\n  2 line(s): WidgetA x4, WidgetB x6\n  Read by: xml (structured)\n\nIN SHORT\n  The invoice is billed in EUR. Checks found no FX policy to settle in USD. Escalate to Treasury for decision.\n\nSYSTEM RECOMMENDATION\n  REVIEW BEFORE APPROVING: billed in EUR; no FX policy to settle in USD\n\nNOTED (did not block)\n  - WidgetA: billed 225.00 vs catalog 250.00 (10% off)\n  - WidgetB: billed 475.00 vs catalog 500.00 (5% off)\n\n  APPROVE: http://127.0.0.1:8765/decide?t=eyJyIjoxLCJhIjoiYXBwcm92ZSIsImgiOiIyNGMyMjVkNjU5ZjZmMjNhIiwieCI6MTc5MzU4OTk0Mn0.iZ3ZvhB_Q8_KWryOTY-dig\n  REJECT:  http://127.0.0.1:8765/decide?t=eyJyIjoxLCJhIjoicmVqZWN0IiwiaCI6IjI0YzIyNWQ2NTlmNmYyM2EiLCJ4IjoxNzkzNTg5OTQyfQ.-vVMg4uC-an2pG9aJPP8wA\n\nThese links work once, only for this invoice as shown, and expire in 5 days.\nNothing is paid until you approve; if you do not respond it will be escalated to your delegate.",
+  "explanation": "The invoice is billed in EUR. Checks found no FX policy to settle in USD. Escalate to Treasury for decision.",
+  "status": "AWAITING"
+ },
+ {
+  "source_path": "data/invoices/invoice_1015.csv",
+  "invoice": {
+   "invoice_number": "INV-1015",
+   "revision": null,
+   "vendor": "Reliable Components Inc.",
+   "date": "2026-01-29",
+   "due_date": "2026-02-28",
+   "currency": "USD",
+   "line_items": [
+    {
+     "item": "WidgetA",
+     "quantity": 10,
+     "unit_price": "250.00",
+     "amount": "2500.00",
+     "note": null
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 5,
+     "unit_price": "500.00",
+     "amount": "2500.00",
+     "note": null
+    },
+    {
+     "item": "GadgetX",
+     "quantity": 2,
+     "unit_price": "750.00",
+     "amount": "1500.00",
+     "note": null
+    }
+   ],
+   "subtotal": "6500.00",
+   "tax_amount": "0.00",
+   "shipping": null,
+   "total": "6500.00",
+   "payment_terms": null,
+   "bank_account": null,
+   "notes": null,
+   "source_path": "data/invoices/invoice_1015.csv",
+   "source_format": "csv",
+   "channel": "structured",
+   "extractor": "csv",
+   "parse_warnings": []
+  },
+  "findings": [],
+  "approval": {
+   "decision": "approve",
+   "reasoning": "Total 6500 USD <=10000, no errors/holds in findings []",
+   "rounds": 1,
+   "critiques": []
+  },
+  "paid": true,
+  "payment_ref": "ACH-870CA28D5A",
+  "payment_amount": "6500.00",
+  "payment_state": "submitted",
+  "release_on": "2026-10-27",
+  "error": null,
+  "timings_ms": {
+   "parse": 0.0,
+   "llm_extract": 0.0,
+   "validate": 2.93,
+   "approve": 7046.21,
+   "settle": 1.8
+  },
+  "trace": [
+   {
+    "agent": "Intake",
+    "action": "read csv via csv",
+    "ms": 0.0
+   },
+   {
+    "agent": "Validation",
+    "action": "checked against ERP and policy",
+    "ms": 0.09
+   },
+   {
+    "agent": "Reviewer",
+    "action": "decided",
+    "ms": 7046.2,
+    "events": [
+     {
+      "kind": "model",
+      "as": "reviewer",
+      "tokens": [
+       643,
+       28
+      ],
+      "model": "grok-4.3"
+     },
+     {
+      "kind": "decision",
+      "text": "approve: Total 6500 USD <=10000, no errors/holds in findings []"
+     },
+     {
+      "kind": "skipped",
+      "as": "critic"
+     }
+    ]
+   },
+   {
+    "agent": "Payment",
+    "action": "scheduled / sent",
+    "ms": 1.51
+   }
+  ],
+  "llm": {
+   "calls": 1,
+   "cached": 0,
+   "skipped": [
+    "critic"
+   ],
+   "tools": 0,
+   "tokens_in": 643,
+   "tokens_out": 28,
+   "cost_ticks": 16293500
+  },
+  "sender": null,
+  "subject": null,
+  "followup": null,
+  "approval_request": null,
+  "awaiting": null,
+  "approval_card": null,
+  "explanation": null,
+  "status": "PAID"
+ },
+ {
+  "source_path": "data/invoices/invoice_1016.json",
+  "invoice": {
+   "invoice_number": "INV-1016",
+   "revision": null,
+   "vendor": "Widgets Inc.",
+   "date": "2026-01-27",
+   "due_date": "2026-02-27",
+   "currency": "USD",
+   "line_items": [
+    {
+     "item": "WidgetA",
+     "quantity": 4,
+     "unit_price": "250.0",
+     "amount": "1000.0",
+     "note": null
+    },
+    {
+     "item": "WidgetB",
+     "quantity": 2,
+     "unit_price": "500.0",
+     "amount": "1000.0",
+     "note": null
+    },
+    {
+     "item": "WidgetC",
+     "quantity": 3,
+     "unit_price": "350.0",
+     "amount": "1050.0",
+     "note": null
+    }
+   ],
+   "subtotal": "3050.0",
+   "tax_amount": "183.0",
+   "shipping": null,
+   "total": "3233.0",
+   "payment_terms": "Net 30",
+   "bank_account": null,
+   "notes": null,
+   "source_path": "data/invoices/invoice_1016.json",
+   "source_format": "json",
+   "channel": "structured",
+   "extractor": "json",
+   "parse_warnings": []
+  },
+  "findings": [
+   {
+    "code": "unknown_item",
+    "severity": "error",
+    "message": "'WidgetC' not found in inventory"
+   }
+  ],
+  "approval": {
+   "decision": "reject",
+   "reasoning": "Rejected: 'WidgetC' not found in inventory",
+   "rounds": 1,
+   "critiques": []
+  },
+  "paid": false,
+  "payment_ref": null,
+  "payment_amount": null,
+  "payment_state": null,
+  "release_on": null,
+  "error": null,
+  "timings_ms": {
+   "parse": 0.0,
+   "llm_extract": 0.01,
+   "validate": 8273.17,
+   "approve": 11058.48,
+   "settle": 12800.25
+  },
+  "trace": [
+   {
+    "agent": "Intake",
+    "action": "read json via json",
+    "ms": 0.0
+   },
+   {
+    "agent": "Validation",
+    "action": "checked against ERP and policy",
+    "ms": 8266.43,
+    "events": [
+     {
+      "kind": "model",
+      "as": "resolver",
+      "tokens": [
+       471,
+       11
+      ],
+      "model": "grok-4.3"
+     },
+     {
+      "kind": "tool",
+      "name": "search_items",
+      "args": "{\"query\":\"WidgetC\"}",
+      "result": "{'result': [{'name': 'WidgetA', 'stock': 15, 'unit_price': '250.00', 'similarity': 0.86}, {'name': 'WidgetB', 'stock': 10, 'unit_price': '500.00', 'similarity':"
+     },
+     {
+      "kind": "model",
+      "as": "resolver",
+      "tokens": [
+       584,
+       6
+      ],
+      "model": "grok-4.3"
+     }
+    ]
+   },
+   {
+    "agent": "Reviewer",
+    "action": "decided",
+    "ms": 11058.47,
+    "events": [
+     {
+      "kind": "skipped",
+      "as": "reviewer"
+     },
+     {
+      "kind": "skipped",
+      "as": "critic"
+     }
+    ]
+   },
+   {
+    "agent": "Comms",
+    "action": "explained in plain English",
+    "ms": 12799.87,
+    "events": [
+     {
+      "kind": "model",
+      "as": "comms",
+      "tokens": [
+       358,
+       32
+      ],
+      "model": "grok-4.3"
+     },
+     {
+      "kind": "wrote",
+      "text": "Invoice INV-1016 from Widgets Inc. was rejected. Checks found 'WidgetC' not in inventory. Please decide next steps."
+     }
+    ]
+   },
+   {
+    "agent": "Comms",
+    "action": "drafted vendor follow-up",
+    "ms": 14081.6,
+    "events": [
+     {
+      "kind": "model",
+      "as": "comms",
+      "tokens": [
+       361,
+       50
+      ],
+      "model": "grok-4.3"
+     },
+     {
+      "kind": "wrote",
+      "text": "Regarding invoice INV-1016, we cannot match an item on this invoice to our catalogue ('WidgetC' not found in inventory). Which PO number and PO line does it belong to? Accounts Payable, Acme Corp"
+     }
+    ]
+   }
+  ],
+  "llm": {
+   "calls": 4,
+   "cached": 0,
+   "skipped": [
+    "reviewer",
+    "critic"
+   ],
+   "tools": 1,
+   "tokens_in": 1774,
+   "tokens_out": 99,
+   "cost_ticks": 71074000
+  },
+  "sender": null,
+  "subject": null,
+  "followup": "To: (sender unknown: file intake)\nSubject: Quick question on invoice INV-1016\n\nRegarding invoice INV-1016, we cannot match an item on this invoice to our catalogue ('WidgetC' not found in inventory). Which PO number and PO line does it belong to?\nAccounts Payable, Acme Corp",
+  "approval_request": null,
+  "awaiting": null,
+  "approval_card": null,
+  "explanation": "Invoice INV-1016 from Widgets Inc. was rejected. Checks found 'WidgetC' not in inventory. Please decide next steps.",
+  "status": "REJECT"
+ }
+]

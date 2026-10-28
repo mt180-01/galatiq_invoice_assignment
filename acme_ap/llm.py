@@ -83,6 +83,57 @@ def run_tool(tools: dict[str, Tool], name: str, raw_args: str | dict) -> dict:
 M = TypeVar("M", bound=BaseModel)
 
 
+def parse_json_object(content: str | None) -> dict:
+    """The first complete JSON object in a model's reply: the whole text if it is JSON, else a ```fenced``` block, else the first balanced
+    {...} found by actually parsing (not a greedy pattern, which swallows everything between the first '{' and the last '}')."""
+    text = (content or "").strip()
+    candidates = [text, *re.findall(r"```(?:json)?\s*(.*?)```", text, re.S)]
+    for cand in candidates:
+        try:
+            data = json.loads(cand.strip())
+        except json.JSONDecodeError:
+            continue
+        if isinstance(data, dict):
+            return data
+    decoder = json.JSONDecoder()
+    for i, ch in enumerate(text):
+        if ch == "{":
+            try:
+                data, _ = decoder.raw_decode(text[i:])
+            except json.JSONDecodeError:
+                continue
+            if isinstance(data, dict):
+                return data
+    raise LLMUnavailable("the reply contained no JSON object" if "{" not in text else "the reply contained no valid JSON object")
+
+
+_UNSUPPORTED = {"title", "default", "minLength", "maxLength", "minItems", "maxItems", "minimum", "maximum", "examples", "description"}
+
+
+def strict_schema(model: type[BaseModel]) -> dict:
+    """The model's JSON Schema in the strict dialect structured-output APIs accept: every property required, no extra properties, and none of the
+    keywords strict mode rejects. (Pydantic still enforces the full rules, lengths included, on what comes back.)"""
+    def clean(node):
+        if isinstance(node, dict):
+            out = {k: clean(v) for k, v in node.items() if k not in _UNSUPPORTED or k == "properties"}
+            if out.get("type") == "object" or "properties" in out:
+                out["additionalProperties"] = False
+                out["required"] = list(out.get("properties", {}))
+            return out
+        if isinstance(node, list):
+            return [clean(v) for v in node]
+        return node
+    schema = model.model_json_schema()
+    defs = schema.pop("$defs", None)
+    schema = clean(schema)
+    if defs:
+        schema["$defs"] = {k: clean(v) for k, v in defs.items()}
+    return schema
+
+
+_wanted_schema: contextvars.ContextVar[tuple[str, dict] | None] = contextvars.ContextVar("wanted_schema", default=None)
+
+
 class Meter:
     """What the model cost. Prices are USD per million tokens from XAI_PRICE_IN / XAI_PRICE_OUT; with none set, only
     tokens are reported (this repo does not guess a tariff)."""
@@ -205,7 +256,10 @@ class GrokClient(LLM):
     label = "Grok"
     DEFAULT_RETRY = (1.0, 3.0)
     _model_checked = False
-    _json_mode = True  # ask the API for a JSON object; switched off for good if the endpoint rejects the parameter
+    # How hard to ask for well-formed JSON, strongest first: a JSON Schema ("json_schema"), a JSON object ("json_object"), or just ask nicely
+    # ("none"). If the endpoint rejects the parameter we step down one level for good, so a refusal costs one retry, once.
+    _format_mode = "json_schema"
+    _FORMATS = ("json_schema", "json_object", "none")
 
     async def _send(self, payload: dict) -> httpx.Response:
         """POST with a couple of patient retries for the failures that clear by themselves (rate limit, 'at capacity', 5xx, timeouts)."""
@@ -242,10 +296,17 @@ class GrokClient(LLM):
                     self.model = found
                     payload = {**payload, "model": found}
                     resp = await self._send(payload)
-            if resp.status_code in (400, 422) and "response_format" in payload and "response_format" in resp.text:
-                type(self)._json_mode = False  # this endpoint does not take it: carry on without
+            if resp.status_code in (400, 422) and "response_format" in payload and any(w in resp.text.lower() for w in ("response_format", "json_schema", "schema", "format")):
+                lower = self._FORMATS[min(self._FORMATS.index(type(self)._format_mode) + 1, 2)]
+                type(self)._format_mode = lower  # this endpoint does not take the stronger form: step down and carry on
                 payload = {k: v for k, v in payload.items() if k != "response_format"}
+                if lower == "json_object":
+                    payload["response_format"] = {"type": "json_object"}
                 resp = await self._send(payload)
+                if resp.status_code in (400, 422) and "response_format" in payload:  # not even json_object: ask without
+                    type(self)._format_mode = "none"
+                    payload = {k: v for k, v in payload.items() if k != "response_format"}
+                    resp = await self._send(payload)
             resp.raise_for_status()
             body = resp.json()
             body["choices"][0]["message"]
@@ -277,16 +338,7 @@ class GrokClient(LLM):
 
     @staticmethod
     def _json_from(content: str) -> dict:
-        match = re.search(r"\{.*\}", content or "", re.S)
-        if not match:
-            raise LLMUnavailable("Grok returned no JSON object")
-        try:
-            data = json.loads(match.group(0))
-        except json.JSONDecodeError as exc:
-            raise LLMUnavailable(f"Grok returned invalid JSON: {exc}") from exc
-        if not isinstance(data, dict):
-            raise LLMUnavailable("Grok returned JSON that is not an object")
-        return data
+        return parse_json_object(content)
 
     async def chat_json(self, system: str, user: str) -> dict:
         agent = _agent.get()
@@ -298,7 +350,10 @@ class GrokClient(LLM):
             return hit
         payload = {"model": model, "temperature": 0, "max_tokens": MAX_OUT.get(agent, 600),
                    "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
-        if self._json_mode:
+        wanted = _wanted_schema.get()
+        if type(self)._format_mode == "json_schema" and wanted:
+            payload["response_format"] = {"type": "json_schema", "json_schema": {"name": wanted[0], "schema": wanted[1], "strict": True}}
+        elif type(self)._format_mode != "none":
             payload["response_format"] = {"type": "json_object"}
         data = self._json_from((await self._post(payload, agent))["choices"][0]["message"].get("content"))
         if self.cache:
@@ -369,7 +424,11 @@ async def structured(llm: LLM, system: str, user: str, schema: type[M], tools: l
     then give up with LLMUnavailable so the caller falls back to the deterministic path."""
     prompt, last = user, None
     for _ in range(repairs + 1):
-        data = await (llm.run_tools(system, prompt, tools) if tools else llm.chat_json(system, prompt))
+        token = _wanted_schema.set((schema.__name__, strict_schema(schema)))  # lets a capable endpoint enforce the shape itself
+        try:
+            data = await (llm.run_tools(system, prompt, tools) if tools else llm.chat_json(system, prompt))
+        finally:
+            _wanted_schema.reset(token)
         try:
             return schema.model_validate(data)
         except ValidationError as exc:

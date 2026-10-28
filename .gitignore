@@ -10,3 +10,4 @@ outbox/
 .env.*
 *.key
 xai_key
+ui_demo.db*

@@ -1,6 +1,6 @@
 PY = .venv/bin/python
 
-.PHONY: setup test demo bench e2e
+.PHONY: setup test demo bench e2e ui
 
 setup:
 	python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
@@ -16,3 +16,6 @@ bench:
 
 e2e:
 	$(PY) scripts/e2e_check.py
+
+ui:
+	$(PY) main.py serve --demo --db ui_demo.db

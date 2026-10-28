@@ -47,7 +47,7 @@ async def main() -> int:
     async def auth():
         with as_agent("reviewer"):
             reply = await llm.chat_json("Reply with the JSON object {\"ok\": true}.", "ping")
-        return reply.get("ok") is True, f"model {MODEL} answered; JSON mode {'accepted' if GrokClient._json_mode else 'rejected, client dropped it'}"
+        return reply.get("ok") is True, f"model {MODEL} answered; response format now: {GrokClient._format_mode}"
 
     async def tools():
         calls = []
@@ -61,7 +61,7 @@ async def main() -> int:
         with as_agent("reviewer"):
             r = await structured(llm, "You approve invoices. Reply as JSON {\"decision\": \"approve|reject|escalate\", \"reasoning\": \"...\"}.",
                                  "A clean $500 invoice from an approved vendor, all items in stock. Decide.", approval.ReviewDecision)
-        return r.decision in ("approve", "reject", "escalate"), f"decision={r.decision}"
+        return r.decision in ("approve", "reject", "escalate"), f"decision={r.decision}; the endpoint accepted response format '{GrokClient._format_mode}'"
 
     async def extraction():
         inv, text = parse_file(str(ROOT / "data/invoices/invoice_1010.txt"))      # the typo-heavy one

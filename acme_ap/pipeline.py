@@ -56,10 +56,11 @@ def bill_key(inv: Invoice) -> str:
 class Pipeline:
     def __init__(self, erp: ErpAdapter, llm: LLM, workers: int | None = None, llm_concurrency: int = 8,
                  origins: dict[str, Origin] | None = None, approvals=None, payments=None, bank_concurrency: int = 8,
-                 llm_policy: str = "gated"):
+                 llm_policy: str = "gated", store=None):
         self.erp, self.llm = erp, llm
         self.origins = origins or {}
         self.approvals = approvals
+        self.store = store  # optional: keeps each finished outcome for the web interface
         self.payments = payments or getattr(approvals, "payments", None) or default_payments(erp)
         gated = llm_policy == "gated"  # "always" = ask the model on every invoice (the pre-optimisation behaviour, kept for comparison)
         self.intake, self.validator = IntakeAgent(llm, gated), ValidationAgent(erp, self.payments, llm)
@@ -113,6 +114,23 @@ class Pipeline:
         return text
 
     async def _process(self, path: str, parse_future: asyncio.Future, idx: int) -> Outcome:
+        """One invoice start to finish. The finishing touches (what the model cost, the stored record) happen for every outcome,
+        including duplicates and unreadable files, which leave _process_one early."""
+        ledger: list = []
+        invoice_ledger.set(ledger)  # this task's model use, summed into out.llm at the end
+        out = await self._process_one(path, parse_future, idx)
+        out.llm = {"calls": sum(e[0] == "call" for e in ledger), "cached": sum(e[0] == "cached" for e in ledger),
+                   "skipped": [e[1] for e in ledger if e[0] == "skip"], "tools": sum(e[0] == "tool" for e in ledger),
+                   "tokens_in": sum(e[2] for e in ledger), "tokens_out": sum(e[3] for e in ledger),
+                   "cost_ticks": sum(e[4] for e in ledger)} if ledger else {}
+        if self.store is not None and (out.invoice is not None or out.error):
+            try:
+                await asyncio.to_thread(self.store.save, out, bill_key(out.invoice) if out.invoice else None)
+            except Exception:  # noqa: BLE001 - keeping a record must never fail an invoice
+                log.exception("could not store the outcome")
+        return out
+
+    async def _process_one(self, path: str, parse_future: asyncio.Future, idx: int) -> Outcome:
         origin = self.origins.get(path)
         out, t = Outcome(source_path=path, sender=origin.sender if origin else None,
                          subject=origin.subject if origin else None), time.perf_counter()
@@ -124,8 +142,6 @@ class Pipeline:
             out.timings_ms[stage] = round((now - t) * 1000, 2)
             t = now
 
-        ledger: list = []
-        invoice_ledger.set(ledger)  # this task's model use, summed into out.llm at the end
         try:
             kind, payload = (await parse_future)[idx]
             if kind == "err":
@@ -185,8 +201,4 @@ class Pipeline:
         except Exception as exc:  # noqa: BLE001 - one bad invoice never stops the batch
             out.error = f"{type(exc).__name__}: {exc}"
             log.exception("unhandled error", extra={"trace": trace, "stage": "pipeline", "detail": out.error})
-        out.llm = {"calls": sum(e[0] == "call" for e in ledger), "cached": sum(e[0] == "cached" for e in ledger),
-                   "skipped": [e[1] for e in ledger if e[0] == "skip"], "tools": sum(e[0] == "tool" for e in ledger),
-                   "tokens_in": sum(e[2] for e in ledger), "tokens_out": sum(e[3] for e in ledger),
-                   "cost_ticks": sum(e[4] for e in ledger)} if ledger else {}
         return out

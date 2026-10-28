@@ -119,8 +119,9 @@ def _comms_email(user: str) -> httpx.Response:
 def _comms_summary(user: str) -> httpx.Response:
     f = json.loads(user)
     problems = "; ".join(f["findings"][:2]) or "no specific finding recorded"
-    nxt = f"It needs a decision from {f['next_owner']}." if f.get("next_owner") else "Nothing further is needed unless the vendor sends a corrected invoice."
-    return _reply(json.dumps({"summary": f"Invoice {f['invoice']} from {f['vendor']} for {f['currency']} {f['total']} was {f['decision']}ed by the checks: {problems}. {nxt}"}))
+    verb = {"reject": "was rejected by the checks", "escalate": "needs a person's decision"}.get(f["decision"], "was reviewed")
+    nxt = f"Next: {f['next_owner']} decides." if f.get("next_owner") else "Nothing further is needed unless the vendor sends a corrected invoice."
+    return _reply(json.dumps({"summary": f"Invoice {f['invoice']} from {f['vendor']} for {f['currency']} {f['total']} {verb}: {problems}. {nxt}"}))
 
 
 def handler(request: httpx.Request) -> httpx.Response:

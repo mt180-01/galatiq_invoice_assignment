@@ -147,7 +147,7 @@ did not change (the single orchestrating process is still the ceiling).
 Try it: `python main.py --invoice_path=data/approvals_demo`, read `outbox/approvals/*.txt`, then `python approve.py list` / `respond <token> --as <email>` / `tick --hours 50`.
 `--auto-vp` runs a clearly labelled **simulated** VP for demos. The brief's "simulate VP review" is covered by the rule-based approver plus this workflow; no real person or mail system is involved.
 
-**Not built / limits**: no email sending, no inbound reply parsing, no web endpoint (the links point at a fictional host and are exercised through `approve.py`), no authentication of the responder beyond the signed token (a real endpoint must authenticate the person, e.g. SSO, and check they hold the role), no segregation-of-duties check against who created the bill, no out-of-office calendar, no bulk approval. The approver directory is fictional role mailboxes.
+**Not built / limits**: no email sending, no inbound reply parsing, the links open the local web interface (section 4k) or `approve.py`; no authentication of the responder beyond the signed token and a pick-your-mailbox list (a real endpoint must authenticate the person, e.g. SSO, and check they hold the role), no segregation-of-duties check against who created the bill, no out-of-office calendar, no bulk approval. The approver directory is fictional role mailboxes.
 
 **SIMD / vectorisation: not used here, on purpose.** Measured (`scripts/bench_approvals.py`): routing 0.8 us, hashing 2.6 us, signing/verifying a token ~2.5 us, and creating a request plus rendering its card ~100 us. A person takes minutes to days.
 Even 100,000 pending requests is ~10 s of compute in total. The cost to optimise is human waiting time (right person, evidence in the message, reminders, escalation), not CPU.
@@ -233,7 +233,7 @@ trail is recorded and shown. The "first read" is deliberately simpler than the f
 | **Grok as the reasoning engine** (xAI API) | `GrokClient` speaks the OpenAI-compatible chat-completions protocol xAI uses (`https://api.x.ai/v1`, `grok-3`, `XAI_API_KEY`). Grok does the judgement work: reading documents the rules cannot, and a second opinion on invoices policy would approve. Routine, exact work (checks, routing, payment) stays in rules on purpose, to keep tokens and risk down. | `tests/test_pipeline.py`, `tests/test_tooluse.py`. Run live: `scripts/live_smoke.py` 5/5, full pipeline 17/17 (section 4i). |
 | **Multi-agent orchestration** | A custom orchestrator (`acme_ap/pipeline.py`) runs six agents (`python main.py agents`), each with a charter, tools and a trace entry per invoice. Chosen over a framework so that scheduling across CPU cores and I/O stays under our control. | `tests/test_agents_cost.py::test_trace_shows_which_agent_did_what` |
 | **Function calling / tool use** | The Reviewer's model chooses and calls read-only tools (`lookup_item`, `lookup_vendor`, `vendor_history`, `policy_limits`) in a bounded loop; bad calls come back as error messages it can correct. | `tests/test_tooluse.py` (tool loop, unknown tool, step limit, real ERP tools) |
-| **Structured outputs** | Replies must fit Pydantic schemas (`ReviewDecision`, `AuditIssues`); the request asks for a JSON object (dropped automatically if an endpoint rejects the parameter). | `test_malformed_reply_is_sent_back...`, `test_json_mode_is_dropped...` |
+| **Structured outputs** | Replies must fit Pydantic schemas (`ReviewDecision`, `AuditIssues`, `Corrections`, ...), sent to the API as strict JSON Schema (`response_format: json_schema`; verified accepted by the live API), stepping down to JSON-object mode and then to plain only if an endpoint refuses. JSON is found by parsing (first complete object; fenced blocks handled), not by a greedy pattern, and the result is validated again by Pydantic. | `test_malformed_reply_is_sent_back...`, `test_json_mode_is_dropped...` |
 | **Self-correction loops** | Four: arithmetic self-check with retry (Intake); schema repair (a malformed reply is returned to the model with the reason); the auditor challenging the reviewer's draft; and the always-on draft-critique-revise reflection. | `test_malformed_reply...`, `test_reviewer_reflects_and_revises...`, `test_llm_extract_*` |
 | **No internet; simulate locally** | With no key, a local stand-in speaks the *same protocol* as the HTTP transport of the real client (`acme_ap/sim_llm.py`), so prompts, tool calls and schema checks all run for real; the bank, ERP, email and approvers are local mocks. It is labelled "local simulation (not Grok)" wherever it appears and cannot show how well Grok reasons. `--offline` removes the model entirely. | `test_stand_in_model_reproduces_every_outcome_and_really_uses_tools` |
 | **Python, PyMuPDF, local** | Python 3.13, PyMuPDF for PDFs, Tesseract for scans, SQLite, no cloud. | `requirements.txt`, `make e2e` |
@@ -255,9 +255,21 @@ development came to a few cents. xAI's published rates for the model used are ab
 tokens (third-party pricing guides; not confirmed from an official page). Whether free promotional credits cover usage depends on the account and cannot
 be read with an API key; check the xAI console. Tests and `make e2e` never use a key.
 
+## 4k. The web interface
+
+`python main.py serve [--demo]` (or `make ui`) starts a local interface on `127.0.0.1:8765`: a **dashboard** (what happened, who is waiting and for how long, where the money
+is), an **invoice page** with the findings and *what each agent did* (every model call, tool call and conclusion), and the **approval page** the decision links open. Cards
+and links now point here instead of a made-up domain. It is the standard library only (nothing to install), reads the database the command-line runs leave behind
+(every outcome is stored with its trace), and is covered by `tests/test_web.py` over real HTTP.
+
+Security properties, tested: every dynamic value is HTML-escaped (a vendor named `<script>...` is shown as text); a strict content-security-policy, `nosniff` and `no-store` on every
+response; forged, empty, replayed and expired links are refused; a stranger's identity is refused; a double click pays once; the invoice is re-checked before any payment.
+Limit: the page lets you pick who you are from the mailboxes the routing table authorises for that request. That is a stand-in for single sign-on, and a real deployment
+must authenticate the person before showing this page. Screenshots in `docs/img/` are generated from a real run by `scripts/make_screens.py`.
+
 ## 4i. Verified against the live Grok API
 
-Run on 2026-10-27 with a real xAI key (kept in a private file outside the repo; `scripts/live_smoke.py` reads it and never prints it).
+Recorded transcripts and results are in [`docs/live_runs/`](live_runs/). Run on 2026-10-27 with a real xAI key (kept in a private file outside the repo; `scripts/live_smoke.py` reads it and never prints it).
 
 | Check | Result |
 |---|---|
