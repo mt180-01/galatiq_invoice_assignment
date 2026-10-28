@@ -248,7 +248,7 @@ def test_the_policy_is_stored_with_the_database_so_other_tools_follow_it(tmp_pat
     assert MockNetSuite(tmp_path / "s.db", keep_ledger=True).stock_policy == "reserve"                         # what approve.py, pay.py and the web page construct
     assert MockNetSuite(tmp_path / "s.db", keep_ledger=True, stock_policy="cap").stock_policy == "cap"        # and it can be changed on purpose
     with pytest.raises(ValueError):
-        MockNetSuite(tmp_path / "s.db", stock_policy="decrement")
+        MockNetSuite(tmp_path / "s.db", stock_policy="subtract")
 
 
 def test_a_person_approving_cannot_spend_stock_an_earlier_approval_already_took(tmp_path):

@@ -28,7 +28,7 @@ The command line is first-class too: [`docs/img/demo.svg`](docs/img/demo.svg) is
 | Robustness to garbage | 2,000 randomly corrupted invoices: **0 approved with a wrong value** (a stray "see invoice 31337" once got through; found and fixed) | `scripts/stress_extraction.py` |
 | Speed | a clean invoice spends about 10-15 ms in the system, against "5 days" in the brief; about 2,200 documents/s on 14 cores | `main.py --bench`, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §4 |
 | Waiting on a person | never silent: reminder at 24 h, escalation at 48 h, expiry at 5 days | `approve.py tick`, `make e2e` |
-| Tests | **331 tests** plus a **59-check end-to-end run** from a fresh clone; a test fails the build if a credential is ever committed | `make test`, `make e2e` |
+| Tests | **339 tests** plus a **60-check end-to-end run** from a fresh clone; a test fails the build if a credential is ever committed | `make test`, `make e2e` |
 
 ## Business impact
 
@@ -53,7 +53,7 @@ the cost side is measured.
 4. **Free by default, live on request, capped.** A local stand-in model (labelled as such) runs the same protocol; `--grok` is opt-in with a per-run budget; the default model is a plain one, not a reasoning one, because a
    reasoning model was ~3x the cost and several times slower for this work (measured).
 5. **The ledger is the system's memory and it is kept between runs**, so nothing is ever paid twice, with idempotency keys on every payment. Duplicates use the vendor's master name; a changed resubmission of a rejected invoice is allowed.
-6. **Stock is a per-invoice cap by default** (the brief's own table lists three invoices as "within stock" that together exceed it); `--stock-policy reserve` is the cumulative, opt-in alternative.
+6. **Stock is a per-invoice cap by default** (the brief's own table lists three invoices as "within stock" that together exceed it); `--stock-policy reserve` is the cumulative alternative, and `--stock-policy decrement` takes the units off the shelf for good when an invoice is paid (kept between runs; `main.py stock` shows what is left).
 7. **Payments are scheduled, not instant**: due date minus bank lead time (business days), early-pay discounts captured, an account on the invoice that differs from the one on file is held, new accounts need two people.
 8. **Approvals are signed links issued to one mailbox**, single-use, expiring, bound to the invoice as shown, with the signing key outside the database. *Trade-off:* a forwarded link acts as its addressee; real use needs email delivery and SSO.
 9. **A small web interface on the standard library, not Streamlit**: upload, dashboard, review queue and the approval page in one dependency-free server (hardened for the endpoints that can pay). *Trade-off:* less polish than a UI toolkit.
@@ -110,7 +110,7 @@ Contributing and a map of the code: [CONTRIBUTING.md](CONTRIBUTING.md). More: `a
 
 | Criterion | Where to look |
 |---|---|
-| **Functionality** | 17/17 end to end, offline and on live Grok; `make e2e` (59 checks from a fresh clone) |
+| **Functionality** | 17/17 end to end, offline and on live Grok; `make e2e` (60 checks from a fresh clone) |
 | **Code quality** | typed models, one responsibility per module, error handling at every boundary (a failing model step never fails an invoice), structured logs, 248 tests |
 | **Agentic sophistication** | the table above: tool use, strict structured output, five self-correction loops, six agents with charters, guards; recorded, replayable live runs and a per-invoice evaluation |
 | **Shipping mindset** | simulated what must be (bank, ERP, email) behind adapters; cut what doesn't earn its keep (no framework, no database server, no auth system); limits stated in §5 of the architecture doc |

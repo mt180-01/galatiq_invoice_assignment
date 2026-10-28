@@ -12,6 +12,7 @@ from pathlib import Path
 from .base import ItemRecord, VendorRecord
 
 ABANDONED_AFTER_MINUTES = 15  # a claim that is still 'received' after this long belongs to a crashed run
+STOCK_POLICIES = ("cap", "reserve", "decrement")
 FAILED = ('reject', 'rejected', 'blocked', 'expired')  # bill statuses that mean nothing was paid and the attempt is over
 SEED_ITEMS = [("WidgetA", 15, "250.00"), ("WidgetB", 10, "500.00"), ("GadgetX", 5, "750.00"), ("FakeItem", 0, "0.00")]
 SEED_VENDORS = [
@@ -32,6 +33,7 @@ CREATE TABLE IF NOT EXISTS vendor_bills (
 CREATE TABLE IF NOT EXISTS vendor_payments (
     bill_key TEXT PRIMARY KEY, vendor TEXT, amount TEXT, reference TEXT, paid_at TEXT DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS stock_reservations (bill_key TEXT, item TEXT, qty INTEGER, PRIMARY KEY (bill_key, item));
+CREATE TABLE IF NOT EXISTS stock_movements (bill_key TEXT, item TEXT, qty INTEGER, PRIMARY KEY (bill_key, item));
 CREATE TABLE IF NOT EXISTS erp_settings (k TEXT PRIMARY KEY, v TEXT);
 CREATE TABLE IF NOT EXISTS audit_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT, bill_key TEXT, stage TEXT, detail TEXT, at TEXT DEFAULT CURRENT_TIMESTAMP);
@@ -64,16 +66,17 @@ class MockNetSuite:
                 c.execute("ALTER TABLE vendor_bills ADD COLUMN fingerprint TEXT")
             c.execute("CREATE INDEX IF NOT EXISTS vendor_bills_number ON vendor_bills(number)")  # near-duplicate lookups must not scan the ledger
             if not keep_ledger:
-                c.executescript("DELETE FROM vendor_bills; DELETE FROM vendor_payments; DELETE FROM audit_log; DELETE FROM stock_reservations;")
+                c.executescript("DELETE FROM vendor_bills; DELETE FROM vendor_payments; DELETE FROM audit_log; DELETE FROM stock_reservations; DELETE FROM stock_movements;")
             if stock_policy:
-                if stock_policy not in ("cap", "reserve"):
-                    raise ValueError("stock_policy must be 'cap' or 'reserve'")
+                if stock_policy not in STOCK_POLICIES:
+                    raise ValueError("stock_policy must be one of " + ", ".join(STOCK_POLICIES))
                 c.execute("INSERT OR REPLACE INTO erp_settings VALUES ('stock_policy', ?)", (stock_policy,))
             row = c.execute("SELECT v FROM erp_settings WHERE k='stock_policy'").fetchone()
             self.stock_policy = row[0] if row else "cap"
-            c.execute("DELETE FROM inventory")
+            if not keep_ledger:
+                c.execute("DELETE FROM inventory")  # a fresh ledger starts from the opening stock...
+            c.executemany("INSERT OR IGNORE INTO inventory VALUES (?,?,?)", SEED_ITEMS)  # ...otherwise stock is what the last run left (a new catalogue item is added, none is overwritten)
             c.execute("DELETE FROM vendors")
-            c.executemany("INSERT INTO inventory VALUES (?,?,?)", SEED_ITEMS)
             c.executemany("INSERT INTO vendors VALUES (?,?,?)", SEED_VENDORS)
             c.commit()
         self._items = {norm(n): n for n, _, _ in SEED_ITEMS}
@@ -104,13 +107,18 @@ class MockNetSuite:
             return None
         return ItemRecord(row[0], row[1] - self._reserved(row[0]), Decimal(row[2]), fuzzy)  # what is still unclaimed, if stock is being reserved
 
+    @property
+    def tracks_stock(self) -> bool:
+        """True when approved invoices claim stock (`reserve` and `decrement`); under the default `cap` each invoice is checked on its own."""
+        return self.stock_policy != "cap"
+
     def _reserved(self, item: str, exclude_key: str | None = None) -> int:
-        if self.stock_policy != "reserve":
+        if not self.tracks_stock:
             return 0
         return self._conn().execute("SELECT COALESCE(SUM(qty), 0) FROM stock_reservations WHERE item=? AND bill_key IS NOT ?", (item, exclude_key)).fetchone()[0]
 
     def reserve_stock(self, key: str, lines: list[tuple[str, int]]) -> list[str]:
-        if self.stock_policy != "reserve":
+        if not self.tracks_stock:
             return []
         wanted: dict[str, int] = {}
         for name, qty in lines:
@@ -136,6 +144,27 @@ class MockNetSuite:
         with self._write:
             self._conn().execute("DELETE FROM stock_reservations WHERE bill_key=?", (key,))
             self._conn().commit()
+
+    def _consume(self, c: sqlite3.Connection, key: str) -> None:
+        """`decrement` policy, when the bill is paid: the reserved units leave the shelf for good. Safe to call twice (the reservation is gone after the first)."""
+        rows = c.execute("SELECT item, qty FROM stock_reservations WHERE bill_key=?", (key,)).fetchall()
+        for item, qty in rows:
+            c.execute("UPDATE inventory SET stock = stock - ? WHERE item=?", (qty, item))
+            c.execute("INSERT OR REPLACE INTO stock_movements VALUES (?,?,?)", (key, item, qty))
+            c.execute("INSERT INTO audit_log (bill_key, stage, detail) VALUES (?,?,?)", (key, "stock", f"{item}: -{qty} on payment"))
+        c.execute("DELETE FROM stock_reservations WHERE bill_key=?", (key,))
+
+    def _restore(self, c: sqlite3.Connection, key: str) -> None:
+        """The bank returned the payment, so the goods are not accounted for: put back what `_consume` took."""
+        for item, qty in c.execute("SELECT item, qty FROM stock_movements WHERE bill_key=?", (key,)).fetchall():
+            c.execute("UPDATE inventory SET stock = stock + ? WHERE item=?", (qty, item))
+            c.execute("INSERT INTO audit_log (bill_key, stage, detail) VALUES (?,?,?)", (key, "stock", f"{item}: +{qty} payment returned"))
+        c.execute("DELETE FROM stock_movements WHERE bill_key=?", (key,))
+
+    def stock_levels(self) -> list[dict]:
+        """On hand, still reserved by approved-but-unpaid bills, and available, for every catalogue item."""
+        rows = self._conn().execute("SELECT item, stock FROM inventory ORDER BY item").fetchall()
+        return [{"item": i, "on_hand": s, "reserved": self._reserved(i), "available": s - self._reserved(i)} for i, s in rows]
 
     def lookup_vendor(self, name: str) -> VendorRecord | None:
         return self._vendors.get(norm(name))
@@ -232,4 +261,9 @@ class MockNetSuite:
                 c.execute("INSERT INTO vendor_payments (bill_key, vendor, amount, reference) VALUES (?,?,?,?)",
                           (key, vendor, str(amount), ref))
             c.execute("INSERT INTO audit_log (bill_key, stage, detail) VALUES (?,?,?)", (key, "decision", f"{status}: {reasoning}"))
+            if self.stock_policy == "decrement":
+                if status == "paid":
+                    self._consume(c, key)
+                elif status == "payment_returned":
+                    self._restore(c, key)
             c.commit()

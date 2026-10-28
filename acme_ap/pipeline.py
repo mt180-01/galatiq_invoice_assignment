@@ -164,7 +164,7 @@ class Pipeline:
         """Reserve stock (opt-in policy), then schedule or send the payment. Returns the ledger row to record and the ERP status, if any."""
         inv = out.invoice
         payment_row, pay_status = None, None
-        if out.approval.decision is Decision.APPROVE and getattr(self.erp, "stock_policy", "cap") == "reserve":
+        if out.approval.decision is Decision.APPROVE and getattr(self.erp, "tracks_stock", False):
             # Cumulative stock control (opt-in): the units this invoice consumes are set aside atomically before payment, so two invoices that each
             # fit in stock cannot both be approved when together they do not.
             short = await asyncio.to_thread(self.erp.reserve_stock, key, [(li.item, li.quantity) for li in inv.line_items])

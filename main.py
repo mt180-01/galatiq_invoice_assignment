@@ -91,7 +91,26 @@ def agents() -> None:
     console.print(t)
 
 
+def stock(argv: list[str]) -> None:
+    """Show the inventory as the ledger leaves it: on hand, reserved by approved-but-unpaid invoices, available."""
+    from acme_ap.erp import MockNetSuite
+
+    db = argv[argv.index("--db") + 1] if "--db" in argv else "inventory.db"
+    erp = MockNetSuite(db, keep_ledger=True)
+    t = Table(title=f"Stock (policy: {erp.stock_policy})")
+    for col, right in (("Item", False), ("On hand", True), ("Reserved", True), ("Available", True)):
+        t.add_column(col, justify="right" if right else "left")
+    for r in erp.stock_levels():
+        t.add_row(r["item"], str(r["on_hand"]), str(r["reserved"]), str(r["available"]))
+    console.print(t)
+    if erp.stock_policy == "cap":
+        console.print("[dim]Under the default policy each invoice is checked against these numbers on its own and nothing is deducted. "
+                      "Use --stock-policy decrement to deduct stock as invoices are paid.[/]")
+
+
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "stock":
+        return stock(sys.argv[2:])
     if len(sys.argv) > 1 and sys.argv[1] == "demo":
         return demo()
     if len(sys.argv) > 1 and sys.argv[1] == "agents":
@@ -101,8 +120,9 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Acme AP invoice automation")
     ap.add_argument("--invoice_path", default="data/invoices", help="invoice file or directory")
     ap.add_argument("--db", default="inventory.db")
-    ap.add_argument("--stock-policy", choices=("cap", "reserve"), default=None,
-                    help="cap (default): each invoice is checked against stock on hand. reserve: also against what earlier approved invoices already claimed (stored with the database)")
+    ap.add_argument("--stock-policy", choices=("cap", "reserve", "decrement"), default=None,
+                    help="cap (default): each invoice is checked against stock on hand. reserve: also against what earlier approved invoices already claimed. "
+                         "decrement: reserve, and the stock leaves the shelf for good when the invoice is paid (put back if the bank returns it). Stored with the database")
     ap.add_argument("--reset", action="store_true", help="start with an empty ledger. By default the ledger is kept between runs, so an invoice paid earlier is a duplicate now")
     ap.add_argument("--keep-ledger", action="store_true", help=argparse.SUPPRESS)  # the old spelling of what is now the default
     ap.add_argument("--workers", type=int, default=None, help="CPU worker processes (default: auto-sized from the PDF count; 1 = serial)")

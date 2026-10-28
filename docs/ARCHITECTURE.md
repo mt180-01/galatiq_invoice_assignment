@@ -262,7 +262,7 @@ A reviewer found these; each was checked against the code first, fixed, and cove
 | Finding | Verdict | Fix |
 |---|---|---|
 | **The ledger was wiped on every run**, so running the CLI twice paid an invoice twice; duplicate protection held only inside one run | True; the most serious | The ledger is kept by default. `--reset` starts over. A re-run that is mostly duplicates says why. The benchmark and `serve --demo` use their own scratch databases so they can never wipe the real one |
-| **Stock is never reduced after payment** | True as stated, but the brief's own sample table lists INV-1001, 1004 and 1006 as "within stock", and they bill 10 + 3 + 5 = 18 WidgetA against 15 on hand: stock is a per-invoice cap, and a decrementing default would reject INV-1006 | Default unchanged. **Opt-in `--stock-policy reserve`** (stored with the database, so `approve.py`, `pay.py` and the web page follow it): validation sees only unclaimed stock; the units are reserved atomically just before payment (12 invoices racing for 15 units: exactly 7 approved, whatever the timing); a person approving later cannot spend units an earlier approval took; a payment that fails for good releases them |
+| **Stock is never reduced after payment** | True as stated, but the brief's own sample table lists INV-1001, 1004 and 1006 as "within stock", and they bill 10 + 3 + 5 = 18 WidgetA against 15 on hand: stock is a per-invoice cap, and a decrementing default would reject INV-1006 | Default unchanged. **Opt-in `--stock-policy reserve`** and, beyond it, **`--stock-policy decrement`** (below) (stored with the database, so `approve.py`, `pay.py` and the web page follow it): validation sees only unclaimed stock; the units are reserved atomically just before payment (12 invoices racing for 15 units: exactly 7 approved, whatever the timing); a person approving later cannot spend units an earlier approval took; a payment that fails for good releases them |
 | **The duplicate key included the raw vendor name**, so a respelled vendor got past it | True | The key uses the vendor's master-data name, so an alias (`FastShip Ltd.`) is the same vendor. The same invoice number and total from a *similar* vendor name (not the same key) is held for a person as `possible_duplicate`, and the sender is not contacted. The lookup is indexed, not a scan |
 | **An invoice number was claimed before validation**, so with the ledger kept, a corrected resubmission of a rejected invoice was blocked forever | True | An earlier attempt that never paid (rejected, blocked, expired) no longer holds the number: a *changed* resubmission is processed and the audit log records it. An *identical* copy of a rejected invoice is a duplicate (processing it again can only repeat the rejection; found by the end-to-end run when a JSON and a PDF of one bill were both processed, which also exposed that `250.0` and `250.00` hashed differently). A claim left behind by a crashed run expires after 15 minutes |
 | **`import resource` is Unix-only**, so the CLI crashed on Windows | True | Optional import; without it CPU time is this process's alone. A test hides the module and runs a batch. (The `Makefile` and shell snippets assume Unix; on Windows run the `python` commands directly. Not tested on Windows itself.) |
@@ -305,6 +305,17 @@ the regex reading also sees it or the amount appears in the text. Limits: the ca
 
 **What would get this paid.** `acme_ap/nextsteps.py` turns each blocking finding into a line addressed to whoever can act (the vendor, AP, the approver), shown on the invoice
 page and after the terminal table. It is derived from the findings, so it cannot disagree with the decision, and a test fails if a rule exists without a next step.
+
+## 4o. Stock that leaves the shelf
+
+Three stock policies, stored with the database so every tool follows the one chosen. `cap` (default): each invoice is checked against stock on hand and nothing is deducted
+(the brief's own table needs this). `reserve`: approved invoices set units aside, so later invoices see only what is unclaimed. **`decrement`**: the same reservation, and when
+the ERP records the bill as *paid* the reserved units are removed from `inventory.stock` for good, in the same transaction as the status change, with an audit-log line and a
+`stock_movements` row. A scheduled payment holds its units but does not take them until it is actually paid; a payment that fails for good releases the reservation; a payment the
+bank returns puts the units back; settling twice takes them once. The opening stock used to be re-seeded every time the ERP class started, so no deduction could have survived
+a restart: it is now seeded only on `--reset` (new catalogue items are added without overwriting anything), so stock persists between runs, and a second run of the same invoices is
+all duplicates and changes nothing. `python main.py stock` shows on hand, reserved and available. Limits: units are the catalogue's stock, not a warehouse system; there is no
+receiving step, so "paid" stands in for "goods accepted"; and the default stays `cap`, so the provided-invoice results are unchanged.
 
 ## 4k. The web interface
 
