@@ -13,7 +13,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt     # 1. set 
 
 `make setup`, `make test`, `make demo` and `make bench` do the same; `make e2e` runs the whole workflow through the command-line tools and checks every step.
 A single file works too (`--invoice_path=data/invoices/invoice_1001.txt`). Add `-v` for per-stage logs and `--json out.json`
-to save results. **Everything is free by default.** A local stand-in model (labelled as such) runs the same agent protocol, tool calls included, with no internet and no cost; `--offline` turns the model off entirely. The real Grok API is **billed per token by xAI**, so it is opt-in: add `--grok` (or `ACME_USE_GROK=1`). A saved key is never used otherwise. Each `--grok` run has a hard spending cap (`XAI_BUDGET_USD`, default $0.10) and the report shows the exact amount xAI says it charged.
+to save results. **Everything is free by default.** A local stand-in model (labelled as such) runs the same agent protocol, tool calls included, with no internet and no cost; `--offline` turns the model off entirely. The real Grok API is **billed per token by xAI**, so it is opt-in: add `--grok` (or `ACME_USE_GROK=1`). A saved key is never used otherwise. Each `--grok` run has a hard spending cap (`XAI_BUDGET_USD`, default $0.25) and the report shows the exact amount xAI says it charged.
 Keep the key out of the repo: export `XAI_API_KEY` in your shell, or save it alone in `~/.config/acme_ap/xai_key` (`chmod 600`), where the code reads it. `python scripts/live_smoke.py` checks the live API; `tests/test_no_secrets.py` fails if a credential is ever committed.
 Scanned PDFs need `tesseract` installed.
 
@@ -39,6 +39,7 @@ scorecard and a payments summary. Side effects go to files, never to the outside
 .venv/bin/python main.py --invoice_path=data/approvals_demo --auto-vp  # over-limit invoice, simulated VP approves
 .venv/bin/python approve.py list                                       # approver side: list, card, respond, tick
 .venv/bin/python pay.py status                                         # treasury side: status, release, reconcile
+.venv/bin/python main.py --trace --invoice_path=data/self_correction   # watch the agents work: model calls, tool calls, self-correction
 .venv/bin/python main.py agents                                        # who does what, and when each may use the model
 .venv/bin/python scripts/measure_llm_cost.py                           # model calls and tokens: ask-everything vs the gated team
 .venv/bin/python main.py --bench 20000                                 # CPU benchmark

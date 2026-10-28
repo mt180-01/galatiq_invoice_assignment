@@ -38,7 +38,7 @@ check("test suite in a fresh clone", rc == 0 and m and "failed" not in out, m.gr
 
 # 2. the guided demo
 rc, out = py("main.py", "demo")
-check("main.py demo runs all 7 steps", rc == 0 and all(f"Step {i}." in out for i in range(1, 8)) and "Traceback" not in out)
+check("main.py demo runs all 8 steps", rc == 0 and all(f"Step {i}." in out for i in range(1, 9)) and "Traceback" not in out)
 check("demo: VP approval paid, payments reconciled with no issues", "approved by vp-finance@acmecorp.example; paid" in out and re.search(r"returned 0, still in flight 0; issues: none", out))
 
 # 3. agents roster
@@ -80,6 +80,19 @@ check("default run uses the local stand-in model and reaches the same 17 outcome
 check("the stand-in model called tools (function calling exercised)", sum(o["llm"].get("tools", 0) for o in sres) > 0 and "tool calls run for the model" in out,
       f"{sum(o['llm'].get('tools', 0) for o in sres)} tool calls")
 check("structured logs: a decision line per invoice and a 'Paid X to Y' line per payment", out.count("acme.decision") == 17 and out.count("acme.payment Paid") == 7, f"{out.count('acme.decision')} decisions, {out.count('acme.payment Paid')} payments")
+
+# 4c. the agent upgrades: item self-correction, lookalike vendor, model-written notes, and the trace
+rc, out = py("main.py", "--trace", "--db", str(tmp / "sc.db"), "--outbox", outbox + "C", "--json", str(tmp / "c.json"), "--invoice_path", "data/self_correction")
+cres = {o["invoice"]["invoice_number"]: o for o in json.loads((tmp / "c.json").read_text())}
+check("mistyped item 'Wdgt B' is found by catalogue search, corrected and the invoice goes on to payment",
+      cres["INV-3201"]["status"] in ("PAID", "SCHEDULED") and cres["INV-3201"]["invoice"]["line_items"][0]["item"] == "WidgetB", cres["INV-3201"]["status"])
+check("a similar-looking but different product (GadgetY) is NOT corrected", cres["INV-3202"]["status"] == "REJECT" and cres["INV-3202"]["invoice"]["line_items"][0]["item"] == "GadgetY")
+check("a look-alike vendor is flagged for a person, never changed", cres["INV-3203"]["status"] == "AWAITING" and cres["INV-3203"]["invoice"]["vendor"] == "Widget Inc"
+      and "possible match" in json.dumps(cres["INV-3203"]["findings"]))
+check("rejections get a model-written plain-English note", bool(cres["INV-3202"]["explanation"]), (cres["INV-3202"]["explanation"] or "")[:60])
+check("--trace shows tool calls, corrections and conclusions", all(s in out for s in ("tool search_items", "corrected:", "suggested:", "decision:")))
+check("every PAID invoice had a model second opinion before the money moved",
+      all(any(e["kind"] == "model" for t in o["trace"] if t["agent"] == "Reviewer" for e in t.get("events", [])) for o in sres if o["status"] == "PAID"))
 
 # 5. human-in-the-loop: second run on the approval demo (adds the over-limit and changed-bank-account invoices)
 db2 = str(tmp / "hitl.db")

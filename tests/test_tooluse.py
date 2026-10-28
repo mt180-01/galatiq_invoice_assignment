@@ -214,3 +214,35 @@ def test_unrelated_errors_do_not_trigger_model_discovery():
     from acme_ap.llm import _model_missing
     assert _model_missing('{"error": "The model foo does not exist"}') and not _model_missing('{"error": "Incorrect API key provided"}')
     assert not _model_missing('{"error": "rate limit exceeded"}')
+
+
+# ---- patience with failures that clear by themselves (found live: "model is at capacity", HTTP 429) --------
+def test_a_busy_api_is_retried_and_the_answer_arrives():
+    seen = []
+    llm = client([httpx.Response(429, json={"error": "The model is currently at capacity"}), httpx.Response(503, text="try later"), message('{"ok": 1}')], seen)
+    assert asyncio.run(llm.chat_json("s", "u")) == {"ok": 1} and len(seen) == 3
+    assert llm.meter.calls["unassigned"] == 1                                              # failed attempts are not counted as (or billed as) calls
+
+
+def test_a_persistently_busy_api_gives_up_after_the_retries_and_keeps_the_model_for_later():
+    seen = []
+    llm = client([httpx.Response(429, text="at capacity")] * 9, seen)
+    with pytest.raises(LLMUnavailable, match="HTTP 429"):
+        asyncio.run(llm.chat_json("s", "u"))
+    assert len(seen) == 3 and llm.available                                                 # first try + two retries; a busy spell is not a dead key
+
+
+def test_a_timeout_is_retried_but_a_rejected_key_is_not():
+    attempts = []
+
+    def flaky(request):
+        attempts.append(1)
+        if len(attempts) == 1:
+            raise httpx.ConnectTimeout("slow")
+        return message('{"ok": 2}')
+    assert asyncio.run(GrokClient("k", transport=httpx.MockTransport(flaky)).chat_json("s", "u")) == {"ok": 2} and len(attempts) == 2
+    bad = []
+    llm = GrokClient("k", transport=httpx.MockTransport(lambda r: (bad.append(1), httpx.Response(401, text="Incorrect API key provided"))[1]))
+    with pytest.raises(LLMUnavailable):
+        asyncio.run(llm.chat_json("s", "u"))
+    assert len(bad) == 1 and not llm.available                                             # no point retrying a bad key

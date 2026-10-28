@@ -90,6 +90,7 @@ class Outcome(BaseModel):
     approval_request: int | None = None
     awaiting: str | None = None  # role whose decision is pending
     approval_card: str | None = None
+    explanation: str | None = None  # plain-English note for the person who must act (model-written, checked against the record)
 
     @property
     def status(self) -> str:

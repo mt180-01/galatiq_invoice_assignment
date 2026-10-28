@@ -87,9 +87,9 @@ def test_no_tokens_spent_when_policy_has_already_decided():
         assert decide(clean(), findings, llm).decision is expect and llm.asked == []
 
 
-def test_small_clean_structured_invoice_needs_no_second_opinion():
+def test_every_invoice_about_to_be_paid_gets_exactly_one_second_opinion():
     llm = Counting()
-    assert decide(clean("500"), [], llm).decision is Decision.APPROVE and llm.asked == []
+    assert decide(clean("500"), [], llm).decision is Decision.APPROVE and llm.asked == ["draft"]      # money moves: one call, no challenger when it agrees
 
 
 @pytest.mark.parametrize("inv,findings", [(clean("500"), [finding(Severity.WARN)]), (clean("6000"), []),
@@ -166,9 +166,10 @@ def test_cost_is_reported_only_with_prices(monkeypatch):
 
 
 # ---- the team ---------------------------------------------------------------------------------------
-def test_every_agent_has_a_charter_and_only_two_may_use_the_model():
+def test_every_agent_has_a_charter_and_the_money_and_human_agents_never_use_a_model():
     assert [c.name for c in CHARTERS] == ["Intake", "Validation", "Reviewer", "Desk", "Payment", "Comms"]
-    assert [c.name for c in CHARTERS if not c.model_use.startswith("Never")] == ["Intake", "Reviewer"]
+    assert [c.name for c in CHARTERS if not c.model_use.startswith("Never")] == ["Intake", "Validation", "Reviewer", "Comms"]
+    assert [c.name for c in CHARTERS if c.model_use.startswith("Never")] == ["Desk", "Payment"]       # routing people and moving money stay rule-only
 
 
 def test_trace_shows_which_agent_did_what(tmp_path):
@@ -184,6 +185,6 @@ def test_gating_cuts_calls_and_tokens_without_changing_a_single_outcome():
     always, a_out = cost_run("always", False)
     gated, g_out = cost_run("gated", True)
     assert sorted(a_out.values()) == sorted(g_out.values())
-    assert gated.total_calls <= always.total_calls * 0.25
+    assert gated.total_calls <= always.total_calls * 0.5
     tokens = lambda m: sum(m.tokens_in.values()) + sum(m.tokens_out.values())  # noqa: E731
-    assert tokens(gated) <= tokens(always) * 0.25
+    assert tokens(gated) <= tokens(always) * 0.5

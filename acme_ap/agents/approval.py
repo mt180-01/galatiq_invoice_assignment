@@ -79,12 +79,9 @@ class AuditIssues(BaseModel):
 
 
 def second_opinion_worth_paying_for(inv: Invoice, findings: list[Finding], floor: Approval, risk_hint: str | None = None) -> bool:
-    """The model can only make a decision stricter, so it can matter in exactly one case: policy would approve.
-    Even then, a small, clean invoice read from a structured file has nothing a second opinion could catch."""
-    if floor.decision is not Decision.APPROVE:
-        return False  # already rejected or with a person: nothing to tighten, and a person will look anyway
-    return (any(f.severity is Severity.WARN for f in findings) or (inv.total or Decimal(0)) >= APPROVAL_THRESHOLD / 2
-            or inv.lane == "ai-extracted" or bool(inv.parse_warnings) or bool(risk_hint))
+    """The model can only make a decision stricter, so it can matter in exactly one case: policy would approve, which means money is
+    about to move. Every such invoice gets a second opinion; rejects and anything already with a person do not (nothing to tighten)."""
+    return floor.decision is Decision.APPROVE
 
 
 async def decide(inv: Invoice, findings: list[Finding], llm: LLM, gate: bool = False, tools: list[Tool] | None = None,
@@ -104,6 +101,8 @@ async def decide(inv: Invoice, findings: list[Finding], llm: LLM, gate: bool = F
             with as_agent("reviewer"):
                 draft = await _llm_draft(inv, findings, llm, None, tools, risk_hint) or floor
                 consulted = True
+                if llm.meter:
+                    llm.meter.event("reviewer", "decision", f"{draft.decision.value}: {draft.reasoning}")
             for _ in range(MAX_ROUNDS - 1):
                 issues = critique(inv, findings, draft)
                 if not (gate and not issues and draft.decision == floor.decision):  # agreeing with policy needs no challenger
@@ -143,7 +142,8 @@ def _brief(inv: Invoice, findings: list[Finding]) -> str:
         "invoice": {"number": inv.invoice_number, "vendor": inv.vendor, "total": str(inv.total), "currency": inv.currency,
                     "items": [(li.item, li.quantity) for li in inv.line_items]},
         "findings": [[f.severity.value, f.code, f.message] for f in findings],
-        "policy": f"auto-approve <= {APPROVAL_THRESHOLD} USD when clean; any error -> reject; any hold -> escalate to human",
+        "policy": f"approve when total <= {APPROVAL_THRESHOLD} USD and there is no error and no hold finding (warnings NEVER block approval); "
+                  "any error -> reject; any hold -> escalate to a human",
     }, separators=(",", ":"))
 
 

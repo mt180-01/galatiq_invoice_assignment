@@ -8,6 +8,7 @@ Cost controls live here, so every agent gets them without knowing about them:
 """
 from __future__ import annotations
 
+import asyncio
 import contextvars
 import hashlib
 import json
@@ -27,7 +28,7 @@ from pydantic import BaseModel, ValidationError
 
 _agent = contextvars.ContextVar("agent", default="unassigned")
 invoice_ledger: contextvars.ContextVar[list | None] = contextvars.ContextVar("invoice_ledger", default=None)  # per-invoice usage sink
-MAX_OUT = {"intake": 900, "reviewer": 160, "critic": 120}  # reply-length caps (tokens) by agent
+MAX_OUT = {"intake": 900, "reviewer": 160, "critic": 120, "resolver": 200, "comms": 260}  # reply-length caps (tokens) by agent
 
 
 @contextmanager
@@ -93,9 +94,9 @@ class Meter:
         self.tokens_in, self.tokens_out = Counter(), Counter()
         self.reported_ticks = 0  # cost as reported by the API itself (1 USD = 10,000,000,000 ticks), the exact figure
 
-    def record(self, agent: str, tin: int, tout: int, cached: bool = False, ticks: int = 0) -> None:
+    def record(self, agent: str, tin: int, tout: int, cached: bool = False, ticks: int = 0, model: str = "") -> None:
         if (sink := invoice_ledger.get()) is not None:
-            sink.append(("cached" if cached else "call", agent, tin, tout, ticks))
+            sink.append(("cached" if cached else "call", agent, tin, tout, ticks, {"model": model}))
         if cached:
             self.cached[agent] += 1
             return
@@ -104,16 +105,21 @@ class Meter:
         self.tokens_out[agent] += tout
         self.reported_ticks += ticks
 
-    def tool(self, agent: str, name: str) -> None:
+    def tool(self, agent: str, name: str, args=None, result=None) -> None:
         self.tool_calls[agent] += 1
         if (sink := invoice_ledger.get()) is not None:
-            sink.append(("tool", agent, 0, 0, 0))
+            sink.append(("tool", agent, 0, 0, 0, {"name": name, "args": args, "result": str(result)[:160] if result is not None else None}))
+
+    def event(self, agent: str, kind: str, text: str) -> None:
+        """Something an agent concluded, for the invoice's visible trace (not a model call)."""
+        if (sink := invoice_ledger.get()) is not None:
+            sink.append(("event", agent, 0, 0, 0, {"kind": kind, "text": text[:240]}))
 
     def skip(self, agent: str, n: int = 1) -> None:
         """A call this agent could have made and chose not to (the gate found it could not change the result)."""
         self.skipped[agent] += n
         if (sink := invoice_ledger.get()) is not None:
-            sink.append(("skip", agent, 0, 0, 0))
+            sink.append(("skip", agent, 0, 0, 0, {}))
 
     @property
     def total_calls(self) -> int:
@@ -182,10 +188,12 @@ class GrokClient(LLM):
 
     def __init__(self, api_key: str, model: str = "grok-3", base_url: str = "https://api.x.ai/v1",
                  transport: httpx.AsyncBaseTransport | None = None, timeout: float = 30.0,
-                 cache: LLMCache | None = None, meter: Meter | None = None, budget_usd: float | None = None):
+                 cache: LLMCache | None = None, meter: Meter | None = None, budget_usd: float | None = None,
+                 retry_delays: tuple[float, ...] | None = None):
         self.model, self.cache, self.meter = model, cache, meter or Meter()
         self.budget_usd = budget_usd  # hard cap on what this client may spend; None = unlimited (only for the key-free stand-in)
         self._key = api_key
+        self.retry_delays = self.DEFAULT_RETRY if retry_delays is None else retry_delays  # seconds to wait before each retry of a transient failure (429/5xx/timeouts)
         self._client = httpx.AsyncClient(
             base_url=base_url, timeout=timeout, transport=transport,
             headers={"Authorization": f"Bearer {api_key}"},
@@ -195,8 +203,23 @@ class GrokClient(LLM):
         return os.environ.get(f"XAI_MODEL_{agent.upper()}") or self.model
 
     label = "Grok"
+    DEFAULT_RETRY = (1.0, 3.0)
     _model_checked = False
     _json_mode = True  # ask the API for a JSON object; switched off for good if the endpoint rejects the parameter
+
+    async def _send(self, payload: dict) -> httpx.Response:
+        """POST with a couple of patient retries for the failures that clear by themselves (rate limit, 'at capacity', 5xx, timeouts)."""
+        for attempt in range(len(self.retry_delays) + 1):
+            try:
+                resp = await self._client.post("/chat/completions", json=payload)
+            except httpx.TransportError:
+                if attempt == len(self.retry_delays):
+                    raise
+            else:
+                if resp.status_code not in (429, 500, 502, 503, 504) or attempt == len(self.retry_delays):
+                    return resp
+            await asyncio.sleep(self.retry_delays[attempt])
+        raise AssertionError("unreachable")
 
     async def _post(self, payload: dict, agent: str) -> dict:
         """One API call with usage metering. Raises LLMUnavailable on any transport or protocol failure."""
@@ -207,7 +230,7 @@ class GrokClient(LLM):
             log_model.warning("spending cap of $%.2f reached ($%.4f spent): the rest of this run uses the free rules", self.budget_usd, self.meter.spent_usd)
             raise LLMUnavailable(f"budget of ${self.budget_usd:.2f} reached")
         try:
-            resp = await self._client.post("/chat/completions", json=payload)
+            resp = await self._send(payload)
             if resp.status_code in (401, 403) or (resp.status_code == 400 and "api key" in resp.text.lower()):
                 self.available = False  # stop asking: every later call would fail the same way and every invoice would pay for the attempt
                 raise LLMUnavailable(f"Grok rejected the API key (HTTP {resp.status_code}: {resp.text[:160].replace(self._key, '***')}); "
@@ -218,11 +241,11 @@ class GrokClient(LLM):
                     log_model.warning("model %s is not available to this key; using %s", payload["model"], found)
                     self.model = found
                     payload = {**payload, "model": found}
-                    resp = await self._client.post("/chat/completions", json=payload)
+                    resp = await self._send(payload)
             if resp.status_code in (400, 422) and "response_format" in payload and "response_format" in resp.text:
                 type(self)._json_mode = False  # this endpoint does not take it: carry on without
                 payload = {k: v for k, v in payload.items() if k != "response_format"}
-                resp = await self._client.post("/chat/completions", json=payload)
+                resp = await self._send(payload)
             resp.raise_for_status()
             body = resp.json()
             body["choices"][0]["message"]
@@ -237,7 +260,7 @@ class GrokClient(LLM):
         sent = sum(len(json.dumps(m)) for m in payload["messages"])
         got = len(json.dumps(body["choices"][0]["message"]))
         self.meter.record(agent, int(usage.get("prompt_tokens") or sent // 4), int(usage.get("completion_tokens") or got // 4),
-                          ticks=int(usage.get("cost_in_usd_ticks") or 0))
+                          ticks=int(usage.get("cost_in_usd_ticks") or 0), model=str(body.get("model") or payload.get("model") or ""))
         return body
 
     async def _discover_model(self) -> str | None:
@@ -297,9 +320,9 @@ class GrokClient(LLM):
             messages.append({"role": "assistant", "content": message.get("content"), "tool_calls": calls})
             for call in calls:
                 fn = call.get("function") or {}
-                self.meter.tool(agent, fn.get("name", "?"))
-                messages.append({"role": "tool", "tool_call_id": call.get("id", ""),
-                                 "content": json.dumps(run_tool(by_name, fn.get("name", ""), fn.get("arguments", "")), default=str)[:2000]})
+                outcome = run_tool(by_name, fn.get("name", ""), fn.get("arguments", ""))
+                self.meter.tool(agent, fn.get("name", "?"), fn.get("arguments", ""), outcome)
+                messages.append({"role": "tool", "tool_call_id": call.get("id", ""), "content": json.dumps(outcome, default=str)[:2000]})
         raise LLMUnavailable("tool loop did not reach an answer")
 
     async def aclose(self) -> None:
@@ -318,7 +341,7 @@ def read_api_key() -> str | None:
         return None
 
 
-DEFAULT_BUDGET_USD = 0.10  # per run; XAI_BUDGET_USD overrides. A full pass over the 17 sample invoices costs about a cent or two.
+DEFAULT_BUDGET_USD = 0.25  # per run; XAI_BUDGET_USD overrides. A full pass over the 17 sample invoices costs a few cents.
 
 
 def make_llm(offline: bool = False, cache_path: str | Path | None = None, simulate: bool = False, live: bool = False) -> LLM:

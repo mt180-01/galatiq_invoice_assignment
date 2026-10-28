@@ -62,9 +62,9 @@ class Pipeline:
         self.approvals = approvals
         self.payments = payments or getattr(approvals, "payments", None) or default_payments(erp)
         gated = llm_policy == "gated"  # "always" = ask the model on every invoice (the pre-optimisation behaviour, kept for comparison)
-        self.intake, self.validator = IntakeAgent(llm, gated), ValidationAgent(erp, self.payments)
+        self.intake, self.validator = IntakeAgent(llm, gated), ValidationAgent(erp, self.payments, llm)
         self.reviewer, self.desk = ReviewerAgent(llm, erp, gated), DeskAgent(approvals)
-        self.payer, self.comms = PaymentAgent(self.payments, bank_concurrency), CommsAgent()
+        self.payer, self.comms = PaymentAgent(self.payments, bank_concurrency), CommsAgent(llm)
         self.workers = workers if workers is not None else (os.cpu_count() or 1)
         self.llm_sem = asyncio.Semaphore(llm_concurrency)
 
@@ -101,6 +101,16 @@ class Pipeline:
         finally:
             if pool:
                 pool.shutdown(wait=True)
+
+    async def _comms(self, out: Outcome, action: str, write):
+        """Run a writing task; keep it in the trace only if it did something (a model call, or text produced)."""
+        mark = len(out.trace)
+        async with step(out, "Comms", action):
+            async with self.llm_sem:
+                text = await write(out)
+        if text is None and not out.trace[mark].get("events"):
+            out.trace.pop(mark)
+        return text
 
     async def _process(self, path: str, parse_future: asyncio.Future, idx: int) -> Outcome:
         origin = self.origins.get(path)
@@ -142,7 +152,7 @@ class Pipeline:
 
             # Local ERP reads take microseconds; a real (network) ERP adapter would be awaited here instead.
             async with step(out, "Validation", "checked against ERP and policy"):
-                out.findings = self.validator.check(inv)
+                out.findings = await self.validator.check(inv)
             lap("validate")
             for f in out.findings:
                 log.info("finding", extra={"trace": trace, "stage": "validate", "detail": f"{f.severity.value}:{f.code} {f.message}"})
@@ -162,6 +172,8 @@ class Pipeline:
                 if res.submitted:
                     out.paid, out.payment_ref, out.payment_amount = True, res.ref, res.amount
                     payment_row = (inv.vendor or "", res.amount, res.ref)
+            if out.approval.decision is not Decision.APPROVE and self.llm.available:
+                out.explanation = await self._comms(out, "explained in plain English", self.comms.explain)
             request = None
             if out.approval.decision is Decision.ESCALATE and self.approvals is not None:
                 async with step(out, "Desk", "routed to a person"):
@@ -169,7 +181,7 @@ class Pipeline:
             status = pay_status or ("pending_approval" if request else out.approval.decision.value)
             await asyncio.to_thread(self.erp.settle_bill, key, status, out.approval.reasoning, payment_row)
             lap("settle")
-            out.followup = self.comms.followup(out)
+            out.followup = await self._comms(out, "drafted vendor follow-up", self.comms.followup) if self.llm.available else await self.comms.followup(out)
         except Exception as exc:  # noqa: BLE001 - one bad invoice never stops the batch
             out.error = f"{type(exc).__name__}: {exc}"
             log.exception("unhandled error", extra={"trace": trace, "stage": "pipeline", "detail": out.error})

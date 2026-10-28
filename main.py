@@ -20,7 +20,7 @@ from acme_ap.demo import demo
 from acme_ap.ingestion import SUPPORTED
 from acme_ap.intake import expand
 from acme_ap.llm import make_llm
-from acme_ap.report import ai_usage, console, impact, payment_summary, scorecard, show
+from acme_ap.report import ai_usage, console, impact, payment_summary, scorecard, show, show_trace
 from acme_ap.runner import auto_vp, ledger_view, run_batch, write_cards, write_notices, write_outbox
 
 warnings.filterwarnings("ignore")
@@ -89,9 +89,10 @@ def main() -> None:
     ap.add_argument("--llm-concurrency", type=int, default=8)
     ap.add_argument("--llm-policy", choices=("gated", "always"), default="gated",
                     help="gated (default): ask the model only where it can change the result; always: ask on every invoice (costly)")
+    ap.add_argument("--trace", action="store_true", help="show, per invoice, what each agent did: model calls, tool calls, conclusions")
     ap.add_argument("--offline", action="store_true", help="no model at all: rules only")
     ap.add_argument("--simulate", action="store_true", help="use the local stand-in model (this is already the default)")
-    ap.add_argument("--grok", action="store_true", help="use the real Grok API: billed per token by xAI, capped per run by XAI_BUDGET_USD (default $0.10)")
+    ap.add_argument("--grok", action="store_true", help="use the real Grok API: billed per token by xAI, capped per run by XAI_BUDGET_USD (default $0.25)")
     ap.add_argument("--json", metavar="FILE", help="write full results as JSON")
     ap.add_argument("--bench", type=int, metavar="N", help="throughput benchmark over N generated documents, serial vs parallel")
     ap.add_argument("-v", "--verbose", action="store_true", help="show per-stage structured logs")
@@ -146,6 +147,8 @@ def main() -> None:
     notices = write_notices(outcomes, Path(args.outbox), waiting, pay_rows)
     impact(outcomes, waiting)
     ai_usage(outcomes, llm_label)
+    if args.trace:
+        show_trace(outcomes)
     scorecard(outcomes)
     payment_summary(args.db)
     if cards:

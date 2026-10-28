@@ -95,6 +95,25 @@ class MockNetSuite:
                 return None
             return c.execute("SELECT source FROM vendor_bills WHERE bill_key=?", (key,)).fetchone()[0]
 
+    def search_items(self, query: str, limit: int = 3) -> list[dict]:
+        want, out = norm(query), []
+        for key, name in self._items.items():
+            score = difflib.SequenceMatcher(None, want, key).ratio()
+            if score >= 0.5:
+                row = self._conn().execute("SELECT stock, unit_price FROM inventory WHERE item=?", (name,)).fetchone()
+                out.append({"name": name, "stock": row[0], "unit_price": row[1], "similarity": round(score, 2)})
+        return sorted(out, key=lambda r: -r["similarity"])[:limit]
+
+    def search_vendors(self, query: str, limit: int = 3) -> list[dict]:
+        want, seen, out = norm(query), {}, []
+        for key, rec in self._vendors.items():
+            score = difflib.SequenceMatcher(None, want, key).ratio()
+            if score >= 0.5 and seen.get(rec.name, 0) < score:
+                seen[rec.name] = score
+        for name, score in seen.items():
+            out.append({"name": name, "status": self._vendors[norm(name)].status, "similarity": round(score, 2)})
+        return sorted(out, key=lambda r: -r["similarity"])[:limit]
+
     def vendor_history(self, vendor: str) -> dict:
         rows = self._conn().execute("SELECT total FROM vendor_bills WHERE bill_key LIKE ? AND status IN ('paid','scheduled') AND total IS NOT NULL",
                                     (norm(vendor) + "|%",)).fetchall()

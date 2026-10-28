@@ -37,7 +37,7 @@ def test_a_saved_key_is_not_used_unless_you_ask_for_it(saved_key, monkeypatch):
 
 def test_a_live_client_always_has_a_budget(saved_key, monkeypatch):
     monkeypatch.delenv("XAI_BUDGET_USD", raising=False)
-    assert make_llm(live=True).budget_usd == 0.10
+    assert make_llm(live=True).budget_usd == 0.25
     monkeypatch.setenv("XAI_BUDGET_USD", "0.5")
     assert make_llm(live=True).budget_usd == 0.5
 

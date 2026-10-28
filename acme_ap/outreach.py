@@ -44,7 +44,8 @@ def _asks(outcome: Outcome) -> list[tuple[str, str]]:
     return list(questions.items())
 
 
-def draft_followup(outcome: Outcome) -> str | None:
+def followup_context(outcome: Outcome) -> dict | None:
+    """Who to ask and what to ask, decided by rules alone. None = nobody should be contacted."""
     inv = outcome.invoice
     if inv is None or outcome.approval is None or outcome.paid or outcome.error:
         return None
@@ -53,17 +54,21 @@ def draft_followup(outcome: Outcome) -> str | None:
     asks = _asks(outcome)[:MAX_ASKS]
     if not asks:
         return None
-    ref = inv.invoice_number or outcome.subject or "your invoice"
-    lines = [
-        f"To: {outcome.sender or '(sender unknown: file intake)'}",
-        f"Subject: Quick question on invoice {ref}",
-        "",
-        "Hello,",
-        "",
-        f"Thanks for your invoice {ref}. We can pay it as soon as we confirm {'this' if len(asks) == 1 else 'these'}"
-        f" (a one-line reply is fine, no forms or portal needed):",
-        "",
-    ]
+    return {"to": outcome.sender or "(sender unknown: file intake)", "ref": inv.invoice_number or outcome.subject or "your invoice", "asks": asks}
+
+
+def render_followup(ctx: dict, body: str | None = None) -> str:
+    """The email. `body` (from a model, already checked) replaces the template's wording; the questions are always ours."""
+    head = [f"To: {ctx['to']}", f"Subject: Quick question on invoice {ctx['ref']}", ""]
+    if body:
+        return "\n".join(head + [body.strip()])
+    asks = ctx["asks"]
+    lines = head + ["Hello,", "", f"Thanks for your invoice {ctx['ref']}. We can pay it as soon as we confirm {'this' if len(asks) == 1 else 'these'}"
+                    f" (a one-line reply is fine, no forms or portal needed):", ""]
     lines += [f"  {i}. {q}" for i, (_, q) in enumerate(asks, 1)]
-    lines += ["", "Thank you,", "Accounts Payable, Acme Corp"]
-    return "\n".join(lines)
+    return "\n".join(lines + ["", "Thank you,", "Accounts Payable, Acme Corp"])
+
+
+def draft_followup(outcome: Outcome) -> str | None:
+    ctx = followup_context(outcome)
+    return render_followup(ctx) if ctx else None

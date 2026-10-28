@@ -67,12 +67,76 @@ def _reviewer(messages: list[dict], with_tools: bool) -> httpx.Response:
     return _reply(json.dumps({"decision": "approve", "reasoning": f"No errors or holds; vendor and items verified ({checked}); within the auto-approval limit."}))
 
 
+def _key(s: str) -> str:
+    return "".join(c for c in s.lower() if c.isalnum())
+
+
+def _tool_results(messages: list[dict]) -> list[tuple[str, dict, object]]:
+    """[(tool name, arguments, result)] for every tool call already answered in this conversation."""
+    calls = {c["id"]: c["function"] for m in messages if m["role"] == "assistant" for c in m.get("tool_calls") or []}
+    out = []
+    for m in messages:
+        if m["role"] == "tool":
+            fn = calls.get(m["tool_call_id"], {})
+            out.append((fn.get("name", ""), json.loads(fn.get("arguments") or "{}"), json.loads(m["content"]).get("result")))
+    return out
+
+
+def _call(name: str, args: dict, i: int) -> dict:
+    return {"id": f"call_{i}", "type": "function", "function": {"name": name, "arguments": json.dumps(args)}}
+
+
+def _resolver_items(messages: list[dict]) -> httpx.Response:
+    """Looks each unknown item up, and corrects it only when the best catalogue match is the same name written differently."""
+    names = [n.strip(" '") for n in messages[1]["content"].split("Not found:", 1)[1].strip(" []").split(",") if n.strip()]
+    if not _tool_results(messages):
+        return _reply(tool_calls=[_call("search_items", {"query": n}, i) for i, n in enumerate(names, 1)])
+    fixes = []
+    for _, args, result in _tool_results(messages):
+        top = (result or [{}])[0]
+        if top and top.get("similarity", 0) >= 0.8 and _key(args["query"])[:1] == _key(top["name"])[:1] and _key(args["query"])[-1:] == _key(top["name"])[-1:]:
+            fixes.append({"written": args["query"], "correct": top["name"], "reason": f"closest catalogue item, similarity {top['similarity']}"})
+    return _reply(json.dumps({"corrections": fixes}))
+
+
+def _resolver_vendor(messages: list[dict]) -> httpx.Response:
+    name = messages[1]["content"].split("Vendor on the invoice:", 1)[1].strip()
+    if not _tool_results(messages):
+        return _reply(tool_calls=[_call("search_vendors", {"query": name}, 1)])
+    top = ((_tool_results(messages)[0][2] or [{}])[0])
+    if top and top.get("similarity", 0) >= 0.75 and _key(name)[:1] == _key(top["name"])[:1]:
+        return _reply(json.dumps({"match": top["name"], "reason": f"closest approved vendor, similarity {top['similarity']}"}))
+    return _reply(json.dumps({"match": None, "reason": "no close approved vendor"}))
+
+
+def _comms_email(user: str) -> httpx.Response:
+    facts = json.loads(user)
+    qs = "\n".join(f"{i}. {q}" for i, q in enumerate(facts["questions"], 1))
+    return _reply(json.dumps({"body": f"Hello,\n\nThank you for invoice {facts['invoice']}. So we can pay it, could you help with the following "
+                                      f"(a one-line reply is fine)?\n\n{qs}\n\nThank you,\nAccounts Payable, Acme Corp"}))
+
+
+def _comms_summary(user: str) -> httpx.Response:
+    f = json.loads(user)
+    problems = "; ".join(f["findings"][:2]) or "no specific finding recorded"
+    nxt = f"It needs a decision from {f['next_owner']}." if f.get("next_owner") else "Nothing further is needed unless the vendor sends a corrected invoice."
+    return _reply(json.dumps({"summary": f"Invoice {f['invoice']} from {f['vendor']} for {f['currency']} {f['total']} was {f['decision']}ed by the checks: {problems}. {nxt}"}))
+
+
 def handler(request: httpx.Request) -> httpx.Response:
     body = json.loads(request.content)
     messages = body["messages"]
     system, user = messages[0]["content"], messages[1]["content"]
     if system.startswith("You extract invoice data"):
         return _extraction(user)
+    if system.startswith("You resolve item names"):
+        return _resolver_items(messages)
+    if system.startswith("The vendor on an invoice is not in the approved vendor master"):
+        return _resolver_vendor(messages)
+    if system.startswith("You write short, polite emails"):
+        return _comms_email(user)
+    if system.startswith("You write a plain-English note"):
+        return _comms_summary(user)
     if "auditor" in system:
         return _critic(user)
     return _reviewer(messages, with_tools=bool(body.get("tools")))

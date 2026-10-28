@@ -120,6 +120,7 @@ class ApprovalService:
                   f"  Invoice {inv.invoice_number}, dated {inv.date or '?'}, due {inv.due_date or '?'}, terms {inv.payment_terms or '?'}",
                   f"  {len(inv.line_items)} line(s): " + ", ".join(f"{li.item} x{li.quantity}" for li in inv.line_items[:5]) + (" ..." if len(inv.line_items) > 5 else ""),
                   f"  Read by: {inv.extractor} ({inv.lane})", "",
+                  *(["IN SHORT", f"  {out.explanation}", ""] if out.explanation else []),
                   "SYSTEM RECOMMENDATION",
                   ("  APPROVE: every automated check passed; the only reason this needs you is the amount."
                    if not any(f.severity is Severity.HOLD for f in out.findings) else

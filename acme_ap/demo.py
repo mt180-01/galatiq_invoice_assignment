@@ -13,7 +13,7 @@ from .approvals import ApprovalService
 from .erp import MockNetSuite
 from .payments import MockBank, PaymentService
 from .notices import digest, draft_notice
-from .report import STYLE, console, impact, payment_summary, scorecard
+from .report import STYLE, console, impact, payment_summary, scorecard, show_trace
 from .runner import ledger_view, run_batch
 
 DATA = Path(__file__).resolve().parent.parent / "data"
@@ -79,6 +79,8 @@ def demo() -> None:
         console.print("[dim]" + "\n".join("  | " + line for line in draft_notice(by_no["INV-3003"]).splitlines()[:6]) + "[/]")
         waiting, rows = ledger_view(db)
         console.print("[dim]" + "\n".join("  | " + line for line in digest(outcomes, waiting, rows).splitlines()[:8]) + "\n  | ...[/]")
+        step(8, "How the agents actually worked: each model call, tool call and conclusion on two invoices (free local model; use --grok for the real one).")
+        show_trace([by_no["INV-1001"]] + [o for o in outcomes if o.invoice and o.invoice.invoice_number == "INV-1008"][:1], only_ai=False)
         console.print("\n[dim]Next: python main.py --help, python approve.py --help, python pay.py --help, docs/ARCHITECTURE.md[/]")
     finally:
         shutil.rmtree(root, ignore_errors=True)

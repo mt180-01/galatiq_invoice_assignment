@@ -81,6 +81,37 @@ def impact(outcomes: list[Outcome], waiting: list[dict]) -> None:
         console.print("  waiting on a person       : 0")
 
 
+def show_trace(outcomes: list[Outcome], only_ai: bool = True, limit: int | None = None) -> None:
+    """The agents at work, invoice by invoice: who did what, which tools the model called, what it concluded."""
+    from rich.markup import escape
+    shown = 0
+    for o in outcomes:
+        if not o.invoice or o.status == "DUPLICATE" or (only_ai and not any(t.get("events") for t in o.trace)):
+            continue
+        if limit is not None and shown >= limit:
+            break
+        shown += 1
+        console.print(f"[bold]{escape(str(o.invoice.invoice_number))}[/] {escape(str(o.invoice.vendor))}  [{STYLE.get(o.status, 'white')}]{o.status}[/]")
+        for t in o.trace:
+            console.print(f"  [cyan]{t['agent']:<11}[/] {escape(t['action'])} [dim]({t['ms']:.0f} ms)[/]")
+            for e in t.get("events", []):
+                kind = e["kind"]
+                if kind == "tool":
+                    line = f"tool {e['name']}({escape(str(e['args'] or ''))}) -> {escape(str(e['result']))}"
+                elif kind == "model":
+                    line = f"asked the model as {e['as']}: {e['tokens'][0]} tokens in, {e['tokens'][1]} out"
+                elif kind == "cached":
+                    line = f"model answer for {e['as']} came from the cache"
+                elif kind == "skipped":
+                    why = {"intake": "the rules' reading was complete", "reviewer": "the rules had already decided", "critic": "the draft agreed with policy"}
+                    line = f"model not asked ({e['as']}): {why.get(e['as'], 'nothing it could change')}"
+                else:
+                    line = f"{kind}: {escape(e.get('text', ''))}"
+                console.print(f"                 [dim]-> {line}[/]")
+    if not shown:
+        console.print("[dim]no invoice involved the model or its tools in this run[/]")
+
+
 def ai_usage(outcomes: list[Outcome], label: str) -> None:
     """What the model cost and what the agents saved by not asking it."""
     u = llm_usage(outcomes)

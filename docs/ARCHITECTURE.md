@@ -273,6 +273,17 @@ What the live run found that the stubs could not, all fixed and covered by tests
 2. **Too many tool calls.** The reviewer made 10 tool calls for one invoice. The prompt now asks for only the tools it needs, once each; the same check made 1 call (5,154 to 3,414 tokens).
 3. **Model availability.** The key's model list (`/models`) showed only Grok 4.x ids, so the client now discovers a usable chat model (preferring non-reasoning, which does not bill hidden thinking tokens) if the configured one is rejected.
 
+**Second live round (2026-10-27), after the agent upgrades** (second opinion before every payment, tool-driven item correction, model-written notes):
+
+| Run | Result | Cost (as reported by xAI) |
+|---|---|---|
+| 17 provided invoices, `--grok` | 17/17 outcomes as labelled, 0 errors; 7 of 7 paid invoices had a Grok second opinion; 9 plain-English notes and 4 follow-ups written and accepted by the grounding check | $0.0619 (26 model calls) |
+| `data/self_correction`, `--grok --trace` | `Wdgt B` found by catalogue search and corrected to `WidgetB`; `GadgetY` correctly left alone; look-alike vendor `Widget Inc` flagged with a suggestion, not changed | $0.0147 (10 calls) |
+
+What this round found that nothing else could, all fixed and tested: (a) one call returned **HTTP 429 "model is currently at capacity"**, so calls now retry twice with
+a short wait (and failed attempts are never counted or billed); (b) **Grok rejected a corrected invoice because it read a warning as an error**; the policy text in the prompt
+now says warnings never block approval, and the same invoice is approved. Latency is real: individual calls took 3-11 seconds.
+
 Still unverified: dollar cost (set `XAI_PRICE_IN` / `XAI_PRICE_OUT`), behaviour under rate limits at volume, and Grok's accuracy on messy scans. The 5,931 tokens are
 real counts for 20 files; the earlier 1,621-token figure came from a stand-in on a different set with estimated counts, so the two are not directly comparable.
 
@@ -282,23 +293,23 @@ real counts for 20 files; the earlier 1,621-token figure came from a stand-in on
 
 ```
 document ─> INTAKE ─> VALIDATION ─> REVIEWER ──approve──> PAYMENT ─> COMMS
- (any format)  │            │            │  └─escalate──> DESK (a person decides) ─approve─> PAYMENT
-               │            │            └──reject──────────────────────────────────────────> COMMS (one vendor question, if fixable)
-          model only    no model     model only where it can matter
-          in doubt
+ (any format)  │            │  ↺ resolver    │  └─escalate──> DESK (a person decides) ─approve─> PAYMENT
+               │            │  (typo search) └──reject──────────────────────────────────────────> COMMS (vendor question, notes)
+          model only    model only for   model before any payment;     model phrases, rules decide;
+          in doubt      unmatched names  never on rejects              text checked against the record
 ```
 
 | Agent | One job | Why it is its own agent | May spend model tokens? |
 |---|---|---|---|
 | **Intake** | Any document to a structured Invoice | The only agent that must understand messy language; everything else works on structured data | Only when the regex reading is incomplete, inconsistent or carries warnings |
-| **Validation** | Check against ERP and policy | Exact, auditable rules; a model would add cost and doubt | Never |
-| **Reviewer** | Approve / escalate / reject, with a model draft and a challenger | The only judgement call; policy sets the floor, the model may only be stricter | Only if policy would approve **and** there is a reason for a second opinion (a warning, half the sign-off limit, or an AI-read document); the challenger only if the draft departs from policy |
+| **Validation** | Check against ERP and policy; a resolver agent searches when a name can't be matched | Exact, auditable rules, plus a self-correction loop for typos | Only when the rules meet an item or vendor name they cannot match. Items are corrected only if the model's pick exists in the catalogue and is textually very close (a model that wants `SuperGizmo` to become `WidgetA` is refused); vendors are **never** corrected, because a look-alike vendor name is a classic fraud trick, so a suggested match is only shown to the person who decides |
+| **Reviewer** | Approve / escalate / reject, with a model draft (with read-only tools) and a challenger | The only judgement call; policy sets the floor, the model may only be stricter | On **every** invoice policy would approve, so every payment has a model's second opinion before the money moves; never on rejects or anything already with a person; the challenger only if the draft departs from policy |
 | **Desk** | Get a human decision when one is required | Owns the human-in-the-loop clock: routing, signed one-click cards, reminders, escalation, expiry | Never |
 | **Payment** | Schedule, check the payee account, send idempotently, reconcile | Money moves by rules only | Never |
-| **Comms** | Vendor question, remittance notice, AP digest | Facts to templates; no creativity wanted near money | Never |
+| **Comms** | Vendor question, plain-English notes for the people who must act, remittance notice, AP digest | Words for people | Only to phrase. The facts, and whether anyone is contacted at all, come from rules (a suspicious sender is never contacted, the model is not even asked); everything the model writes is checked against the record and discarded for the template if it adds a figure, drops a required figure, or contains a link |
 
 **Token and cost controls** (all in `acme_ap/llm.py` and the two gates):
-1. *Don't ask when the answer can't change.* A reject, or anything already with a person, never goes to the model (it can only tighten, and a person will look). A clean, small, structured invoice gets no second opinion.
+1. *Don't ask when the answer can't change.* A reject, or anything already with a person, never goes to the model (it can only tighten, and a person will look). Every invoice about to be paid does get one second opinion, because that is where an error costs money.
 2. *Ask once, challenge only on disagreement.* One draft when the model agrees with policy; the challenger runs only when it departs.
 3. *Intake asks only in doubt.* A complete, arithmetically consistent regex reading is used as is (which also removes the prompt-injection surface for those documents).
 4. *Shorter prompts.* Invoice text is compacted (padding, rule lines, blank runs removed, capped at 6,000 characters); findings are sent as short tuples; replies are capped per agent.
@@ -306,17 +317,20 @@ document ─> INTAKE ─> VALIDATION ─> REVIEWER ──approve──> PAYMENT 
 6. *Model per agent.* `XAI_MODEL_INTAKE`, `XAI_MODEL_REVIEWER`, `XAI_MODEL_CRITIC` select a cheaper model for the easier jobs.
 7. *Metering.* Every call is billed to an agent; the run prints calls made, cached, avoided and tokens. Set `XAI_PRICE_IN` / `XAI_PRICE_OUT` (USD per million tokens) to see money; no tariff is assumed.
 
-**Measured** with `python scripts/measure_llm_cost.py` on the 22 sample documents, through a stand-in Grok that answers correctly:
+**Measured** with `python scripts/measure_llm_cost.py` on the 22 sample documents, through the local stand-in model (it answers sensibly; token counts are the
+client's 4-characters-per-token estimate). "Ask about everything" means the original policy for extraction, review and challenge; the resolver and the
+Comms agent run the same under both, since they only act when there is something to fix or say.
 
 | Policy | Model calls | Tokens (in + out) |
 |---|---|---|
-| Ask about everything, raw prompts (the original behaviour) | 51 | 11,251 |
-| Same calls, compact prompts | 51 | 10,964 (-3%) |
-| **Gated (default)** | **7** | **1,621 (-86%)** |
+| Ask about everything, raw prompts | 94 | 36,699 |
+| Same calls, compact prompts | 94 | 36,408 (-1%) |
+| **Gated (default)** | **38** | **13,325 (-64%)** |
 
-Outcomes are identical in all three. **Read this fairly:** the stub never errs, so it shows how much the system *asks*, not how a real model answers; the
-sample is small and mostly clean or structured, so a mailbox full of messy scans will gate less; and the compaction saving is small here because the
-sample invoices are short. The calls avoided are the structural saving; the token figure is a volume, to be priced at your own rates. Real Grok token counts are in section 4i.
+Outcomes are identical in all three. The earlier version of this table (7 calls, 1,621 tokens) is higher now because of what was added on purpose: a second
+opinion with tool calls before every payment, the resolver, and model-written notes. **Real Grok on the 17 provided invoices (section 4i): 26 model calls,
+12,426 tokens in / 1,109 out, $0.062 as reported by xAI.** Read this fairly: the stand-in never errs, so it shows how much the system *asks*, not how a real
+model answers, and the sample is small and mostly clean.
 
 ## 5. Known limitations
 - Duplicate detection is by (vendor, invoice number, revision); which of two identical copies is called the duplicate depends on timing.
