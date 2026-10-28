@@ -1,15 +1,28 @@
 # Recorded live runs
 
-Real runs against the xAI Grok API (not the local stand-in), saved so the claim "it works with live Grok" can be checked.
+Real runs against the xAI Grok API (not the local stand-in), saved so the claim "it works with live Grok" can be checked, and **replayed offline for free**.
 
 | File | What it is |
 |---|---|
-| `2026-10-27-provided-invoices.txt` | The terminal output of `python main.py --grok --trace --invoice_path data/invoices`: structured log lines, results table, impact, AI usage with the **cost xAI reported**, and the per-invoice agent trace (model calls, tool calls, conclusions). |
-| `2026-10-27-provided-invoices.json` | The same run's full results (`--json`): every invoice's findings, decision, agent trace with model/tool events, the model-written notes and follow-ups, and token usage and cost per invoice. |
+| `provided-invoices.cassette.jsonl` | The recording: every request/response exchange of the run (36, all successful), keyed by a hash of the request. No headers, so no key. This is what `--replay-llm` reads. |
+| `2026-10-27-provided-invoices.txt` | The terminal output of that run (`--trace`): structured log lines, results, impact, AI usage with the **cost xAI reported**, and the per-invoice agent trace (model calls, tool calls, conclusions). |
+| `2026-10-27-provided-invoices.json` | The same run's full results (`--json`): findings, decisions, agent traces with model/tool events, the model-written notes and emails, tokens and cost per invoice. |
 
-Result: 17 of 17 outcomes as labelled, 0 errors, 28 model calls, 4 tool calls, **$0.0637** as reported by xAI. Native `json_schema` structured output was accepted by the API.
+**Replay it** (no network, no key, no cost): `python main.py --replay-llm docs/live_runs/provided-invoices.cassette.jsonl --invoice_path data/invoices`. It reproduces the run:
+17 of 17 outcomes, the same notes and emails, 36 model calls answered from the recording, **$0.0200** (what xAI charged when it was recorded). Per invoice, with the rules-only run
+alongside, see [`../EVALUATION.md`](../EVALUATION.md). Record again with `--record-llm FILE` (needs a key; about two cents).
 
-Honest notes: the 28 calls include extraction, a second opinion before each of the 7 payments, the item/vendor resolver, and the plain-English notes and follow-ups.
-Grok made few tool calls on these invoices because the checks it was given were already sufficient; tool calling itself is exercised in `scripts/live_smoke.py`
-and in `data/self_correction/`. Temporary folders were scrubbed from the text and the JSON; no credential is in either file (`tests/test_no_secrets.py` scans the repo).
-Reproduce with your own key: `python main.py --grok --trace --invoice_path data/invoices` (about six cents).
+What the run shows: 17/17 outcomes as labelled and 0 errors; **36 model calls and 42 tool calls**, all served by `grok-4.20-0309-non-reasoning`; slowest step 3.7 seconds; $0.0200 for the
+17 invoices (about $0.0012 each). Native `json_schema` structured output was accepted by the API. The model changed no decision (it can only tighten one, and these invoices are clear-cut);
+it gave a second opinion before each of the 7 payments, wrote 10 plain-English notes and 4 vendor emails, and searched for name fixes on 2 invoices that stayed rejected.
+
+## What earlier recordings taught us (all fixed, each with a regression test)
+
+* **`grok-3` was served by a different, slower, dearer model.** On the account used, asking for `grok-3` returned `grok-4.3`, a reasoning model: ~5 s and three times the cost per
+  small call, against 1-2 s for the plain model. Calls now use a non-reasoning model when you have not named one (`XAI_MODEL` is always respected).
+* **A race in that selection** let the first few concurrent calls go out under the old name; found in the recording (five exchanges served by the slow model), fixed with a lock.
+* **Optional wording must not stall an invoice.** A courtesy email once held an invoice up for 94 seconds (three 30-second timeouts plus backoff). Notes and emails now get a 12-second
+  limit and no retries; on timeout the template is used. A run with the slow model recorded 12 such timeouts in 29 requests, and the system still got all 17 outcomes right.
+* **Failures are part of the record.** The recorder keeps 429s and timeouts, so a replay goes through the same retries and fallbacks as the live run did.
+
+Temporary folders were scrubbed from the text and JSON; no credential is in any file (`tests/test_no_secrets.py` scans the repo, and a test checks the recording for keys and headers).

@@ -69,6 +69,18 @@ out_dir = Path(outbox)
 check("outbox: follow-ups, approval cards, notices, digest",
       len(list(out_dir.glob("*.txt"))) >= 4 and len(list((out_dir / "approvals").glob("*.txt"))) == 2 and (out_dir / "daily_digest.txt").exists() and list((out_dir / "notices").glob("*.txt")))
 
+# 4e. evidence: a real Grok run replayed offline, and the per-invoice evaluation
+rc, out = py("main.py", "--replay-llm", "docs/live_runs/provided-invoices.cassette.jsonl", "--db", str(tmp / "rp.db"), "--outbox", outbox + "R", "--json", str(tmp / "rp.json"), "--invoice_path", "data/invoices")
+rp = json.loads((tmp / "rp.json").read_text())
+rstatus = {}
+for o in rp:
+    if o["status"] != "DUPLICATE":
+        rstatus[o["invoice"]["invoice_number"] + (f"-{o['invoice']['revision']}" if o["invoice"].get("revision") else "")] = o["status"]
+check("a recorded live Grok run replays offline: 36 model calls answered, 0 missing, the recorded cost", "36 model call(s) answered from the recording, 0 not recorded" in out and "spent $0.0200" in out)
+check("the replay reaches the same 17 outcomes and reproduces the model's notes", rstatus == expected and sum(bool(o.get("explanation")) for o in rp) == 10, f"{sum(rstatus[k] == v for k, v in expected.items())}/17")
+rc, out = py("scripts/evaluate.py", "--check")
+check("docs/EVALUATION.md (rules-only and LLM-on, every invoice) is current", rc == 0 and "is current" in out)
+
 # 4a. the ledger remembers: running twice never pays twice; --reset starts over
 dbl = str(tmp / "twice.db")
 one = ["main.py", "--offline", "--db", dbl, "--outbox", outbox + "T", "--invoice_path", "data/invoices/invoice_1001.txt"]
@@ -132,6 +144,24 @@ try:
     check("the page shows who the link was issued to, with no identity pick-list", "<b>vp-finance@acmecorp.example</b>" in decision and "<select" not in decision)
     check("the VP approves in the browser flow (a typed name carries no weight) and the invoice is paid", "paid" in post(decision="approve", who="attacker@evil.example", **form))
     check("a second click is refused", "already approved" in post(decision="approve", **form))
+    up = urllib.request.urlopen(base + "/upload", timeout=10).read().decode()
+    csrf = re.search(r'name="csrf" value="([^"]+)"', up).group(1)
+    boundary = "e2eboundary"
+    sample = (REPO / "data" / "invoices" / "invoice_1006.csv").read_bytes()
+    body = (f'--{boundary}\r\nContent-Disposition: form-data; name="csrf"\r\n\r\n{csrf}\r\n'
+            f'--{boundary}\r\nContent-Disposition: form-data; name="files"; filename="invoice_1006.csv"\r\nContent-Type: text/csv\r\n\r\n').encode() + sample + f"\r\n--{boundary}--\r\n".encode()
+    def upload(token_body):
+        req = urllib.request.Request(base + "/upload", data=token_body, method="POST", headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                return r.status, r.read().decode()
+        except urllib.error.HTTPError as err:
+            return err.code, err.read().decode()
+    check("the upload page offers a file picker", 'type="file"' in up and "Upload invoices" in page)
+    check("a forged upload (wrong form token) is refused", upload(body.replace(csrf.encode(), b"forged"))[0] == 403)
+    code, _ = upload(body)
+    dash = urllib.request.urlopen(base + "/", timeout=10).read().decode()
+    check("an uploaded invoice is processed by the agents and appears on the dashboard", code == 200 and "INV-1006" in dash)
     inv_id = re.search(r'href="/invoice/(\d+)">INV-3201<', urllib.request.urlopen(base + "/", timeout=10).read().decode()).group(1)
     detail = urllib.request.urlopen(base + f"/invoice/{inv_id}", timeout=10).read().decode()
     check("the invoice page shows the agents' trace with the tool call and the correction", "What each agent did" in detail and "search_items" in detail and "corrected" in detail)

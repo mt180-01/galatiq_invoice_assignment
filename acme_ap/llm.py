@@ -28,6 +28,7 @@ from pydantic import BaseModel, ValidationError
 
 _agent = contextvars.ContextVar("agent", default="unassigned")
 invoice_ledger: contextvars.ContextVar[list | None] = contextvars.ContextVar("invoice_ledger", default=None)  # per-invoice usage sink
+AGENT_TIMEOUT = {"comms": 12.0}  # seconds. Wording is optional: a slow reply must never hold up an invoice, so it gets a short leash and no retries
 MAX_OUT = {"intake": 900, "reviewer": 160, "critic": 120, "resolver": 200, "comms": 260}  # reply-length caps (tokens) by agent
 
 
@@ -240,10 +241,11 @@ class GrokClient(LLM):
     def __init__(self, api_key: str, model: str = "grok-3", base_url: str = "https://api.x.ai/v1",
                  transport: httpx.AsyncBaseTransport | None = None, timeout: float = 30.0,
                  cache: LLMCache | None = None, meter: Meter | None = None, budget_usd: float | None = None,
-                 retry_delays: tuple[float, ...] | None = None):
+                 retry_delays: tuple[float, ...] | None = None, auto_model: bool = False):
         self.model, self.cache, self.meter = model, cache, meter or Meter()
         self.budget_usd = budget_usd  # hard cap on what this client may spend; None = unlimited (only for the key-free stand-in)
         self._key = api_key
+        self.auto_model, self._model_lock = auto_model, asyncio.Lock()  # auto: no model was chosen, so pick one this key can use (see _resolve_model)
         self.retry_delays = self.DEFAULT_RETRY if retry_delays is None else retry_delays  # seconds to wait before each retry of a transient failure (429/5xx/timeouts)
         self._client = httpx.AsyncClient(
             base_url=base_url, timeout=timeout, transport=transport,
@@ -263,16 +265,18 @@ class GrokClient(LLM):
 
     async def _send(self, payload: dict) -> httpx.Response:
         """POST with a couple of patient retries for the failures that clear by themselves (rate limit, 'at capacity', 5xx, timeouts)."""
-        for attempt in range(len(self.retry_delays) + 1):
+        agent = _agent.get()
+        delays = () if agent in AGENT_TIMEOUT else self.retry_delays  # optional work is not retried
+        for attempt in range(len(delays) + 1):
             try:
-                resp = await self._client.post("/chat/completions", json=payload)
+                resp = await self._client.post("/chat/completions", json=payload, **({"timeout": AGENT_TIMEOUT[agent]} if agent in AGENT_TIMEOUT else {}))
             except httpx.TransportError:
-                if attempt == len(self.retry_delays):
+                if attempt == len(delays):
                     raise
             else:
-                if resp.status_code not in (429, 500, 502, 503, 504) or attempt == len(self.retry_delays):
+                if resp.status_code not in (429, 500, 502, 503, 504) or attempt == len(delays):
                     return resp
-            await asyncio.sleep(self.retry_delays[attempt])
+            await asyncio.sleep(delays[attempt])
         raise AssertionError("unreachable")
 
     async def _post(self, payload: dict, agent: str) -> dict:
@@ -324,6 +328,19 @@ class GrokClient(LLM):
                           ticks=int(usage.get("cost_in_usd_ticks") or 0), model=str(body.get("model") or payload.get("model") or ""))
         return body
 
+    async def _resolve_model(self) -> None:
+        """If the user did not name a model, use a plain (non-reasoning) one when the account offers it. A name like "grok-3" can be served by a larger
+        reasoning model that bills hidden thinking tokens and takes several times longer, which routine extraction and review do not need
+        (measured on one account: 4.7-5.3 s and ~10,000,000 ticks per note against 1.0-1.9 s and ~3,000,000)."""
+        if not self.auto_model:
+            return
+        async with self._model_lock:  # everyone else waits here until the lookup is finished, so no call goes out under the old name
+            if self.auto_model:
+                found = await self._discover_model()
+                if found and "non-reasoning" in found:
+                    self.model = found
+                self.auto_model = False  # only now is it settled
+
     async def _discover_model(self) -> str | None:
         """Ask the API which models this key can use and take the first plain chat model, preferring non-reasoning ones
         (cheaper: reasoning models bill hidden thinking tokens, which routine invoice work does not need)."""
@@ -342,6 +359,7 @@ class GrokClient(LLM):
 
     async def chat_json(self, system: str, user: str) -> dict:
         agent = _agent.get()
+        await self._resolve_model()
         model = self.model_for(agent)
         system = system + "\nRespond with a single JSON object only."
         key = hashlib.sha256(f"{model}\x00{system}\x00{user}".encode()).hexdigest()
@@ -363,6 +381,7 @@ class GrokClient(LLM):
     async def run_tools(self, system: str, user: str, tools: list[Tool], max_steps: int = 4) -> dict:
         """Function-calling loop: the model asks for tools, we run them, it sees the results, and finally answers in JSON."""
         agent, by_name = _agent.get(), {t.name: t for t in tools}
+        await self._resolve_model()
         messages: list[dict] = [{"role": "system", "content": system + "\nWhen you have what you need, answer with a single JSON object only."},
                                 {"role": "user", "content": user}]
         for step in range(max_steps + 1):
@@ -399,20 +418,36 @@ def read_api_key() -> str | None:
 DEFAULT_BUDGET_USD = 0.25  # per run; XAI_BUDGET_USD overrides. A full pass over the 17 sample invoices costs a few cents.
 
 
-def make_llm(offline: bool = False, cache_path: str | Path | None = None, simulate: bool = False, live: bool = False) -> LLM:
+def make_llm(offline: bool = False, cache_path: str | Path | None = None, simulate: bool = False, live: bool = False,
+             record_to: str | Path | None = None, replay_from: str | Path | None = None) -> LLM:
     """Which model answers:
       offline        no model at all (rules only), free
       default        the local stand-in, free
       live=True      Grok, billed per token by xAI, capped by a per-run budget. Never chosen unless asked for (--grok or ACME_USE_GROK=1),
                      so a saved key cannot cost money by accident."""
-    live = live or os.environ.get("ACME_USE_GROK") == "1"
-    key = read_api_key() if live else None
     if offline:
         return OfflineLLM()
+    if replay_from:  # a recorded live run, answered from the file: no network, no key, no cost
+        from .cassette import ReplayTransport
+        transport = ReplayTransport(replay_from)
+        GrokClient._format_mode, GrokClient._model_checked = "json_schema", False  # start from the same state a fresh live run did
+        client = GrokClient("replay", transport=transport, retry_delays=(0, 0), budget_usd=None)  # recorded 429s are replayed, so retries follow the same path, instantly
+        client.label, client.replay = f"Grok (replayed from {Path(replay_from).name})", transport
+        return client
+    live = live or bool(record_to) or os.environ.get("ACME_USE_GROK") == "1"
+    key = read_api_key() if live else None
     if key and not simulate:
         budget = _env_float("XAI_BUDGET_USD")
-        return GrokClient(key, model=os.environ.get("XAI_MODEL", "grok-3"), cache=LLMCache(cache_path) if cache_path else None,
-                          budget_usd=DEFAULT_BUDGET_USD if budget is None else budget)
+        transport = None
+        if record_to:  # recording must see every request, so the answer cache is off
+            from .cassette import RecordingTransport
+            transport = RecordingTransport(record_to, note=f"recorded {__import__('datetime').date.today()} against model {os.environ.get('XAI_MODEL', 'grok-3')}")
+        chosen = os.environ.get("XAI_MODEL")
+        client = GrokClient(key, model=chosen or "grok-3", auto_model=not chosen, transport=transport, cache=None if record_to else (LLMCache(cache_path) if cache_path else None),
+                            budget_usd=DEFAULT_BUDGET_USD if budget is None else budget)
+        if record_to:
+            client.label, client.recording = "Grok (recording)", transport
+        return client
     from . import sim_llm
     client = GrokClient("local-simulation", transport=sim_llm.transport())
     client.label = sim_llm.LABEL

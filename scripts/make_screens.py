@@ -46,6 +46,7 @@ def web(tmp: Path) -> None:
     home = urllib.request.urlopen(base + "/").read().decode()
     decide = base + re.search(r'href="(/decide\?t=[^"]+)"[^>]*>INV-3001', home).group(1).replace("&amp;", "&")
     shot(base + "/", "dashboard.png", height=1500)
+    shot(base + "/upload", "upload.png", width=900, height=430)
     inv = {m.group(2): m.group(1) for m in re.finditer(r'href="/invoice/(\d+)">([^<]+)<', home)}
     shot(base + f"/invoice/{inv['INV-3201']}", "invoice-trace.png", height=1250)       # the self-corrected one: tool calls and the fix
     shot(decide, "approval.png", width=900, height=1050)

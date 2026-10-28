@@ -68,6 +68,7 @@ def serve_ui(argv: list[str]) -> None:
     ap = argparse.ArgumentParser(prog="main.py serve")
     ap.add_argument("--db", default=None, help="default: inventory.db, or ui_demo.db with --demo (so a demo never overwrites your ledger)")
     ap.add_argument("--port", type=int, default=8765)
+    ap.add_argument("--grok", action="store_true", help="process uploads with the real Grok API (billed, capped per run); default is the free local model")
     ap.add_argument("--demo", action="store_true", help="first process the sample invoices (provided, self-correction, approval demo) into --db with the free local model; replaces what --db holds")
     a = ap.parse_args(argv)
     a.db = a.db or ("ui_demo.db" if a.demo else "inventory.db")
@@ -77,7 +78,7 @@ def serve_ui(argv: list[str]) -> None:
         args = SimpleNamespace(db=a.db, keep_ledger=False, llm_concurrency=8, offline=False, simulate=True, grok=False)
         outcomes, _, _ = asyncio.run(run_batch(paths, args, 1))
         console.print(f"[dim]loaded {len(outcomes)} sample documents into {a.db}[/]")
-    serve(a.db, port=a.port)
+    serve(a.db, port=a.port, grok=a.grok)
 
 
 def agents() -> None:
@@ -113,6 +114,8 @@ def main() -> None:
     ap.add_argument("--llm-concurrency", type=int, default=8)
     ap.add_argument("--llm-policy", choices=("gated", "always"), default="gated",
                     help="gated (default): ask the model only where it can change the result; always: ask on every invoice (costly)")
+    ap.add_argument("--record-llm", metavar="FILE", help="run on live Grok (billed, capped) and save every request/response to FILE so the run can be replayed offline")
+    ap.add_argument("--replay-llm", metavar="FILE", help="answer model calls from a recording made with --record-llm: no network, no key, no cost")
     ap.add_argument("--trace", action="store_true", help="show, per invoice, what each agent did: model calls, tool calls, conclusions")
     ap.add_argument("--offline", action="store_true", help="no model at all: rules only")
     ap.add_argument("--simulate", action="store_true", help="use the local stand-in model (this is already the default)")
@@ -130,7 +133,7 @@ def main() -> None:
         logging.getLogger(name).setLevel(logging.INFO)
     paths = collect(args.invoice_path)
     ncpu = os.cpu_count() or 1
-    llm_label = make_llm(args.offline, simulate=args.simulate, live=args.grok).label
+    llm_label = make_llm(args.offline, simulate=args.simulate, live=args.grok, record_to=None, replay_from=args.replay_llm).label if not args.record_llm else "Grok (recording)"
     console.print(f"[bold]{f'{args.bench:,} generated documents (from {len(paths)} samples)' if args.bench else f'{len(paths)} document(s)'}[/], {ncpu} CPU cores, LLM: "
                   f"{llm_label + (' (' + os.environ.get('XAI_MODEL', 'grok-3') + ')' if llm_label == 'Grok' else '')}")
 
@@ -174,6 +177,11 @@ def main() -> None:
     notices = write_notices(outcomes, Path(args.outbox), waiting, pay_rows)
     impact(outcomes, waiting)
     ai_usage(outcomes, llm_label)
+    if hasattr(args, "replay_stats"):
+        hits, misses = args.replay_stats
+        console.print(f"  [dim]replay: {hits} model call(s) answered from the recording, {misses} not recorded" + (" (those steps used the rules: record again if prompts changed)" if misses else "") + "[/]")
+    if hasattr(args, "recorded"):
+        console.print(f"  [dim]recorded {args.recorded} model exchange(s) ({getattr(args, 'recorded_failures', 0)} failed) to {args.record_llm}[/]")
     if args.trace:
         show_trace(outcomes)
     scorecard(outcomes)

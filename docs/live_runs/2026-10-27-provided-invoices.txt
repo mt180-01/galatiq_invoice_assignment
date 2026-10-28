@@ -1,113 +1,151 @@
-20 document(s), 14 CPU cores, LLM: Grok (grok-3)
+20 document(s), 14 CPU cores, LLM: Grok (recording)
                                                                    Invoice results                                                                    
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃ File                      ┃ Vendor                       ┃ Total        ┃ Status    ┃ Why                                                          ┃
 ┡━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ invoice_1001.txt          │ Widgets Inc.                 │ USD 5000.00  │ PAID      │ Total 5000 USD <=10000, empty findings (no error/hold)       │
+│ invoice_1001.txt          │ Widgets Inc.                 │ USD 5000.00  │ PAID      │ Vendor approved, items exist with sufficient stock, total    │
+│                           │                              │              │           │ $5000 <= $10000, no errors/holds in findings, new ve…        │
 │ invoice_1002.txt          │ Gadgets Co.                  │ USD 15000.00 │ REJECT    │ Rejected: GadgetX: 20 billed but only 5 in stock             │
-│ invoice_1003.txt          │ Fraudster LLC                │ USD 100000.0 │ REJECT    │ Rejected: FakeItem: zero stock on hand, 100 billed; multiple │
+│ invoice_1003.txt          │ Fraudster LLC                │ USD 100000   │ REJECT    │ Rejected: FakeItem: zero stock on hand, 100 billed; multiple │
 │                           │                              │              │           │ fraud signals: pressure language (immediately, pe…           │
-│ invoice_1004.json         │ Precision Parts Ltd.         │ USD 1890.0   │ PAID      │ Total 1890 USD <=10000, no errors/holds in findings, per     │
-│                           │                              │              │           │ policy                                                       │
-│ invoice_1004_revised.json │ Precision Parts Ltd.         │ USD 5940.0   │ AWAITING  │ -> AP Manager (request #2). Needs human review: revision R1: │
+│ invoice_1004.json         │ Precision Parts Ltd.         │ USD 1890.0   │ PAID      │ Vendor approved, items exist with sufficient stock,          │
+│                           │                              │              │           │ calculated total 1750 matches invoice under 10000, no erro…  │
+│ invoice_1004_revised.json │ Precision Parts Ltd.         │ USD 5940.0   │ AWAITING  │ -> AP Manager (request #1). Needs human review: revision R1: │
 │                           │                              │              │           │ may supersede an earlier bill; confirm before pay…           │
 │ invoice_1005.json         │ Global Supply Chain Partners │ USD 15225.0  │ REJECT    │ Rejected: GadgetX: 8 billed but only 5 in stock              │
-│ invoice_1006.csv          │ Acme Industrial Supplies     │ USD 2750.00  │ PAID      │ Total 2750 USD <=10000, no errors/holds in findings, meets   │
-│                           │                              │              │           │ policy                                                       │
+│ invoice_1006.csv          │ Acme Industrial Supplies     │ USD 2750.00  │ PAID      │ Vendor approved, items exist with sufficient stock,          │
+│                           │                              │              │           │ calculated total 2750 matches invoice, no errors/holds, un…  │
 │ invoice_1007.csv          │ MegaWidgets Corp             │ USD 15525.00 │ REJECT    │ Rejected: WidgetA: 20 billed but only 15 in stock; WidgetB:  │
 │                           │                              │              │           │ 15 billed but only 10 in stock; subtotal 14750.00 …          │
 │ invoice_1008.txt          │ NoProd Industries            │ USD 9900.00  │ REJECT    │ Rejected: 'SuperGizmo' not found in inventory;               │
 │                           │                              │              │           │ 'MegaSprocket' not found in inventory                        │
 │ invoice_1009.json         │ -                            │ USD -250.0   │ REJECT    │ Rejected: total is negative (-250.0); vendor name is         │
 │                           │                              │              │           │ missing; WidgetA: quantity -5 is not positive; line items…   │
-│ invoice_1010.txt          │ Consolidated Materials Group │ USD 7185.00  │ PAID      │ Total 7185 <=10000, only warning (price variance, rush), no  │
-│                           │                              │              │           │ error/hold per policy                                        │
+│ invoice_1010.txt          │ Consolidated Materials Group │ USD 7185.00  │ PAID      │ Vendor approved, total 7185 <= 10000, only warning (price    │
+│                           │                              │              │           │ variance on rush order) which does not block per pol…        │
 │ invoice_1011.pdf          │ Summit Manufacturing Co.     │ USD 3000.00  │ DUPLICATE │ already received from invoice_1011.txt; not processed twice  │
-│ invoice_1011.txt          │ Summit Manufacturing Co.     │ USD 3000.00  │ PAID      │ Total 3000 USD <=10000, findings empty (no error/hold)       │
+│ invoice_1011.txt          │ Summit Manufacturing Co.     │ USD 3000.00  │ PAID      │ Vendor approved, new vendor (0 prior bills), items exist     │
+│                           │                              │              │           │ with sufficient stock, calculated total $3000 matches…       │
 │ invoice_1012.pdf          │ QuickShip Distributers       │ USD 9975.00  │ DUPLICATE │ already received from invoice_1012.txt; not processed twice  │
-│ invoice_1012.txt          │ QuickShip Distributers       │ USD 9975.00  │ PAID      │ Total 9975 <= 10000, only a warn (no error/hold), warnings   │
-│                           │                              │              │           │ do not block per policy                                      │
+│ invoice_1012.txt          │ QuickShip Distributers       │ USD 9975.00  │ PAID      │ Vendor approved, all items exist with sufficient stock,      │
+│                           │                              │              │           │ total 9975 under 10000 limit, only a warning (near_thr…      │
 │ invoice_1013.json         │ Atlas Industrial Supply      │ USD 22562.8  │ REJECT    │ Rejected: WidgetA: 22 billed but only 15 in stock; WidgetB:  │
 │                           │                              │              │           │ 18 billed but only 10 in stock; GadgetX: 9 billed …          │
 │ invoice_1013.pdf          │ Atlas Industrial Supply      │ USD 22562.8  │ DUPLICATE │ already received from invoice_1013.json; not processed twice │
-│ invoice_1014.xml          │ TechParts International      │ EUR 4125.00  │ AWAITING  │ -> Treasury (request #1). Needs human review: billed in EUR; │
+│ invoice_1014.xml          │ TechParts International      │ EUR 4125.00  │ AWAITING  │ -> Treasury (request #2). Needs human review: billed in EUR; │
 │                           │                              │              │           │ no FX policy to settle in USD [draft revised afte…           │
-│ invoice_1015.csv          │ Reliable Components Inc.     │ USD 6500.00  │ PAID      │ Total 6500 USD <=10000, no errors/holds in findings []       │
+│ invoice_1015.csv          │ Reliable Components Inc.     │ USD 6500.00  │ PAID      │ Vendor approved, items exist with sufficient stock,          │
+│                           │                              │              │           │ calculated total 6500 matches invoice, no errors/holds, wi…  │
 │ invoice_1016.json         │ Widgets Inc.                 │ USD 3233.0   │ REJECT    │ Rejected: 'WidgetC' not found in inventory                   │
 └───────────────────────────┴──────────────────────────────┴──────────────┴───────────┴──────────────────────────────────────────────────────────────┘
 AWAITING=2  DUPLICATE=3  PAID=7  REJECT=8
 Impact (17 invoices)
-  no human touch needed     : 7 (41%); in the system a median 19347 ms, 95% under 47369 ms  (baseline in the brief: ~5 days each)
-  stopped before the bank   : 8 rejected + 3 duplicates blocked  (insufficient_stock x4, total_math x3, unknown_item x2, out_of_stock x1)
-  waiting on a person       : 2; oldest 0h with Treasury, reminder in 24h  (never silent: reminder 24h, escalation 48h, expiry 5d)
-AI usage  model: Grok
-  model calls : 28 made, 4 tool calls run for the model, 0 answered from cache, 35 avoided by gates (critic 17, intake 8, reviewer 10)  (asking on 
-every invoice would be about 63)
-  tokens      : 13,661 in / 1,469 out; spent $0.0637 (reported by xAI)
+  no human touch needed     : 7 (41%); in the system a median 2515 ms, 95% under 3830 ms  (baseline in the brief: ~5 days each)
+  stopped before the bank   : 8 rejected + 3 duplicates blocked  (insufficient_stock x4, total_math x3, unknown_item x2, fraud_indicators x1)
+  waiting on a person       : 2; oldest 0h with AP Manager, reminder in 24h  (never silent: reminder 24h, escalation 48h, expiry 5d)
+AI usage  model: Grok (recording)
+  model calls : 36 made, 42 tool calls run for the model, 0 answered from cache, 35 avoided by gates (critic 17, intake 8, reviewer 10)  (asking on 
+every invoice would be about 71)
+  tokens      : 20,234 in / 2,231 out; spent $0.0200 (reported by xAI)
+  recorded 36 model exchange(s) (0 failed) to docs/live_runs/provided-invoices.cassette.jsonl
 INV-1001 Widgets Inc.  PAID
   Intake      read txt via heuristic:txt (0 ms)
                  -> model not asked (intake): the rules' reading was complete
-  Validation  checked against ERP and policy (0 ms)
-  Reviewer    decided (5971 ms)
-                 -> asked the model as reviewer: 634 tokens in, 29 out
-                 -> decision: approve: Total 5000 USD <=10000, empty findings (no error/hold)
+  Validation  checked against ERP and policy (12 ms)
+  Reviewer    decided (1655 ms)
+                 -> asked the model as reviewer: 626 tokens in, 48 out
+                 -> tool lookup_vendor({"name":"Widgets Inc."}) -> {'result': {'found': True, 'name': 'Widgets Inc.', 'status': 'approved'}}
+                 -> tool vendor_history({"vendor":"Widgets Inc."}) -> {'result': {'bills': 0}}
+                 -> tool lookup_item({"item":"WidgetA"}) -> {'result': {'found': True, 'name': 'WidgetA', 'stock': 15, 'unit_price': '250.00', 
+'approximate_match': False}}
+                 -> tool lookup_item({"item":"WidgetB"}) -> {'result': {'found': True, 'name': 'WidgetB', 'stock': 10, 'unit_price': '500.00', 
+'approximate_match': False}}
+                 -> tool policy_limits({}) -> {'result': {'auto_approve_up_to_usd': '10000', 'vp_sign_off_above_usd': '10000', 'cfo_above_usd': 
+'50000', 'rules': 'any error finding -> reject; any hold findi
+                 -> asked the model as reviewer: 870 tokens in, 42 out
+                 -> decision: approve: Vendor approved, items exist with sufficient stock, total $5000 <= $10000, no errors/holds in findings, new 
+vendor but policy allows
                  -> model not asked (critic): the draft agreed with policy
-  Payment     scheduled / sent (2 ms)
+  Payment     scheduled / sent (1 ms)
 INV-1002 Gadgets Co.  REJECT
   Intake      read txt via heuristic:txt (0 ms)
                  -> model not asked (intake): the rules' reading was complete
+  Validation  checked against ERP and policy (1 ms)
+  Reviewer    decided (0 ms)
+                 -> model not asked (reviewer): the rules had already decided
+                 -> model not asked (critic): the draft agreed with policy
+  Comms       explained in plain English (928 ms)
+                 -> asked the model as comms: 357 tokens in, 41 out
+                 -> wrote: Invoice INV-1002 from Gadgets Co. for 15000.00 USD was rejected because GadgetX was billed for 20 units but only 5 are in 
+stock.
+INV-1003 Fraudster LLC  REJECT
+  Intake      read txt via heuristic:txt (1468 ms)
+                 -> asked the model as intake: 487 tokens in, 154 out
+  Validation  checked against ERP and policy (0 ms)
+  Reviewer    decided (1061 ms)
+                 -> model not asked (reviewer): the rules had already decided
+                 -> model not asked (critic): the draft agreed with policy
+  Comms       explained in plain English (1300 ms)
+                 -> asked the model as comms: 404 tokens in, 71 out
+                 -> wrote: Invoice INV-1003 from Fraudster LLC for 100000 USD was rejected. Checks found the vendor is not in the approved vendor 
+master, it billed for FakeItem with zero stock on hand, and multiple fraud signal
+INV-1004 Precision Parts Ltd.  PAID
+  Intake      read json via json (0 ms)
+  Validation  checked against ERP and policy (0 ms)
+  Reviewer    decided (1694 ms)
+                 -> asked the model as reviewer: 627 tokens in, 50 out
+                 -> tool lookup_vendor({"name":"Precision Parts Ltd."}) -> {'result': {'found': True, 'name': 'Precision Parts Ltd.', 'status': 
+'approved'}}
+                 -> tool vendor_history({"vendor":"Precision Parts Ltd."}) -> {'result': {'bills': 0}}
+                 -> tool lookup_item({"item":"WidgetA"}) -> {'result': {'found': True, 'name': 'WidgetA', 'stock': 15, 'unit_price': '250.00', 
+'approximate_match': False}}
+                 -> tool lookup_item({"item":"WidgetB"}) -> {'result': {'found': True, 'name': 'WidgetB', 'stock': 10, 'unit_price': '500.00', 
+'approximate_match': False}}
+                 -> tool policy_limits({}) -> {'result': {'auto_approve_up_to_usd': '10000', 'vp_sign_off_above_usd': '10000', 'cfo_above_usd': 
+'50000', 'rules': 'any error finding -> reject; any hold findi
+                 -> asked the model as reviewer: 874 tokens in, 45 out
+                 -> decision: approve: Vendor approved, items exist with sufficient stock, calculated total 1750 matches invoice under 10000, no 
+errors/holds/findings, new vendor but policy allows
+                 -> model not asked (critic): the draft agreed with policy
+  Payment     scheduled / sent (2 ms)
+INV-1004 Precision Parts Ltd.  AWAITING
+  Intake      read json via json (0 ms)
   Validation  checked against ERP and policy (0 ms)
   Reviewer    decided (0 ms)
                  -> model not asked (reviewer): the rules had already decided
                  -> model not asked (critic): the draft agreed with policy
-  Comms       explained in plain English (19330 ms)
-                 -> asked the model as comms: 365 tokens in, 41 out
-                 -> wrote: The invoice INV-1002 from Gadgets Co. for 15000.00 USD was rejected. Checks found GadgetX: 20 billed but only 5 in stock.
-INV-1003 Fraudster LLC  REJECT
-  Intake      read txt via heuristic:txt (19858 ms)
-                 -> asked the model as intake: 495 tokens in, 156 out
-  Validation  checked against ERP and policy (0 ms)
-  Reviewer    decided (3687 ms)
-                 -> model not asked (reviewer): the rules had already decided
-                 -> model not asked (critic): the draft agreed with policy
-  Comms       explained in plain English (23823 ms)
-                 -> asked the model as comms: 414 tokens in, 63 out
-                 -> wrote: The invoice was rejected. Checks found the vendor is not in the approved vendor master, the item has zero stock on hand 
-despite being billed, and multiple fraud signals including pressure language, im
-INV-1004 Precision Parts Ltd.  PAID
-  Intake      read json via json (0 ms)
-  Validation  checked against ERP and policy (0 ms)
-  Reviewer    decided (6130 ms)
-                 -> asked the model as reviewer: 635 tokens in, 30 out
-                 -> decision: approve: Total 1890 USD <=10000, no errors/holds in findings, per policy
-                 -> model not asked (critic): the draft agreed with policy
-  Payment     scheduled / sent (1 ms)
-INV-1004 Precision Parts Ltd.  AWAITING
-  Intake      read json via json (0 ms)
-  Validation  checked against ERP and policy (0 ms)
-  Reviewer    decided (7043 ms)
-                 -> model not asked (reviewer): the rules had already decided
-                 -> model not asked (critic): the draft agreed with policy
-  Comms       explained in plain English (24262 ms)
-                 -> asked the model as comms: 373 tokens in, 40 out
-                 -> wrote: The invoice INV-1004 from Precision Parts Ltd. has a finding that revision R1 may supersede an earlier bill. Confirm before
-paying. Escalate to the AP Manager.
-  Desk        routed to a person (1 ms)
+  Comms       explained in plain English (1011 ms)
+                 -> asked the model as comms: 365 tokens in, 48 out
+                 -> wrote: Invoice INV-1004 from Precision Parts Ltd for 5940.0 USD needs your decision. Checks found that revision R1 may supersede 
+an earlier bill. Please confirm before paying and escalate to the AP Manager.
+  Desk        routed to a person (2 ms)
 INV-1005 Global Supply Chain Partners  REJECT
   Intake      read json via json (0 ms)
   Validation  checked against ERP and policy (0 ms)
   Reviewer    decided (0 ms)
                  -> model not asked (reviewer): the rules had already decided
                  -> model not asked (critic): the draft agreed with policy
-  Comms       explained in plain English (23528 ms)
-                 -> asked the model as comms: 365 tokens in, 29 out
-                 -> wrote: The invoice was rejected. Checks found GadgetX: 8 billed but only 5 in stock. Confirm the rejection.
+  Comms       explained in plain English (1001 ms)
+                 -> asked the model as comms: 357 tokens in, 55 out
+                 -> wrote: Invoice INV-1005 from Global Supply Chain Partners for 15225.0 USD was rejected. The check found that GadgetX was billed 
+for 8 units but only 5 are in stock. Please review the findings and decide on n
 INV-1006 Acme Industrial Supplies  PAID
   Intake      read csv via csv (0 ms)
   Validation  checked against ERP and policy (0 ms)
-  Reviewer    decided (6633 ms)
-                 -> asked the model as reviewer: 636 tokens in, 30 out
-                 -> decision: approve: Total 2750 USD <=10000, no errors/holds in findings, meets policy
+  Reviewer    decided (1938 ms)
+                 -> asked the model as reviewer: 628 tokens in, 50 out
+                 -> tool lookup_vendor({"name":"Acme Industrial Supplies"}) -> {'result': {'found': True, 'name': 'Acme Industrial Supplies', 
+'status': 'approved'}}
+                 -> tool vendor_history({"vendor":"Acme Industrial Supplies"}) -> {'result': {'bills': 0}}
+                 -> tool lookup_item({"item":"WidgetA"}) -> {'result': {'found': True, 'name': 'WidgetA', 'stock': 15, 'unit_price': '250.00', 
+'approximate_match': False}}
+                 -> tool lookup_item({"item":"WidgetB"}) -> {'result': {'found': True, 'name': 'WidgetB', 'stock': 10, 'unit_price': '500.00', 
+'approximate_match': False}}
+                 -> tool policy_limits({}) -> {'result': {'auto_approve_up_to_usd': '10000', 'vp_sign_off_above_usd': '10000', 'cfo_above_usd': 
+'50000', 'rules': 'any error finding -> reject; any hold findi
+                 -> asked the model as reviewer: 876 tokens in, 39 out
+                 -> decision: approve: Vendor approved, items exist with sufficient stock, calculated total 2750 matches invoice, no errors/holds, 
+under 10000 limit
                  -> model not asked (critic): the draft agreed with policy
   Payment     scheduled / sent (1 ms)
 INV-1007 MegaWidgets Corp  REJECT
@@ -116,119 +154,174 @@ INV-1007 MegaWidgets Corp  REJECT
   Reviewer    decided (0 ms)
                  -> model not asked (reviewer): the rules had already decided
                  -> model not asked (critic): the draft agreed with policy
-  Comms       explained in plain English (16563 ms)
-                 -> asked the model as comms: 409 tokens in, 66 out
-                 -> wrote: The invoice INV-1007 from MegaWidgets Corp for 15525.00 USD was rejected. Checks found WidgetA billed for 20 but only 15 in
-stock, WidgetB billed for 15 but only 10 in stock, and subtotal plus tax plu
-  Comms       drafted vendor follow-up (28979 ms)
-                 -> asked the model as comms: 389 tokens in, 78 out
-                 -> wrote: Regarding invoice INV-1007, the line items do not add up to the invoice total (subtotal 14750.00 + tax 885.00 + shipping 0 
-= 15635.00, invoice total is 15525.00). Is the stated total correct, or can y
+  Comms       explained in plain English (1288 ms)
+                 -> asked the model as comms: 401 tokens in, 94 out
+                 -> wrote: Invoice INV-1007 from MegaWidgets Corp for 15525.00 USD was rejected. Checks found WidgetA billed for 20 but only 15 in 
+stock, WidgetB billed for 15 but only 10 in stock, and a calculation mismatch (s
+  Comms       drafted vendor follow-up (2022 ms)
+                 -> asked the model as comms: 381 tokens in, 76 out
+                 -> wrote: Dear Vendor, The line items do not add up to the invoice total (subtotal 14750.00 + tax 885.00 + shipping 0 = 15635.00, 
+invoice total is 15525.00). Is the stated total correct, or can you send a corre
 INV-1008 NoProd Industries  REJECT
   Intake      read txt via heuristic:txt (0 ms)
                  -> model not asked (intake): the rules' reading was complete
-  Validation  checked against ERP and policy (12876 ms)
-                 -> asked the model as resolver: 478 tokens in, 24 out
+  Validation  checked against ERP and policy (2439 ms)
+                 -> asked the model as resolver: 470 tokens in, 24 out
                  -> tool search_items({"query":"SuperGizmo"}) -> {'result': []}
                  -> tool search_items({"query":"MegaSprocket"}) -> {'result': []}
-                 -> asked the model as resolver: 521 tokens in, 6 out
-                 -> asked the model as resolver: 431 tokens in, 13 out
+                 -> asked the model as resolver: 513 tokens in, 6 out
+                 -> asked the model as resolver: 423 tokens in, 13 out
                  -> tool search_vendors({"query":"NoProd Industries"}) -> {'result': [{'name': 'Acme Industrial Supplies', 'status': 'approved', 
 'similarity': 0.53}]}
-                 -> asked the model as resolver: 476 tokens in, 25 out
-  Reviewer    decided (6452 ms)
+                 -> asked the model as resolver: 468 tokens in, 28 out
+  Reviewer    decided (57 ms)
                  -> model not asked (reviewer): the rules had already decided
                  -> model not asked (critic): the draft agreed with policy
-  Comms       explained in plain English (20889 ms)
-                 -> asked the model as comms: 385 tokens in, 54 out
-                 -> wrote: The invoice INV-1008 from NoProd Industries was rejected. Checks found the vendor is not in the approved vendor master, 
-SuperGizmo not found in inventory, and MegaSprocket not found in inventory. Plea
+  Comms       explained in plain English (989 ms)
+                 -> asked the model as comms: 377 tokens in, 65 out
+                 -> wrote: Invoice INV-1008 from NoProd Industries for 9900.00 USD was rejected. Checks found the vendor is not in the approved vendor
+master and the items 'SuperGizmo' and 'MegaSprocket' are not found in invent
 INV-1009 None  REJECT
   Intake      read json via json (0 ms)
-  Validation  checked against ERP and policy (0 ms)
-  Reviewer    decided (5966 ms)
+  Validation  checked against ERP and policy (1 ms)
+  Reviewer    decided (924 ms)
                  -> model not asked (reviewer): the rules had already decided
                  -> model not asked (critic): the draft agreed with policy
-  Comms       explained in plain English (28370 ms)
-                 -> asked the model as comms: 418 tokens in, 53 out
-                 -> wrote: Invoice INV-1009 was rejected. Checks found that the total is negative, the vendor name is missing, a quantity is not 
-positive, the line items sum does not match the subtotal, and the calculated total
-  Comms       drafted vendor follow-up (94084 ms)
+  Comms       explained in plain English (1714 ms)
+                 -> asked the model as comms: 410 tokens in, 80 out
+                 -> wrote: Invoice INV-1009 was rejected. Checks found a negative total of -250.0 USD, missing vendor name, negative quantity on 
+WidgetA, line items summing to -250.0 while subtotal is 1000.0, and subtotal plus 
+  Comms       drafted vendor follow-up (1601 ms)
+                 -> asked the model as comms: 427 tokens in, 117 out
+                 -> wrote: A quantity or the total is negative or zero. Is this a credit note, or should it be a corrected invoice? (reply 'credit 
+note' or send the corrected one) What is the legal name of the company issuing t
 INV-1010 Consolidated Materials Group  PAID
   Intake      read txt via heuristic:txt (0 ms)
                  -> model not asked (intake): the rules' reading was complete
   Validation  checked against ERP and policy (0 ms)
-  Reviewer    decided (12725 ms)
-                 -> asked the model as reviewer: 680 tokens in, 34 out
-                 -> decision: approve: Total 7185 <=10000, only warning (price variance, rush), no error/hold per policy
+  Reviewer    decided (2493 ms)
+                 -> asked the model as reviewer: 672 tokens in, 61 out
+                 -> tool lookup_vendor({"name":"Consolidated Materials Group"}) -> {'result': {'found': True, 'name': 'Consolidated Materials Group', 
+'status': 'approved'}}
+                 -> tool vendor_history({"vendor":"Consolidated Materials Group"}) -> {'result': {'bills': 0}}
+                 -> tool policy_limits({}) -> {'result': {'auto_approve_up_to_usd': '10000', 'vp_sign_off_above_usd': '10000', 'cfo_above_usd': 
+'50000', 'rules': 'any error finding -> reject; any hold findi
+                 -> tool lookup_item({"item":"WidgetA"}) -> {'result': {'found': True, 'name': 'WidgetA', 'stock': 15, 'unit_price': '250.00', 
+'approximate_match': False}}
+                 -> tool lookup_item({"item":"WidgetB"}) -> {'result': {'found': True, 'name': 'WidgetB', 'stock': 10, 'unit_price': '500.00', 
+'approximate_match': False}}
+                 -> tool lookup_item({"item":"GadgetX"}) -> {'result': {'found': True, 'name': 'GadgetX', 'stock': 5, 'unit_price': '750.00', 
+'approximate_match': False}}
+                 -> asked the model as reviewer: 973 tokens in, 45 out
+                 -> decision: approve: Vendor approved, total 7185 <= 10000, only warning (price variance on rush order) which does not block per 
+policy; no errors or holds.
                  -> model not asked (critic): the draft agreed with policy
-  Payment     scheduled / sent (1 ms)
+  Payment     scheduled / sent (2 ms)
 INV-1011 Summit Manufacturing Co.  PAID
   Intake      read txt via heuristic:txt (0 ms)
                  -> model not asked (intake): the rules' reading was complete
   Validation  checked against ERP and policy (0 ms)
-  Reviewer    decided (12866 ms)
-                 -> asked the model as reviewer: 636 tokens in, 29 out
-                 -> decision: approve: Total 3000 USD <=10000, findings empty (no error/hold)
+  Reviewer    decided (2434 ms)
+                 -> asked the model as reviewer: 628 tokens in, 52 out
+                 -> tool lookup_vendor({"name":"Summit Manufacturing Co."}) -> {'result': {'found': True, 'name': 'Summit Manufacturing Co.', 
+'status': 'approved'}}
+                 -> tool vendor_history({"vendor":"Summit Manufacturing Co."}) -> {'result': {'bills': 0}}
+                 -> tool policy_limits({}) -> {'result': {'auto_approve_up_to_usd': '10000', 'vp_sign_off_above_usd': '10000', 'cfo_above_usd': 
+'50000', 'rules': 'any error finding -> reject; any hold findi
+                 -> tool lookup_item({"item":"WidgetA"}) -> {'result': {'found': True, 'name': 'WidgetA', 'stock': 15, 'unit_price': '250.00', 
+'approximate_match': False}}
+                 -> tool lookup_item({"item":"WidgetB"}) -> {'result': {'found': True, 'name': 'WidgetB', 'stock': 10, 'unit_price': '500.00', 
+'approximate_match': False}}
+                 -> asked the model as reviewer: 878 tokens in, 50 out
+                 -> decision: approve: Vendor approved, new vendor (0 prior bills), items exist with sufficient stock, calculated total $3000 matches 
+invoice and <= $10000, no errors/holds per findings and policy.
                  -> model not asked (critic): the draft agreed with policy
-  Payment     scheduled / sent (1 ms)
+  Payment     scheduled / sent (2 ms)
 INV-1012 QuickShip Distributers  PAID
   Intake      read txt via heuristic:txt (0 ms)
                  -> model not asked (intake): the rules' reading was complete
   Validation  checked against ERP and policy (0 ms)
-  Reviewer    decided (13803 ms)
-                 -> asked the model as reviewer: 667 tokens in, 36 out
-                 -> decision: approve: Total 9975 <= 10000, only a warn (no error/hold), warnings do not block per policy
+  Reviewer    decided (2734 ms)
+                 -> asked the model as reviewer: 659 tokens in, 63 out
+                 -> tool lookup_vendor({"name":"QuickShip Distributers"}) -> {'result': {'found': True, 'name': 'QuickShip Distributers', 'status': 
+'approved'}}
+                 -> tool lookup_item({"item":"Widget A"}) -> {'result': {'found': True, 'name': 'WidgetA', 'stock': 15, 'unit_price': '250.00', 
+'approximate_match': False}}
+                 -> tool lookup_item({"item":"WidgetB"}) -> {'result': {'found': True, 'name': 'WidgetB', 'stock': 10, 'unit_price': '500.00', 
+'approximate_match': False}}
+                 -> tool lookup_item({"item":"Gadget X"}) -> {'result': {'found': True, 'name': 'GadgetX', 'stock': 5, 'unit_price': '750.00', 
+'approximate_match': False}}
+                 -> tool vendor_history({"vendor":"QuickShip Distributers"}) -> {'result': {'bills': 0}}
+                 -> tool policy_limits({}) -> {'result': {'auto_approve_up_to_usd': '10000', 'vp_sign_off_above_usd': '10000', 'cfo_above_usd': 
+'50000', 'rules': 'any error finding -> reject; any hold findi
+                 -> asked the model as reviewer: 963 tokens in, 51 out
+                 -> decision: approve: Vendor approved, all items exist with sufficient stock, total 9975 under 10000 limit, only a warning 
+(near_threshold) which does not block per policy; no errors or holds.
                  -> model not asked (critic): the draft agreed with policy
   Payment     scheduled / sent (1 ms)
 INV-1013 Atlas Industrial Supply  REJECT
   Intake      read json via json (0 ms)
   Validation  checked against ERP and policy (0 ms)
-  Reviewer    decided (7043 ms)
+  Reviewer    decided (1284 ms)
                  -> model not asked (reviewer): the rules had already decided
                  -> model not asked (critic): the draft agreed with policy
-  Comms       explained in plain English (23137 ms)
-                 -> asked the model as comms: 424 tokens in, 62 out
-                 -> wrote: The invoice was rejected after checks found inconsistencies between billed quantities and available stock for multiple 
-items, along with a mismatch between the calculated total and the invoiced amount
-  Comms       drafted vendor follow-up (14440 ms)
-                 -> asked the model as comms: 390 tokens in, 36 out
-                 -> rejected: model text discarded (required figures missing: ['0', '1472.8', '21040.0']); using the template
+  Comms       explained in plain English (1708 ms)
+                 -> asked the model as comms: 416 tokens in, 66 out
+                 -> wrote: Invoice INV-1013 from Atlas Industrial Supply for 22562.8 USD was rejected. Checks found WidgetA, WidgetB and GadgetX were 
+billed for more units than received in stock, and the invoice total does not 
+  Comms       drafted vendor follow-up (789 ms)
+                 -> asked the model as comms: 382 tokens in, 77 out
+                 -> wrote: Dear Vendor, The line items do not add up to the invoice total (subtotal 21040.0 + tax 1472.8 + shipping 0 = 22512.8, 
+invoice total is 22562.8). Is the stated total correct, or can you send a correcte
 INV-1014 TechParts International  AWAITING
   Intake      read xml via xml (0 ms)
   Validation  checked against ERP and policy (0 ms)
-  Reviewer    decided (7043 ms)
+  Reviewer    decided (1284 ms)
                  -> model not asked (reviewer): the rules had already decided
                  -> model not asked (critic): the draft agreed with policy
-  Comms       explained in plain English (19962 ms)
-                 -> asked the model as comms: 371 tokens in, 28 out
-                 -> wrote: The invoice is billed in EUR. Checks found no FX policy to settle in USD. Escalate to Treasury for decision.
-  Desk        routed to a person (3 ms)
+  Comms       explained in plain English (1580 ms)
+                 -> asked the model as comms: 363 tokens in, 45 out
+                 -> wrote: Invoice INV-1014 from TechParts International for EUR 4125.00 was escalated because it was billed in EUR with no FX policy 
+to settle in USD. Treasury should review and decide next steps.
+  Desk        routed to a person (1 ms)
 INV-1015 Reliable Components Inc.  PAID
   Intake      read csv via csv (0 ms)
   Validation  checked against ERP and policy (0 ms)
-  Reviewer    decided (7046 ms)
-                 -> asked the model as reviewer: 643 tokens in, 28 out
-                 -> decision: approve: Total 6500 USD <=10000, no errors/holds in findings []
+  Reviewer    decided (3077 ms)
+                 -> asked the model as reviewer: 635 tokens in, 63 out
+                 -> tool lookup_vendor({"name":"Reliable Components Inc."}) -> {'result': {'found': True, 'name': 'Reliable Components Inc.', 
+'status': 'approved'}}
+                 -> tool vendor_history({"vendor":"Reliable Components Inc."}) -> {'result': {'bills': 0}}
+                 -> tool lookup_item({"item":"WidgetA"}) -> {'result': {'found': True, 'name': 'WidgetA', 'stock': 15, 'unit_price': '250.00', 
+'approximate_match': False}}
+                 -> tool lookup_item({"item":"WidgetB"}) -> {'result': {'found': True, 'name': 'WidgetB', 'stock': 10, 'unit_price': '500.00', 
+'approximate_match': False}}
+                 -> tool lookup_item({"item":"GadgetX"}) -> {'result': {'found': True, 'name': 'GadgetX', 'stock': 5, 'unit_price': '750.00', 
+'approximate_match': False}}
+                 -> tool policy_limits({}) -> {'result': {'auto_approve_up_to_usd': '10000', 'vp_sign_off_above_usd': '10000', 'cfo_above_usd': 
+'50000', 'rules': 'any error finding -> reject; any hold findi
+                 -> asked the model as reviewer: 938 tokens in, 39 out
+                 -> decision: approve: Vendor approved, items exist with sufficient stock, calculated total 6500 matches invoice, no errors/holds, 
+within 10000 limit
                  -> model not asked (critic): the draft agreed with policy
-  Payment     scheduled / sent (2 ms)
+  Payment     scheduled / sent (0 ms)
 INV-1016 Widgets Inc.  REJECT
   Intake      read json via json (0 ms)
-  Validation  checked against ERP and policy (8266 ms)
-                 -> asked the model as resolver: 471 tokens in, 11 out
+  Validation  checked against ERP and policy (1332 ms)
+                 -> asked the model as resolver: 463 tokens in, 11 out
                  -> tool search_items({"query":"WidgetC"}) -> {'result': [{'name': 'WidgetA', 'stock': 15, 'unit_price': '250.00', 'similarity': 
 0.86}, {'name': 'WidgetB', 'stock': 10, 'unit_price': '500.00', 'similarity':
-                 -> asked the model as resolver: 584 tokens in, 6 out
-  Reviewer    decided (11058 ms)
+                 -> asked the model as resolver: 576 tokens in, 6 out
+  Reviewer    decided (1160 ms)
                  -> model not asked (reviewer): the rules had already decided
                  -> model not asked (critic): the draft agreed with policy
-  Comms       explained in plain English (12800 ms)
-                 -> asked the model as comms: 358 tokens in, 32 out
-                 -> wrote: Invoice INV-1016 from Widgets Inc. was rejected. Checks found 'WidgetC' not in inventory. Please decide next steps.
-  Comms       drafted vendor follow-up (14082 ms)
-                 -> asked the model as comms: 361 tokens in, 50 out
-                 -> wrote: Regarding invoice INV-1016, we cannot match an item on this invoice to our catalogue ('WidgetC' not found in inventory). 
-Which PO number and PO line does it belong to? Accounts Payable, Acme Corp
+  Comms       explained in plain English (631 ms)
+                 -> asked the model as comms: 350 tokens in, 33 out
+                 -> wrote: Invoice INV-1016 from Widgets Inc. for 3233.0 USD was rejected because 'WidgetC' was not found in inventory.
+  Comms       drafted vendor follow-up (661 ms)
+                 -> asked the model as comms: 353 tokens in, 43 out
+                 -> wrote: We cannot match an item on this invoice to our catalogue ('WidgetC' not found in inventory). Which PO number and PO line 
+does it belong to? Accounts Payable, Acme Corp
 Vendor effort (17 invoices)
   machine-readable, no AI needed : 10 (59%)  (structured files 10, e-invoice embedded in PDF 0)
   read by AI/regex from PDF/text : 7 (41%)  (vendor did nothing extra)
@@ -240,31 +333,31 @@ with: python approve.py list | respond
 9 vendor status notice(s) in <tmp>/out/notices/ and the AP digest in 
 <tmp>/out/daily_digest.txt
 4 follow-up draft(s) in <tmp>/out/ (review before sending; nothing is sent automatically)
-128.51s wall, 2.55s CPU, 0.2 docs/s
+4.29s wall, 0.59s CPU, 4.7 docs/s
 results written to <tmp>/r.json
 
 --- logs (stderr) ---
-22:25:15 INFO    acme.decision trace="invoice_1002.txt" stage="approve" detail="reject after 1 round(s): Rejected: GadgetX: 20 billed but only 5 in stock"
-22:25:15 INFO    acme.decision trace="invoice_1005.json" stage="approve" detail="reject after 1 round(s): Rejected: GadgetX: 8 billed but only 5 in stock"
-22:25:15 INFO    acme.decision trace="invoice_1007.csv" stage="approve" detail="reject after 1 round(s): Rejected: WidgetA: 20 billed but only 15 in stock; WidgetB: 15 billed but only 10 in stock; subtotal 14750.00 + tax 885.00 + shipping 0 = 15635.00, invoice total is 15525.00"
-22:25:21 INFO    acme.decision trace="invoice_1001.txt" stage="approve" detail="approve after 1 round(s): Total 5000 USD <=10000, empty findings (no error/hold)"
-22:25:21 INFO    acme.decision trace="invoice_1009.json" stage="approve" detail="reject after 1 round(s): Rejected: total is negative (-250.0); vendor name is missing; WidgetA: quantity -5 is not positive; line items sum to -250.0 but subtotal is 1000.0; subtotal 1000.0 + tax 0 + shipping 0 = 1000.0, invoice total is -250.0"
-22:25:21 INFO    acme.payment Paid 5000.00 to Widgets Inc.
-22:25:21 INFO    acme.decision trace="invoice_1004.json" stage="approve" detail="approve after 1 round(s): Total 1890 USD <=10000, no errors/holds in findings, per policy"
-22:25:21 INFO    acme.payment Paid 1890.0 to Precision Parts Ltd.
-22:25:21 INFO    acme.decision trace="invoice_1006.csv" stage="approve" detail="approve after 1 round(s): Total 2750 USD <=10000, no errors/holds in findings, meets policy"
-22:25:21 INFO    acme.payment Paid 2750.00 to Acme Industrial Supplies
-22:25:22 INFO    acme.decision trace="invoice_1015.csv" stage="approve" detail="approve after 1 round(s): Total 6500 USD <=10000, no errors/holds in findings []"
-22:25:22 INFO    acme.decision trace="invoice_1013.json" stage="approve" detail="reject after 1 round(s): Rejected: WidgetA: 22 billed but only 15 in stock; WidgetB: 18 billed but only 10 in stock; GadgetX: 9 billed but only 5 in stock; subtotal 21040.0 + tax 1472.8 + shipping 0 = 22512.8, invoice total is 22562.8"
-22:25:22 INFO    acme.decision trace="invoice_1014.xml" stage="approve" detail="escalate after 2 round(s): Needs human review: billed in EUR; no FX policy to settle in USD"
-22:25:22 INFO    acme.decision trace="invoice_1004_revised.json" stage="approve" detail="escalate after 2 round(s): Needs human review: revision R1: may supersede an earlier bill; confirm before paying"
-22:25:22 INFO    acme.payment Paid 6500.00 to Reliable Components Inc.
-22:25:27 INFO    acme.decision trace="invoice_1010.txt" stage="approve" detail="approve after 1 round(s): Total 7185 <=10000, only warning (price variance, rush), no error/hold per policy"
-22:25:27 INFO    acme.payment Paid 7185.00 to Consolidated Materials Group
-22:25:28 INFO    acme.decision trace="invoice_1011.txt" stage="approve" detail="approve after 1 round(s): Total 3000 USD <=10000, findings empty (no error/hold)"
-22:25:28 INFO    acme.payment Paid 3000.00 to Summit Manufacturing Co.
-22:25:29 INFO    acme.decision trace="invoice_1012.txt" stage="approve" detail="approve after 1 round(s): Total 9975 <= 10000, only a warn (no error/hold), warnings do not block per policy"
-22:25:29 INFO    acme.payment Paid 9975.00 to QuickShip Distributers
-22:25:34 INFO    acme.decision trace="invoice_1016.json" stage="approve" detail="reject after 1 round(s): Rejected: 'WidgetC' not found in inventory"
-22:25:34 INFO    acme.decision trace="invoice_1008.txt" stage="approve" detail="reject after 1 round(s): Rejected: 'SuperGizmo' not found in inventory; 'MegaSprocket' not found in inventory"
-22:25:38 INFO    acme.decision trace="invoice_1003.txt" stage="approve" detail="reject after 1 round(s): Rejected: FakeItem: zero stock on hand, 100 billed; multiple fraud signals: pressure language (immediately, penalt, urgent, wire transfer); immediate payment terms; unknown vendor; billing for items that do not exist / have no stock"
+23:08:48 INFO    acme.decision trace="invoice_1002.txt" stage="approve" detail="reject after 1 round(s): Rejected: GadgetX: 20 billed but only 5 in stock"
+23:08:48 INFO    acme.decision trace="invoice_1004_revised.json" stage="approve" detail="escalate after 2 round(s): Needs human review: revision R1: may supersede an earlier bill; confirm before paying"
+23:08:48 INFO    acme.decision trace="invoice_1007.csv" stage="approve" detail="reject after 1 round(s): Rejected: WidgetA: 20 billed but only 15 in stock; WidgetB: 15 billed but only 10 in stock; subtotal 14750.00 + tax 885.00 + shipping 0 = 15635.00, invoice total is 15525.00"
+23:08:48 INFO    acme.decision trace="invoice_1005.json" stage="approve" detail="reject after 1 round(s): Rejected: GadgetX: 8 billed but only 5 in stock"
+23:08:49 INFO    acme.decision trace="invoice_1009.json" stage="approve" detail="reject after 1 round(s): Rejected: total is negative (-250.0); vendor name is missing; WidgetA: quantity -5 is not positive; line items sum to -250.0 but subtotal is 1000.0; subtotal 1000.0 + tax 0 + shipping 0 = 1000.0, invoice total is -250.0"
+23:08:49 INFO    acme.decision trace="invoice_1013.json" stage="approve" detail="reject after 1 round(s): Rejected: WidgetA: 22 billed but only 15 in stock; WidgetB: 18 billed but only 10 in stock; GadgetX: 9 billed but only 5 in stock; subtotal 21040.0 + tax 1472.8 + shipping 0 = 22512.8, invoice total is 22562.8"
+23:08:49 INFO    acme.decision trace="invoice_1014.xml" stage="approve" detail="escalate after 2 round(s): Needs human review: billed in EUR; no FX policy to settle in USD"
+23:08:49 INFO    acme.decision trace="invoice_1001.txt" stage="approve" detail="approve after 1 round(s): Vendor approved, items exist with sufficient stock, total $5000 <= $10000, no errors/holds in findings, new vendor but policy allows"
+23:08:49 INFO    acme.payment Paid 5000.00 to Widgets Inc.
+23:08:49 INFO    acme.decision trace="invoice_1004.json" stage="approve" detail="approve after 1 round(s): Vendor approved, items exist with sufficient stock, calculated total 1750 matches invoice under 10000, no errors/holds/findings, new vendor but policy allows"
+23:08:49 INFO    acme.payment Paid 1890.0 to Precision Parts Ltd.
+23:08:50 INFO    acme.decision trace="invoice_1006.csv" stage="approve" detail="approve after 1 round(s): Vendor approved, items exist with sufficient stock, calculated total 2750 matches invoice, no errors/holds, under 10000 limit"
+23:08:50 INFO    acme.payment Paid 2750.00 to Acme Industrial Supplies
+23:08:50 INFO    acme.decision trace="invoice_1011.txt" stage="approve" detail="approve after 1 round(s): Vendor approved, new vendor (0 prior bills), items exist with sufficient stock, calculated total $3000 matches invoice and <= $10000, no errors/holds per findings and policy."
+23:08:50 INFO    acme.payment Paid 3000.00 to Summit Manufacturing Co.
+23:08:50 INFO    acme.decision trace="invoice_1010.txt" stage="approve" detail="approve after 1 round(s): Vendor approved, total 7185 <= 10000, only warning (price variance on rush order) which does not block per policy; no errors or holds."
+23:08:50 INFO    acme.decision trace="invoice_1016.json" stage="approve" detail="reject after 1 round(s): Rejected: 'WidgetC' not found in inventory"
+23:08:50 INFO    acme.decision trace="invoice_1003.txt" stage="approve" detail="reject after 1 round(s): Rejected: FakeItem: zero stock on hand, 100 billed; multiple fraud signals: pressure language (immediately, penalt, urgent, wire transfer); immediate payment terms; unknown vendor; billing for items that do not exist / have no stock"
+23:08:50 INFO    acme.payment Paid 7185.00 to Consolidated Materials Group
+23:08:50 INFO    acme.decision trace="invoice_1008.txt" stage="approve" detail="reject after 1 round(s): Rejected: 'SuperGizmo' not found in inventory; 'MegaSprocket' not found in inventory"
+23:08:50 INFO    acme.decision trace="invoice_1012.txt" stage="approve" detail="approve after 1 round(s): Vendor approved, all items exist with sufficient stock, total 9975 under 10000 limit, only a warning (near_threshold) which does not block per policy; no errors or holds."
+23:08:50 INFO    acme.payment Paid 9975.00 to QuickShip Distributers
+23:08:51 INFO    acme.decision trace="invoice_1015.csv" stage="approve" detail="approve after 1 round(s): Vendor approved, items exist with sufficient stock, calculated total 6500 matches invoice, no errors/holds, within 10000 limit"
+23:08:51 INFO    acme.payment Paid 6500.00 to Reliable Components Inc.

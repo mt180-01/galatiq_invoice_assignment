@@ -6,9 +6,17 @@ a deployment must put real authentication in front of this page.
 """
 from __future__ import annotations
 
+import asyncio
+import hmac
 import html
 import json
+import secrets
+import shutil
+import tempfile
 import urllib.parse
+from email import policy
+from email.parser import BytesParser
+from types import SimpleNamespace
 from datetime import datetime
 from decimal import Decimal
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -20,6 +28,26 @@ from .erp import MockNetSuite
 from .models import Outcome
 from .payments import MockBank, PaymentService
 from .store import OutcomeStore
+
+MAX_BODY = 25_000_000      # an upload request, in bytes
+MAX_FILE = 8_000_000       # one document
+MAX_FILES = 20
+
+
+def parse_multipart(content_type: str, body: bytes) -> tuple[dict[str, str], list[tuple[str, bytes]]]:
+    """(text fields, [(filename, bytes)]) from a multipart/form-data body, using the standard library's mail parser (the `cgi` module is gone from Python 3.13)."""
+    msg = BytesParser(policy=policy.HTTP).parsebytes(b"Content-Type: " + content_type.encode() + b"\r\nMIME-Version: 1.0\r\n\r\n" + body)
+    fields, files = {}, []
+    if not msg.is_multipart():
+        return fields, files
+    for part in msg.iter_parts():
+        name, filename = part.get_param("name", header="content-disposition"), part.get_filename()
+        data = part.get_payload(decode=True) or b""
+        if filename is not None:
+            files.append((filename, data))
+        elif name:
+            fields[str(name)] = data.decode("utf-8", "replace")
+    return fields, files
 
 e = html.escape
 
@@ -78,15 +106,16 @@ def pill(label: str, kind: str) -> str:
 
 def page(title: str, body: str, refresh: bool = False) -> bytes:
     return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            f'<title>{e(title)}</title><style>{CSS}</style></head><body><header><b>Acme AP</b><a href="/">Dashboard</a>'
+            f'<title>{e(title)}</title><style>{CSS}</style></head><body><header><b>Acme AP</b><a href="/">Dashboard</a><a href="/upload">Upload invoices</a>'
             f'<span style="color:var(--mute)">invoice processing with a team of agents</span></header><main>{body}</main></body></html>').encode()
 
 
 class App:
     """The data the pages need, read from the database the command-line runs leave behind."""
 
-    def __init__(self, db: str | Path):
-        self.db = str(db)
+    def __init__(self, db: str | Path, grok: bool = False, port: int = 8765):
+        self.db, self.grok, self.port = str(db), grok, port
+        self.csrf = secrets.token_urlsafe(24)  # fresh per server start; the upload form carries it, so a page on another site cannot submit invoices for you
         self.erp = MockNetSuite(self.db, keep_ledger=True)
         self.payments = PaymentService(self.db, self.erp, MockBank(self.db + ".bank"), reset=False)
         self.approvals = ApprovalService(self.db, self.erp, reset=False, payments=self.payments)
@@ -144,6 +173,57 @@ class App:
                     f'{len(sched)} scheduled for later ({e(money(sum(Decimal(r["amount"]) for r in sched)))}).'
                     + "".join(f'<div class="ev">{e(r["bill_key"])}: release {e(r["release_on"])} by {e(r["rail"].upper())}, {e(money(r["amount"]))}</div>' for r in sched) + "</div>")
         return page("Acme AP: dashboard", "".join(body))
+
+    # ---- upload --------------------------------------------------------------------------------
+    def upload_form(self, note: str = "") -> bytes:
+        model = "real Grok (billed per token, capped per run)" if self.grok else "the free local model"
+        return page("Upload invoices", f'''<h1>Upload invoices</h1><p class="sub">PDF, scan, text, JSON, XML, CSV, or an email (.eml). They go through the same agents as the command line,
+            using {e(model)}. The ledger is kept, so an invoice already processed is a duplicate, never paid twice.</p>{note}
+            <form method="post" action="/upload" enctype="multipart/form-data" class="card"><input type="hidden" name="csrf" value="{e(self.csrf)}">
+            <label for="files">Choose files (up to {MAX_FILES}, {MAX_FILE // 1_000_000} MB each)</label>
+            <input id="files" type="file" name="files" multiple accept=".pdf,.txt,.json,.csv,.xml,.eml" required>
+            <div class="actions"><button class="approve" type="submit">Process</button></div></form>''')
+
+    def process_upload(self, fields: dict[str, str], files: list[tuple[str, bytes]]) -> tuple[int, bytes]:
+        from .ingestion import SUPPORTED
+        from .intake import expand
+        from .runner import run_batch
+        if not hmac.compare_digest(fields.get("csrf", ""), self.csrf):
+            return 403, page("Refused", "<h1>Refused</h1><div class='card'>The form token is missing or stale. Reload the upload page and try again.</div>")
+        accepted, skipped = [], []
+        tmp = Path(tempfile.mkdtemp(prefix="acme_upload_"))
+        try:
+            for i, (raw_name, data) in enumerate(files[:MAX_FILES]):
+                name = Path(raw_name.replace("\\", "/")).name or f"file{i}"           # a name from the browser is text, never a path
+                if Path(name).suffix.lower() not in SUPPORTED | {".eml"}:
+                    skipped.append((name, "unsupported type"))
+                elif len(data) > MAX_FILE:
+                    skipped.append((name, f"over {MAX_FILE // 1_000_000} MB"))
+                elif not data:
+                    skipped.append((name, "empty"))
+                else:
+                    (tmp / f"{i:02d}_{name}").write_bytes(data)
+                    accepted.append(tmp / f"{i:02d}_{name}")
+            skipped += [(n, f"more than {MAX_FILES} files") for n, _ in files[MAX_FILES:]]
+            if not accepted:
+                note = "<div class='card'><b>Nothing to process.</b>" + "".join(f"<div class='ev'>{e(n)}: {e(why)}</div>" for n, why in skipped) + "</div>"
+                return 400, self.upload_form(note)
+            before = max([i for i, _ in self.store.all()] or [0])
+            paths, origins = expand([str(p) for p in accepted], tmp / "expanded")
+            args = SimpleNamespace(db=self.db, keep_ledger=True, llm_concurrency=4, offline=False, simulate=not self.grok, grok=self.grok)
+            asyncio.run(run_batch(paths, args, 1, origins))
+            fresh = [(i, o) for i, o in self.store.all() if i > before]
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        rows = "".join(
+            f'<tr><td>{e(str(o.invoice.invoice_number if o.invoice else Path(o.source_path).name.split("_", 1)[-1]))}</td><td>{e(str(o.invoice.vendor or "-") if o.invoice else "-")}</td>'
+            f'<td>{pill(*self.status(i, o))}</td><td>{e(short(o.explanation or (o.approval.reasoning if o.approval else o.error) or "", 140))}</td><td><a href="/invoice/{i}">Details</a></td></tr>'
+            for i, o in fresh)
+        sk = "".join(f"<div class='ev'>skipped {e(n)}: {e(why)}</div>" for n, why in skipped)
+        waiting = len(self.approvals.waiting())
+        return 200, page("Processed", f'<h1>Processed {len(fresh)} invoice(s)</h1><p class="sub">{waiting} waiting for a person in total. '
+                                      f'<a href="/">Dashboard</a> &middot; <a href="/upload">Upload more</a></p>'
+                                      f'<div class="scroll"><table><tr><th>Invoice</th><th>Vendor</th><th>Status</th><th>What happened</th><th></th></tr>{rows}</table></div>{sk}')
 
     def invoice(self, row_id: int) -> bytes | None:
         o = self.store.get(row_id)
@@ -241,9 +321,17 @@ def make_handler(app: App):
             self.end_headers()
             self.wfile.write(body)
 
+        def _host_ok(self) -> bool:
+            """Only this machine's own name for the server: a page on another site (or a DNS-rebinding trick) cannot talk to it."""
+            return (self.headers.get("Host") or "").split(":")[0] in ("127.0.0.1", "localhost", "[::1]")
+
         def do_GET(self) -> None:  # noqa: N802
             url = urllib.parse.urlparse(self.path)
+            if not self._host_ok():
+                return self._send(403, page("Refused", "<h1>Refused</h1>"))
             try:
+                if url.path == "/upload":
+                    return self._send(200, app.upload_form())
                 if url.path == "/":
                     return self._send(200, app.dashboard())
                 if url.path.startswith("/invoice/") and url.path[9:].isdigit():
@@ -261,7 +349,20 @@ def make_handler(app: App):
                 raise
 
         def do_POST(self) -> None:  # noqa: N802
-            if urllib.parse.urlparse(self.path).path != "/decide":
+            path = urllib.parse.urlparse(self.path).path
+            if not self._host_ok():
+                return self._send(403, page("Refused", "<h1>Refused</h1>"))
+            if path == "/upload":
+                length = int(self.headers.get("Content-Length") or 0)
+                if length > MAX_BODY:
+                    return self._send(413, page("Too large", f"<h1>Too large</h1><p>Uploads are limited to {MAX_BODY // 1_000_000} MB per request.</p>"))
+                try:
+                    fields, files = parse_multipart(self.headers.get("Content-Type", ""), self.rfile.read(length))
+                except Exception:  # noqa: BLE001 - a malformed upload is the sender's problem, not a crash
+                    return self._send(400, page("Bad request", "<h1>That upload could not be read</h1>"))
+                code, body = app.process_upload(fields, files)
+                return self._send(code, body)
+            if path != "/decide":
                 return self._send(404, page("Not found", "<h1>Not found</h1>"))
             length = min(int(self.headers.get("Content-Length") or 0), 10_000)
             form = {k: v[0] for k, v in urllib.parse.parse_qs(self.rfile.read(length).decode("utf-8", "replace")).items()}
@@ -273,12 +374,12 @@ def make_handler(app: App):
     return Handler
 
 
-def make_server(db: str | Path, host: str = "127.0.0.1", port: int = 8765) -> ThreadingHTTPServer:
-    return ThreadingHTTPServer((host, port), make_handler(App(db)))
+def make_server(db: str | Path, host: str = "127.0.0.1", port: int = 8765, grok: bool = False) -> ThreadingHTTPServer:
+    return ThreadingHTTPServer((host, port), make_handler(App(db, grok=grok, port=port)))
 
 
-def serve(db: str | Path, host: str = "127.0.0.1", port: int = 8765) -> None:
-    server = make_server(db, host, port)
+def serve(db: str | Path, host: str = "127.0.0.1", port: int = 8765, grok: bool = False) -> None:
+    server = make_server(db, host, port, grok)
     print(f"Acme AP interface: http://{host}:{server.server_address[1]}/   (Ctrl-C to stop; local only, approver identity is a stand-in for SSO)")
     try:
         server.serve_forever()

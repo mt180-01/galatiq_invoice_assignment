@@ -290,3 +290,83 @@ def test_a_timeout_is_retried_but_a_rejected_key_is_not():
     with pytest.raises(LLMUnavailable):
         asyncio.run(llm.chat_json("s", "u"))
     assert len(bad) == 1 and not llm.available                                             # no point retrying a bad key
+
+
+# ---- optional work must not stall an invoice (found live: a courtesy email held one up for 94 seconds) -----
+def test_wording_is_not_retried_and_gets_a_short_timeout():
+    seen = []
+
+    def handler(request):
+        seen.append(request.extensions.get("timeout"))
+        return httpx.Response(429, text="at capacity")
+    llm = GrokClient("k", transport=httpx.MockTransport(handler), retry_delays=(5.0, 5.0))
+    with as_agent("comms"):
+        with pytest.raises(LLMUnavailable):
+            asyncio.run(llm.chat_json("s", "u"))
+    assert len(seen) == 1 and seen[0]["read"] == 12.0                                       # one try, twelve seconds, no waiting for retries
+    seen.clear()
+    llm2 = GrokClient("k", transport=httpx.MockTransport(handler), retry_delays=(0, 0))
+    with as_agent("reviewer"):
+        with pytest.raises(LLMUnavailable):
+            asyncio.run(llm2.chat_json("s", "u"))
+    assert len(seen) == 3                                                                   # decisions that matter still get their retries
+
+
+# ---- the default model: a plain one when the account has it (found live: "grok-3" was served by a slower, pricier reasoning model) ----------------------
+def model_client(ids, explicit=None, seen=None):
+    def handler(request):
+        if request.url.path.endswith("/models"):
+            return httpx.Response(200, json={"data": [{"id": i} for i in ids]})
+        seen.append(json.loads(request.content)["model"])
+        return message('{"ok": true}')
+    return GrokClient("k", model=explicit or "grok-3", auto_model=not explicit, transport=httpx.MockTransport(handler))
+
+
+def test_with_no_model_chosen_a_non_reasoning_one_is_used_when_offered():
+    seen = []
+    llm = model_client(["grok-4.3", "grok-4.20-0309-reasoning", "grok-4.20-0309-non-reasoning", "grok-imagine-image"], seen=seen)
+    for _ in range(3):
+        assert asyncio.run(llm.chat_json("s", "u")) == {"ok": True}
+    assert seen == ["grok-4.20-0309-non-reasoning"] * 3 and llm.model == "grok-4.20-0309-non-reasoning"
+
+
+def test_an_explicit_model_is_always_respected_and_never_looked_up():
+    seen, looked_up = [], []
+    llm = GrokClient("k", model="grok-4.3", auto_model=False, transport=httpx.MockTransport(
+        lambda r: (looked_up.append(1), httpx.Response(200, json={"data": []}))[1] if r.url.path.endswith("/models") else (seen.append(json.loads(r.content)["model"]), message('{"ok": 1}'))[1]))
+    asyncio.run(llm.chat_json("s", "u"))
+    assert seen == ["grok-4.3"] and not looked_up
+
+
+def test_without_a_non_reasoning_model_the_default_name_stays():
+    seen = []
+    llm = model_client(["grok-4.3", "grok-4.5"], seen=seen)
+    asyncio.run(llm.chat_json("s", "u"))
+    assert seen == ["grok-3"]
+
+
+def test_concurrent_first_calls_all_wait_for_the_model_lookup_and_none_uses_the_old_name():
+    """Found live: calls that arrived while the lookup was in flight went out under the old name. The lookup here is slow, as a real one is."""
+    lookups, seen = [], []
+
+    class SlowLookup(httpx.AsyncBaseTransport):
+        async def handle_async_request(self, request):
+            if request.url.path.endswith("/models"):
+                lookups.append(1)
+                await asyncio.sleep(0.05)
+                return httpx.Response(200, json={"data": [{"id": "grok-4.20-0309-non-reasoning"}]}, request=request)
+            seen.append(json.loads(request.content)["model"])
+            return httpx.Response(200, json={"choices": [{"message": {"role": "assistant", "content": '{"ok": true}'}}]}, request=request)
+    llm = GrokClient("k", model="grok-3", auto_model=True, transport=SlowLookup())
+
+    async def burst():
+        await asyncio.gather(*(llm.chat_json("s", f"u{i}") for i in range(8)))
+    asyncio.run(burst())
+    assert len(lookups) == 1 and seen == ["grok-4.20-0309-non-reasoning"] * 8
+
+
+def test_a_recording_replays_whatever_model_name_is_asked():
+    from acme_ap.cassette import request_key
+    base = {"messages": [{"role": "user", "content": "x"}], "temperature": 0}
+    assert request_key({**base, "model": "grok-3"}) == request_key({**base, "model": "grok-4.20-0309-non-reasoning"})
+    assert request_key({**base, "model": "m"}) != request_key({**base, "messages": [{"role": "user", "content": "y"}], "model": "m"})

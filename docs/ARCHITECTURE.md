@@ -269,12 +269,27 @@ A reviewer found these; each was checked against the code first, fixed, and cove
 | **`_plan_workers` was dead code**, so even 3 PDFs started a full process pool | True: `workers` was never `None` | `None` now means "decide from the amount of PDF work"; a few PDFs are parsed inline, and an explicit `--workers` is still respected |
 | **No real identity check on approvals; the HMAC secret sat in readable SQLite** | Partly stale (a stranger was already refused), but identity was self-asserted and the key was in the database | A link is **issued to one mailbox** and carries it under the signature: `--as` / a typed name can only agree with it, and editing it breaks the signature. A link issued to someone not authorised for that request is refused. The signing key moved out of the database to `ACME_APPROVAL_SECRET` or a private file (`~/.config/acme_ap/approval_secret`, owner-only); a database from before has the key deleted from it. Forwarding a link still lets the recipient act as the addressee, which is inherent to this model; real deployments need email delivery and SSO |
 
+## 4m. Evidence you can re-run for free
+
+* **Record and replay.** `--record-llm FILE` runs on live Grok and saves each exchange (request hash, status, response; never headers); `--replay-llm FILE` answers the same questions from the
+  file: no network, no key, no cost, and the cost shown is what xAI reported when recorded. The recording includes failures (429s, timeouts), so a replay goes through the same retries and
+  fallbacks. The model name is not part of the match. If prompts change on purpose, the replay reports the questions it cannot answer (those steps use the rules) and the fix is to record again.
+* **[EVALUATION.md](EVALUATION.md).** Every invoice with its decision, in two separate runs (rules only; the recorded live Grok run replayed), the brief's stated outcome for the eight invoices it
+  specifies (independent of this code) kept apart from the developer's labels for all 17 (not independent), and what the model did on each. `python scripts/evaluate.py --check` fails if it is out of
+  date, and a test runs it. Result: both runs 17/17, 8/8 against the brief, 0 wrongly paid, decisions identical; the model's contribution on these clear-cut invoices is second opinions, notes and
+  emails, not different decisions (that is in `data/self_correction/`).
+
 ## 4k. The web interface
 
 `python main.py serve [--demo]` (or `make ui`) starts a local interface on `127.0.0.1:8765`: a **dashboard** (what happened, who is waiting and for how long, where the money
-is), an **invoice page** with the findings and *what each agent did* (every model call, tool call and conclusion), and the **approval page** the decision links open. Cards
+is), an **upload page** (drop PDFs, text, JSON/XML/CSV or `.eml` files; they go through the same agents and the same ledger as the command line, with the free local model unless the server was started with `--grok`), an **invoice page** with the findings and *what each agent did* (every model call, tool call and conclusion), and the **approval page** the decision links open. Cards
 and links now point here instead of a made-up domain. It is the standard library only (nothing to install), reads the database the command-line runs leave behind
 (every outcome is stored with its trace), and is covered by `tests/test_web.py` over real HTTP.
+
+Uploads can trigger payments, so that endpoint is hardened and tested: a per-start form token (a page on another site can make your browser POST to localhost but cannot read the
+token), a Host-header allow-list (no DNS-rebinding access to any page), a 25 MB request limit enforced before reading, file types allow-listed, filenames reduced to text (never a path) and escaped.
+Why not Streamlit: the pages needed (upload, dashboard, review queue) are small, and the standard library keeps the project free of a heavyweight dependency and lets the same server
+serve the signed approval links.
 
 Security properties, tested: every dynamic value is HTML-escaped (a vendor named `<script>...` is shown as text); a strict content-security-policy, `nosniff` and `no-store` on every
 response; forged, empty, replayed and expired links are refused; a stranger's identity is refused; a double click pays once; the invoice is re-checked before any payment.
@@ -303,7 +318,8 @@ What the live run found that the stubs could not, all fixed and covered by tests
 
 | Run | Result | Cost (as reported by xAI) |
 |---|---|---|
-| 17 provided invoices, `--grok` | 17/17 outcomes as labelled, 0 errors; 7 of 7 paid invoices had a Grok second opinion; 9 plain-English notes and 4 follow-ups written and accepted by the grounding check | $0.0619 (26 model calls) |
+| 17 provided invoices, `--grok` (an earlier round, before the default model changed) | 17/17 outcomes as labelled, 0 errors; 7 of 7 paid invoices had a Grok second opinion; 9 plain-English notes and 4 follow-ups written and accepted by the grounding check | $0.0619 (26 model calls) |
+| **17 provided invoices, recorded** (`docs/live_runs/`, replayable offline) | 17/17, 0 errors; 36 model calls and 42 tool calls, all served by the non-reasoning model; slowest step 3.7 s; per-invoice table in [EVALUATION.md](EVALUATION.md) | **$0.0200** |
 | `data/self_correction`, `--grok --trace` | `Wdgt B` found by catalogue search and corrected to `WidgetB`; `GadgetY` correctly left alone; look-alike vendor `Widget Inc` flagged with a suggestion, not changed | $0.0147 (10 calls) |
 
 What this round found that nothing else could, all fixed and tested: (a) one call returned **HTTP 429 "model is currently at capacity"**, so calls now retry twice with
@@ -354,8 +370,8 @@ Comms agent run the same under both, since they only act when there is something
 | **Gated (default)** | **38** | **13,325 (-64%)** |
 
 Outcomes are identical in all three. The earlier version of this table (7 calls, 1,621 tokens) is higher now because of what was added on purpose: a second
-opinion with tool calls before every payment, the resolver, and model-written notes. **Real Grok on the 17 provided invoices (section 4i): 26 model calls,
-12,426 tokens in / 1,109 out, $0.062 as reported by xAI.** Read this fairly: the stand-in never errs, so it shows how much the system *asks*, not how a real
+opinion with tool calls before every payment, the resolver, and model-written notes. **Real Grok on the 17 provided invoices (section 4i): 36 model calls,
+20,234 tokens in / 2,231 out, $0.0200 as reported by xAI** (the figure is lower than an earlier $0.062 run because the default model is now a plain one, not a reasoning one). Read this fairly: the stand-in never errs, so it shows how much the system *asks*, not how a real
 model answers, and the sample is small and mostly clean.
 
 ## 5. Known limitations

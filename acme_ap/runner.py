@@ -33,7 +33,8 @@ async def run_batch(paths: list[str], args: argparse.Namespace, workers: int | N
     erp = MockNetSuite(args.db, keep_ledger=args.keep_ledger, stock_policy=getattr(args, "stock_policy", None))
     payments = PaymentService(args.db, erp, MockBank(args.db + ".bank", reset=not args.keep_ledger), reset=not args.keep_ledger)
     approvals = ApprovalService(args.db, erp, reset=not args.keep_ledger, payments=payments)
-    llm = make_llm(args.offline, cache_path=None if args.offline else args.db + ".llmcache", simulate=getattr(args, "simulate", False), live=getattr(args, "grok", False))
+    llm = make_llm(args.offline, cache_path=None if args.offline else args.db + ".llmcache", simulate=getattr(args, "simulate", False), live=getattr(args, "grok", False),
+                   record_to=getattr(args, "record_llm", None), replay_from=getattr(args, "replay_llm", None))
     before = cpu_seconds()
     t0 = time.perf_counter()
     outcomes = await Pipeline(erp, llm, workers=workers, llm_concurrency=args.llm_concurrency, origins=origins,
@@ -41,6 +42,10 @@ async def run_batch(paths: list[str], args: argparse.Namespace, workers: int | N
                               llm_policy=getattr(args, "llm_policy", "gated")).run(paths)
     wall = time.perf_counter() - t0
     cpu = cpu_seconds() - before
+    if hasattr(llm, "replay"):
+        args.replay_stats = (llm.replay.hits, llm.replay.misses)
+    if hasattr(llm, "recording"):
+        args.recorded, args.recorded_failures = llm.recording.recorded, llm.recording.failures
     if hasattr(llm, "aclose"):
         await llm.aclose()
     return outcomes, wall, cpu
