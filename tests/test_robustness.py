@@ -119,3 +119,15 @@ def test_same_bill_submitted_by_many_threads_pays_once(tmp_path):
     assert len({p["ref"] for p in bank.payments()}) == 40
     assert all(r.state in ("submitted", "submitting", "scheduled") for r in results)
     assert sum(1 for r in svc.rows() if r["state"] == "submitted") == 40
+
+
+def test_a_csv_that_is_not_an_invoice_is_refused_in_plain_words(tmp_path):
+    """A hosts file named .csv used to surface as the bare "KeyError: 'item'"."""
+    f = tmp_path / "hosts.csv"
+    f.write_text("127.0.0.1 localhost\n255.255.255.255 broadcasthost\n")
+    try:
+        parse_file(str(f))
+    except ValueError as exc:
+        assert "not an invoice table" in str(exc) and "'item'" in str(exc)
+    else:
+        raise AssertionError("a non-invoice CSV was accepted")

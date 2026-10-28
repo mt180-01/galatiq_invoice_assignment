@@ -55,7 +55,7 @@ The command line is first-class too: [`docs/img/demo.svg`](docs/img/demo.svg) is
 | Robustness to garbage | rules only | 2,000 randomly corrupted invoices: **0 approved with a wrong value** (a stray "see invoice 31337" once got through; found and fixed) | `scripts/stress_extraction.py` |
 | Speed | no model (`--offline`) | a clean invoice spends about 10-15 ms in the system, against "5 days" in the brief; about 2,200 documents/s on 14 cores | `main.py --bench`, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §4 |
 | Waiting on a person | no model | never silent: reminder at 24 h, escalation at 48 h, expiry at 5 days | `approve.py tick`, `make e2e` |
-| Tests | no model | **351 tests** plus a **60-check end-to-end run** from a fresh clone; a test fails the build if a credential is ever committed | `make test`, `make e2e` |
+| Tests | no model | **353 tests** plus a **60-check end-to-end run** from a fresh clone; a test fails the build if a credential is ever committed | `make test`, `make e2e` |
 
 ## Business impact
 
@@ -139,7 +139,7 @@ Contributing and a map of the code: [CONTRIBUTING.md](CONTRIBUTING.md). More: `a
 | Criterion | Where to look |
 |---|---|
 | **Functionality** | 17/17 end to end, offline and on live Grok; `make e2e` (60 checks from a fresh clone) |
-| **Code quality** | typed models, one responsibility per module, error handling at every boundary (a failing model step never fails an invoice), structured logs, 351 tests |
+| **Code quality** | typed models, one responsibility per module, error handling at every boundary (a failing model step never fails an invoice), structured logs, 353 tests |
 | **Agentic sophistication** | the table above: tool use, strict structured output, five self-correction loops, six agents with charters, guards; recorded, replayable live runs and a per-invoice evaluation |
 | **Shipping mindset** | simulated what must be (bank, ERP, email) behind adapters; cut what doesn't earn its keep (no framework, no database server, no auth system); limits stated in §5 of the architecture doc |
 | **Presentation** | this page; measured results with evidence; business impact, cost and ROI; design decisions; screenshots from a real run |

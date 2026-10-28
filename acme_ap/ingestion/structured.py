@@ -175,6 +175,8 @@ def _csv_key_value(rows: list[list[str]], warnings: list[str]) -> Invoice:
 def _csv_tabular(rows: list[list[str]], warnings: list[str]) -> Invoice:
     head = [c.strip().lower() for c in rows[0]]
     col = {name: i for i, name in enumerate(head)}
+    if missing := [n for n in ("item", "qty", "unit price", "line total", "invoice number", "vendor", "date", "due date") if n not in col]:
+        raise ValueError("not an invoice table: no column named " + ", ".join(repr(n) for n in missing))
     items: list[LineItem] = []
     meta: dict[str, str] = {}
     footer: dict[str, str] = {}

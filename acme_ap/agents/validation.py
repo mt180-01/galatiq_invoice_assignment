@@ -40,6 +40,8 @@ def validate(inv: Invoice, erp: ErpAdapter, accounts=None) -> list[Finding]:
     for w in inv.parse_warnings:
         if w.startswith("extractor disagreement"):
             out.append(_f("extractor_disagreement", H, w))
+        elif w.startswith("unparseable invoice date"):  # the date drives terms, the future-dated check and the audit trail: a person confirms it before money moves
+            out.append(_f("unreadable_date", H, w))
         else:
             out.append(_f("extraction_warning", W, w))
     if not inv.invoice_number:

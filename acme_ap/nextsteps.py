@@ -41,6 +41,7 @@ STEPS: dict[str, tuple[str, str]] = {
     "foreign_currency": (AP, "decide how to settle a non-USD bill (no exchange-rate policy exists yet)"),
     "revision": (AP, "check whether this replaces an earlier bill; pay only one of them"),
     "extractor_disagreement": (AP, "two readings of the document disagree; open it and confirm the figures"),
+    "unreadable_date": (VENDOR, "send a corrected invoice with a clear invoice date"),
     "ocr_source": (AP, "this came from a scan; check the figures against the image before payment"),
 }
 

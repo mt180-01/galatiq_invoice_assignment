@@ -108,3 +108,15 @@ def test_a_model_cannot_repair_a_bad_invoice_by_inventing_a_charge(tmp_path):
     assert any("shipping" in d and "not in the document" in d for d in diffs)
     honest = invented.model_copy(update={"shipping": None})
     assert not any("shipping" in d for d in llm_extract._disagreements(honest, regex, text))
+
+
+def test_an_unreadable_invoice_date_holds_the_invoice_instead_of_paying_it(tmp_path):
+    """Found by hand-crafting hostile files: an invoice dated 2026-13-45 was paid automatically, the date only 'noted'."""
+    from acme_ap.agents.validation import validate
+    from acme_ap.erp import MockNetSuite
+    from acme_ap.models import Severity
+    text = invoice("INV-4040", when="2026-13-45")
+    erp = MockNetSuite(str(tmp_path / "d.db"))
+    found = {f.code: f for f in validate(heuristic.extract(text), erp)}
+    assert "unreadable_date" in found and found["unreadable_date"].severity is Severity.HOLD
+    assert "unreadable_date" not in {f.code for f in validate(heuristic.extract(invoice("INV-4041")), erp)}
