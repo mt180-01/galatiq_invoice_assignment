@@ -102,7 +102,7 @@ check("running the CLI twice on the same invoice pays it once (the ledger is kep
 rc, out3 = py(*one, "--reset")
 check("--reset starts from an empty ledger", "PAID=1" in out3)
 
-# 4b. the default run (no flags): local stand-in model with real tool calls, same outcomes, structured logs
+# 4b. the default run (no flags): Grok's recorded answers replayed, with real tool calls, same outcomes, structured logs
 dbs = str(tmp / "sim.db")
 rc, out = py("main.py", "--db", dbs, "--outbox", outbox + "S", "--json", str(tmp / "s.json"), "--invoice_path", "data/invoices")
 sres = json.loads((tmp / "s.json").read_text())
@@ -110,12 +110,12 @@ sstatus = {}
 for o in sres:
     if o["status"] != "DUPLICATE":
         sstatus[o["invoice"]["invoice_number"] + (f"-{o['invoice']['revision']}" if o["invoice"].get("revision") else "")] = o["status"]
-check("default run uses the local stand-in model and reaches the same 17 outcomes", "local simulation (not Grok)" in out and sstatus == expected, f"{sum(sstatus[k] == v for k, v in expected.items())}/17")
-check("the stand-in model called tools (function calling exercised)", sum(o["llm"].get("tools", 0) for o in sres) > 0 and "tool calls run for the model" in out,
+check("default run uses Grok's recorded answers (no key, no network) and reaches the same 17 outcomes", "recorded responses, replayed offline" in out and "36 model call(s) answered from the recording, 0 not recorded" in " ".join(out.split()) and sstatus == expected, f"{sum(sstatus[k] == v for k, v in expected.items())}/17")
+check("the model called tools (function calling exercised)", sum(o["llm"].get("tools", 0) for o in sres) > 0 and "tool calls run for the model" in out,
       f"{sum(o['llm'].get('tools', 0) for o in sres)} tool calls")
 check("structured logs: a decision line per invoice and a 'Paid X to Y' line per payment", out.count("acme.decision") == 17 and out.count("acme.payment Paid") == 7, f"{out.count('acme.decision')} decisions, {out.count('acme.payment Paid')} payments")
 
-# 4c. the agent upgrades: item self-correction, lookalike vendor, model-written notes, and the trace
+# 4c. the agent upgrades (real Grok, replayed from docs/live_runs/self-correction.cassette.jsonl): item self-correction, lookalike vendor, model-written notes, and the trace
 rc, out = py("main.py", "--trace", "--db", str(tmp / "sc.db"), "--outbox", outbox + "C", "--json", str(tmp / "c.json"), "--invoice_path", "data/self_correction")
 cres = {o["invoice"]["invoice_number"]: o for o in json.loads((tmp / "c.json").read_text())}
 check("mistyped item 'Wdgt B' is found by catalogue search, corrected and the invoice goes on to payment",

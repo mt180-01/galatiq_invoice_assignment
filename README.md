@@ -28,7 +28,7 @@ The command line is first-class too: [`docs/img/demo.svg`](docs/img/demo.svg) is
 | Robustness to garbage | 2,000 randomly corrupted invoices: **0 approved with a wrong value** (a stray "see invoice 31337" once got through; found and fixed) | `scripts/stress_extraction.py` |
 | Speed | a clean invoice spends about 10-15 ms in the system, against "5 days" in the brief; about 2,200 documents/s on 14 cores | `main.py --bench`, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §4 |
 | Waiting on a person | never silent: reminder at 24 h, escalation at 48 h, expiry at 5 days | `approve.py tick`, `make e2e` |
-| Tests | **345 tests** plus a **60-check end-to-end run** from a fresh clone; a test fails the build if a credential is ever committed | `make test`, `make e2e` |
+| Tests | **347 tests** plus a **60-check end-to-end run** from a fresh clone; a test fails the build if a credential is ever committed | `make test`, `make e2e` |
 
 ## Business impact
 
@@ -36,7 +36,7 @@ The command line is first-class too: [`docs/img/demo.svg`](docs/img/demo.svg) is
 |---|---|---|---|
 | **Error rate** | 30% of invoices | on the provided set, all 10 problem invoices were stopped or sent to a person before any money moved, **0 wrong payments** (the brief itself names 5 of them: a stock mismatch, out-of-stock/fraud, two unknown items, invalid data) | `docs/EVALUATION.md`; 2,000-invoice stress test |
 | **Time per invoice** | 5 days | clean invoices: milliseconds, no human. Invoices needing a person: a prepared one-click card, with a clock that reminds at 24 h and escalates at 48 h | `main.py` impact block, `approve.py tick` |
-| **Cost per invoice (model)** | n/a | **about $0.0012** measured live, roughly **$122 a year at 100,000 invoices**; free by default | `docs/live_runs/`, `scripts/roi.py` |
+| **Cost per invoice (model)** | n/a | **about $0.0012** measured live, roughly **$122 a year at 100,000 invoices**; free to run: the model answers come from the recording | `docs/live_runs/`, `scripts/roi.py` |
 | **People's time** | 12 min of keying and chasing (assumed) | only the invoices that need a decision, and those arrive summarised | `scripts/roi.py` (your inputs) |
 
 The savings side depends on Acme's volume and wages, which the brief does not give, so `python scripts/roi.py` takes your numbers and shows the structure and a sensitivity table. With *placeholder*
@@ -50,7 +50,7 @@ the cost side is measured.
 2. **Ask the model only where it can matter.** Never on rejects or anything already with a person; once before each payment; in extraction only when the rules' reading is incomplete. *Trade-off:* a cheaper,
    safer system that looks less "AI-heavy"; asking about everything is ~2.5x the calls (`scripts/measure_llm_cost.py`).
 3. **A custom orchestrator, not LangGraph/CrewAI.** CPU-bound PDF work and I/O-bound model and bank calls need different scheduling, and six agents with charters did not need a framework. *Trade-off:* more code of our own.
-4. **Free by default, live on request, capped.** A local stand-in model (labelled as such) runs the same protocol; `--grok` is opt-in with a per-run budget; the default model is a plain one, not a reasoning one, because a
+4. **Grok by default, replayed; live on request, capped.** Out of the box the model is Grok: its answers come from recordings of real runs that ship in the repository (the provided invoices, the red-team documents, the extraction corpus, the self-correction samples), so a reviewer needs no key, no network and no money, and sees Grok's own wording, tool calls and corrections. A document the recordings do not cover (your own invoice) is read by the rules, and the report says how many questions were not recorded. `--grok` asks live Grok (opt-in, per-run budget); `--simulate` is the old local stand-in; `--offline` is no model; the default model is a plain one, not a reasoning one, because a
    reasoning model was ~3x the cost and several times slower for this work (measured).
 5. **The ledger is the system's memory and every way in keeps it** (the command line, the web page, the demo, and the classes' own defaults; only `--reset` or a scratch database made for one run starts empty), so nothing is ever paid twice, with idempotency keys on every payment. Duplicates use the vendor's master name; a changed resubmission of a rejected invoice is allowed.
 6. **Stock is a per-invoice cap by default** (the brief's own table lists three invoices as "within stock" that together exceed it); `--stock-policy reserve` is the cumulative alternative, and `--stock-policy decrement` takes the units off the shelf for good when an invoice is paid (kept between runs; `main.py stock` shows what is left).
@@ -90,9 +90,10 @@ document -> INTAKE -> VALIDATION -> REVIEWER --approve--> PAYMENT -> COMMS
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt      # set up (Tesseract only for scanned PDFs)
-.venv/bin/python main.py --invoice_path=data/invoices                   # process the sample invoices (free, offline)
+.venv/bin/python main.py --invoice_path=data/invoices                   # process the sample invoices on Grok's recorded answers (no key, free, offline)
 .venv/bin/python main.py --invoice_path=data/invoices --reset           # run again from an empty ledger (without --reset the ledger is kept: nothing is ever paid twice)
 .venv/bin/python main.py serve --demo                                   # the web interface: dashboard, upload, review queue (http://127.0.0.1:8765)
+.venv/bin/python main.py --simulate --invoice_path=data/invoices         # the same, on the local stand-in model instead of the recording
 .venv/bin/python main.py demo                                           # the whole story in one command
 .venv/bin/python main.py --replay-llm docs/live_runs/provided-invoices.cassette.jsonl --invoice_path=data/invoices   # a real Grok run, replayed offline for free
 .venv/bin/python main.py --trace --invoice_path=data/self_correction    # watch the agents work

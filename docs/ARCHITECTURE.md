@@ -245,7 +245,7 @@ The client degrades safely: any failure falls back to the rules, and a rejected 
 
 | Mode | Cost | How |
 |---|---|---|
-| default (local stand-in model) and `--offline` | $0 | nothing leaves the machine |
+| default (Grok's recorded answers, replayed) and `--offline`; `--simulate` (local stand-in) | $0 | nothing leaves the machine; the replay shows the cost xAI reported when it was recorded |
 | `--grok` (real xAI API) | pay per token | opt-in only; a saved key is ignored otherwise |
 
 When live, each response carries `cost_in_usd_ticks` (1 USD = 10,000,000,000 ticks); the client sums these, shows the exact spend, and stops asking the
@@ -318,10 +318,23 @@ a restart: it is now seeded only on `--reset` (new catalogue items are added wit
 all duplicates and changes nothing. `python main.py stock` shows on hand, reserved and available. Limits: units are the catalogue's stock, not a warehouse system; there is no
 receiving step, so "paid" stands in for "goods accepted"; and the default stays `cap`, so the provided-invoice results are unchanged.
 
+## 4p. Grok is the default model
+
+The brief names Grok as the reasoning engine, and a reviewer who runs the program with no flags should see that, not a simulator. With no flags the client is a real `GrokClient`
+whose transport replays the recordings in `docs/live_runs/` and `data/extraction_eval/` (provided invoices, red-team documents, extraction corpus, self-correction samples; merged,
+a question recorded twice is answered by the first). Prompts, tool calls, schema checks, retries and the reported cost all run exactly as in a live run; only the network is replaced
+by the file. `python main.py --invoice_path=data/invoices` answers all 36 model questions from the recording and ends 17/17, the same as live. A document the recordings do not cover is
+answered by the rules, the run says "N not recorded", and `--grok` asks live Grok. `--simulate` keeps the local stand-in (the guided demo and `serve --demo` use it because their
+story needs a model that corrects typos on sample data that is not recorded); `--offline` is no model. Like any recording, it is tied to the prompts: change a prompt and the
+affected questions go unanswered until you record again (the replay tests say so). Running on the recording found a real defect: given the self-correction samples, live Grok
+corrected the unknown item `GadgetY` to `GadgetX` (similarity 0.86), which the old 0.8 threshold allowed and an earlier model's judgment had happened to avoid. A name that differs
+from a catalogue item by one changed last character or digit is how a sibling product looks, so it is now never corrected automatically (`is_other_variant`, tested), and the
+self-correction recording was made again.
+
 ## 4k. The web interface
 
 `python main.py serve [--demo]` (or `make ui`) starts a local interface on `127.0.0.1:8765`: a **dashboard** (what happened, who is waiting and for how long, where the money
-is), an **upload page** (drop PDFs, text, JSON/XML/CSV or `.eml` files; they go through the same agents and the same ledger as the command line, with the free local model unless the server was started with `--grok`), an **invoice page** with the findings and *what each agent did* (every model call, tool call and conclusion), and the **approval page** the decision links open. Cards
+is), an **upload page** (drop PDFs, text, JSON/XML/CSV or `.eml` files; they go through the same agents and the same ledger as the command line, on the recorded Grok answers (so a document of your own is read by the rules) unless the server was started with `--grok`), an **invoice page** with the findings and *what each agent did* (every model call, tool call and conclusion), and the **approval page** the decision links open. Cards
 and links now point here instead of a made-up domain. It is the standard library only (nothing to install), reads the database the command-line runs leave behind
 (every outcome is stored with its trace), and is covered by `tests/test_web.py` over real HTTP.
 

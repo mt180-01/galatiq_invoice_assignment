@@ -61,14 +61,31 @@ class RecordingTransport(httpx.AsyncBaseTransport):
         return httpx.Response(response.status_code, headers=headers, content=content, request=request)
 
 
+ROOT = Path(__file__).resolve().parent.parent
+BUNDLED = ("docs/live_runs/provided-invoices.cassette.jsonl", "docs/live_runs/red-team.cassette.jsonl", "data/extraction_eval/extraction.cassette.jsonl", "docs/live_runs/self-correction.cassette.jsonl")
+
+
+def bundled_recordings() -> list[Path]:
+    """The recordings of real Grok runs that ship with the repository: the provided invoices, the red-team documents and the extraction corpus."""
+    return [ROOT / p for p in BUNDLED if (ROOT / p).exists()]
+
+
 class ReplayTransport(httpx.AsyncBaseTransport):
     """Serves recorded answers. A question that was never recorded gets a 404 that the client turns into 'model unavailable' (the rules take over)."""
 
-    def __init__(self, path: str | Path):
-        self.path, self.answers, self.hits, self.misses = Path(path), {}, 0, 0
-        for line in self.path.read_text().splitlines()[1:]:
-            entry = json.loads(line)
-            self.answers.setdefault(entry["key"], []).append((entry.get("status", 200), entry.get("body") or entry.get("error")))
+    def __init__(self, path: str | Path | list[str | Path]):
+        """One recording, or several merged (a question recorded in more than one is answered by the first)."""
+        paths = [Path(p) for p in (path if isinstance(path, (list, tuple)) else [path])]
+        self.path, self.answers, self.hits, self.misses = paths[0], {}, 0, 0
+        seen_keys: set[str] = set()
+        for p in paths:
+            fresh: dict[str, list] = {}
+            for line in p.read_text().splitlines()[1:]:
+                entry = json.loads(line)
+                if entry["key"] not in seen_keys:
+                    fresh.setdefault(entry["key"], []).append((entry.get("status", 200), entry.get("body") or entry.get("error")))
+            self.answers.update(fresh)
+            seen_keys |= set(fresh)
         self._seen: dict[str, int] = {}
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:

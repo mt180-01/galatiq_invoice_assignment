@@ -210,7 +210,7 @@ class App:
                 return 400, self.upload_form(note)
             before = max([i for i, _ in self.store.all()] or [0])
             paths, origins = expand([str(p) for p in accepted], tmp / "expanded")
-            args = SimpleNamespace(db=self.db, keep_ledger=True, llm_concurrency=4, offline=False, simulate=not self.grok, grok=self.grok)
+            args = SimpleNamespace(db=self.db, keep_ledger=True, llm_concurrency=4, offline=False, simulate=False, grok=self.grok)
             asyncio.run(run_batch(paths, args, 1, origins))
             fresh = [(i, o) for i, o in self.store.all() if i > before]
         finally:

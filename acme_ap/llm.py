@@ -423,7 +423,9 @@ def make_llm(offline: bool = False, cache_path: str | Path | None = None, simula
              record_to: str | Path | None = None, replay_from: str | Path | None = None) -> LLM:
     """Which model answers:
       offline        no model at all (rules only), free
-      default        the local stand-in, free
+      default        Grok's own answers, replayed from the recordings that ship with the repository: no network, no key, no cost. A question that
+                     was never recorded (an invoice of your own) is answered by the rules and the report says how many
+      simulate=True  the local stand-in, free (used by the guided demo, whose story needs a model that corrects typos)
       live=True      Grok, billed per token by xAI, capped by a per-run budget. Never chosen unless asked for (--grok or ACME_USE_GROK=1),
                      so a saved key cannot cost money by accident."""
     if offline:
@@ -448,6 +450,13 @@ def make_llm(offline: bool = False, cache_path: str | Path | None = None, simula
                             budget_usd=DEFAULT_BUDGET_USD if budget is None else budget)
         if record_to:
             client.label, client.recording = "Grok (recording)", transport
+        return client
+    from .cassette import ReplayTransport, bundled_recordings
+    if not simulate and (bundled := bundled_recordings()) and not live:
+        transport = ReplayTransport(bundled)
+        GrokClient._format_mode, GrokClient._model_checked = "json_schema", False
+        client = GrokClient("replay", transport=transport, retry_delays=(0, 0), budget_usd=None)
+        client.label, client.replay = "Grok (recorded responses, replayed offline; --grok for live)", transport
         return client
     from . import sim_llm
     client = GrokClient("local-simulation", transport=sim_llm.transport())

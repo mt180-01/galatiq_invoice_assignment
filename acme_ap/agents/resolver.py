@@ -1,7 +1,8 @@
 """Self-correction for unknown names: when validation cannot find an item, an agent searches the catalogue and proposes the likely
 intended name; we re-validate. The model suggests, deterministic checks decide:
 
-  * Items are corrected only if the model's pick exists in the catalogue AND is textually very close to what was written (>= MIN_SIMILARITY).
+  * Items are corrected only if the model's pick exists in the catalogue AND is textually very close to what was written (>= MIN_SIMILARITY) AND does not
+    differ by a single changed last character or digit (`is_other_variant`): found when real Grok corrected GadgetY to GadgetX, which the similarity alone allowed.
     A model that wants to turn "SuperGizmo" into "WidgetA" is refused however confident it sounds.
   * Vendors are NEVER corrected. A look-alike vendor name is a classic payment-fraud trick, so a suggested match is only shown to the
     person who decides ("did you mean ...? confirm by phone"); the unknown-vendor hold stays.
@@ -45,6 +46,18 @@ def similarity(a: str, b: str) -> float:
     return difflib.SequenceMatcher(None, _key(a), _key(b)).ratio()
 
 
+def is_other_variant(written: str, correct: str) -> bool:
+    """True when the two names differ by exactly one substituted character that identifies the variant: the last one (GadgetY vs GadgetX) or a digit
+    (Part-17 vs Part-18). A typo drops, doubles or swaps letters; a changed last character or digit is how one product differs from its sibling, so a
+    name like that is never corrected automatically, however close it looks and whatever the model says."""
+    a, b = _key(written), _key(correct)
+    changes = [op for op in difflib.SequenceMatcher(None, a, b).get_opcodes() if op[0] != "equal"]
+    if len(changes) != 1 or changes[0][0] != "replace":
+        return False
+    _, i1, i2, j1, j2 = changes[0]
+    return i2 - i1 == 1 and j2 - j1 == 1 and (i2 == len(a) or (a[i1].isdigit() and b[j1].isdigit()))
+
+
 def search_tools(erp: ErpAdapter) -> list[Tool]:
     obj = {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"], "additionalProperties": False}
     return [Tool("search_items", "Find catalogue items whose names resemble the query. Returns candidates with a 0-1 similarity.", obj,
@@ -72,9 +85,10 @@ async def correct_items(inv: Invoice, erp: ErpAdapter, llm: LLM) -> list[Finding
     for c in reply.corrections:
         record = erp.lookup_item(c.correct)
         score = similarity(c.written, c.correct)
-        if c.written not in unknown or record is None or record.fuzzy or score < MIN_SIMILARITY:
+        if c.written not in unknown or record is None or record.fuzzy or score < MIN_SIMILARITY or is_other_variant(c.written, record.name):
             if llm.meter:
-                llm.meter.event("resolver", "refused", f"{c.written!r} -> {c.correct!r} refused (similarity {score:.2f}; must be an existing catalogue item and >= {MIN_SIMILARITY})")
+                llm.meter.event("resolver", "refused", f"{c.written!r} -> {c.correct!r} refused (similarity {score:.2f}; must be an existing catalogue item, >= {MIN_SIMILARITY}, "
+                                                       "and not differ by a changed last character or digit: that is how a different product looks)")
             continue
         for li in inv.line_items:
             if li.item == c.written:

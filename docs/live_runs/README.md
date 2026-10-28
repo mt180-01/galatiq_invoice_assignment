@@ -1,6 +1,6 @@
 # Recorded live runs
 
-Real runs against the xAI Grok API (not the local stand-in), saved so the claim "it works with live Grok" can be checked, and **replayed offline for free**.
+Real runs against the xAI Grok API (not the local stand-in), saved so the claim "it works with live Grok" can be checked, and **replayed offline for free**. These recordings are also what the program uses when you run it with no flags: `python main.py --invoice_path=data/invoices` is Grok's own recorded answers, not a simulator.
 
 | File | What it is |
 |---|---|

@@ -66,7 +66,7 @@ def serve_ui(argv: list[str]) -> None:
     ap = argparse.ArgumentParser(prog="main.py serve")
     ap.add_argument("--db", default=None, help="default: inventory.db, or ui_demo.db with --demo (so a demo never overwrites your ledger)")
     ap.add_argument("--port", type=int, default=8765)
-    ap.add_argument("--grok", action="store_true", help="process uploads with the real Grok API (billed, capped per run); default is the free local model")
+    ap.add_argument("--grok", action="store_true", help="process uploads with the real Grok API (billed, capped per run); default is the recorded Grok responses, replayed offline")
     ap.add_argument("--demo", action="store_true", help="first process the sample invoices (provided, self-correction, approval demo) into --db with the free local model. The default demo file is recreated each time; any other --db is kept and only added to")
     a = ap.parse_args(argv)
     a.db = a.db or ("ui_demo.db" if a.demo else "inventory.db")
@@ -140,14 +140,18 @@ def main() -> None:
     ap.add_argument("--replay-llm", metavar="FILE", help="answer model calls from a recording made with --record-llm: no network, no key, no cost")
     ap.add_argument("--trace", action="store_true", help="show, per invoice, what each agent did: model calls, tool calls, conclusions")
     ap.add_argument("--offline", action="store_true", help="no model at all: rules only")
-    ap.add_argument("--simulate", action="store_true", help="use the local stand-in model (this is already the default)")
+    ap.add_argument("--simulate", action="store_true", help="use the local stand-in model instead of the recorded Grok responses (free; it is not Grok)")
     ap.add_argument("--grok", action="store_true", help="use the real Grok API: billed per token by xAI, capped per run by XAI_BUDGET_USD (default $0.25)")
     ap.add_argument("--json", metavar="FILE", help="write full results as JSON")
     ap.add_argument("--bench", type=int, metavar="N", help="throughput benchmark over N generated documents, serial vs parallel")
     ap.add_argument("-v", "--verbose", action="store_true", help="show per-stage structured logs")
     args = ap.parse_args()
     args.keep_ledger = not args.reset
-    args.sequential = args.sequential or bool(args.record_llm or args.replay_llm)  # a recording is only replayable if the order of work is the same  # the ledger is the system's memory of what was paid: it survives between runs unless you ask otherwise
+    if args.bench and not (args.grok or args.simulate or args.replay_llm):
+        args.offline = True  # a benchmark measures the pipeline, not a model
+    chosen = make_llm(args.offline, simulate=args.simulate, live=args.grok, record_to=None, replay_from=args.replay_llm) if not args.record_llm else None
+    args.sequential = args.sequential or bool(args.record_llm) or hasattr(chosen, "replay")  # a recording is only replayable if the order of work is the same
+    # the ledger is the system's memory of what was paid: it survives between runs unless you ask otherwise
 
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(KeyValueFormatter())
@@ -156,7 +160,7 @@ def main() -> None:
         logging.getLogger(name).setLevel(logging.INFO)
     paths = collect(args.invoice_path)
     ncpu = os.cpu_count() or 1
-    llm_label = make_llm(args.offline, simulate=args.simulate, live=args.grok, record_to=None, replay_from=args.replay_llm).label if not args.record_llm else "Grok (recording)"
+    llm_label = chosen.label if chosen is not None else "Grok (recording)"
     console.print(f"[bold]{f'{args.bench:,} generated documents (from {len(paths)} samples)' if args.bench else f'{len(paths)} document(s)'}[/], {ncpu} CPU cores, LLM: "
                   f"{llm_label + (' (' + os.environ.get('XAI_MODEL', 'grok-3') + ')' if llm_label == 'Grok' else '')}")
 
@@ -203,7 +207,7 @@ def main() -> None:
     ai_usage(outcomes, llm_label)
     if hasattr(args, "replay_stats"):
         hits, misses = args.replay_stats
-        console.print(f"  [dim]replay: {hits} model call(s) answered from the recording, {misses} not recorded" + (" (those steps used the rules: record again if prompts changed)" if misses else "") + "[/]")
+        console.print(f"  [dim]replay: {hits} model call(s) answered from the recording, {misses} not recorded" + (" (documents the recordings do not cover, or prompts changed since: those steps used the rules. Pass --grok to ask live Grok; billed, capped)" if misses else "") + "[/]")
     if hasattr(args, "recorded"):
         console.print(f"  [dim]recorded {args.recorded} model exchange(s) ({getattr(args, 'recorded_failures', 0)} failed) to {args.record_llm}[/]")
     if args.trace:

@@ -26,7 +26,9 @@ def saved_key(tmp_path, monkeypatch):
 
 
 def test_a_saved_key_is_not_used_unless_you_ask_for_it(saved_key, monkeypatch):
-    assert make_llm().label == "local simulation (not Grok)"                       # key exists, nobody asked: free stand-in
+    default = make_llm()                                                            # key exists, nobody asked: Grok's recorded answers, replayed. No network, no key, no cost
+    assert default.label.startswith("Grok (recorded responses, replayed offline") and hasattr(default, "replay") and default.budget_usd is None
+    assert make_llm(simulate=True).label == "local simulation (not Grok)"           # the stand-in, on request
     assert make_llm(live=True).label == "Grok"                                      # --grok
     monkeypatch.setenv("ACME_USE_GROK", "1")
     assert make_llm().label == "Grok"                                               # explicit environment opt-in
@@ -85,4 +87,18 @@ def test_a_normal_run_with_a_saved_key_stays_free(saved_key, tmp_path):
     p = subprocess.run([sys.executable, "main.py", "--db", str(tmp_path / "f.db"), "--outbox", str(tmp_path / "o"), "--invoice_path", "data/invoices/invoice_1001.txt"],
                        cwd=ROOT, capture_output=True, text=True, env=env, timeout=120)
     out = p.stdout + p.stderr
-    assert p.returncode == 0 and "local simulation (not Grok)" in out and "cost $0.00" in out and "xai-example" not in out
+    assert p.returncode == 0 and "recorded responses, replayed offline" in out and "when recorded" in out and "xai-example" not in out
+    assert "Grok (recording)" not in out and "api.x.ai" not in out                                      # nothing live was asked for
+
+
+def test_out_of_the_box_the_model_is_grok_replayed_and_every_provided_invoice_is_answered(tmp_path):
+    """What a reviewer sees first: `python main.py --invoice_path=data/invoices` runs on Grok's own recorded answers, free, offline, with no key."""
+    env = {**os.environ, "XAI_API_KEY_FILE": "/nonexistent", "PYTHONWARNINGS": "ignore", "COLUMNS": "220"}
+    for k in ("XAI_API_KEY", "ACME_USE_GROK"):
+        env.pop(k, None)
+    p = subprocess.run([sys.executable, "main.py", "--db", str(tmp_path / "x.db"), "--outbox", str(tmp_path / "o"), "--invoice_path", "data/invoices"],
+                       cwd=ROOT, capture_output=True, text=True, env=env, timeout=180)
+    out = p.stdout + p.stderr
+    assert p.returncode == 0 and "Grok (recorded responses, replayed offline" in out and "local simulation" not in out
+    assert "36 model call(s) answered from the recording, 0 not recorded" in " ".join(out.split())
+    assert "PAID=7" in out and "REJECT=8" in out and "DUPLICATE=3" in out

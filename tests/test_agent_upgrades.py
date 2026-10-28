@@ -196,3 +196,11 @@ def test_the_note_and_the_vendor_email_are_written_at_the_same_time(tmp_path):
     assert [t["action"] for t in comms] == ["explained in plain English", "drafted vendor follow-up"]                 # fixed order in the trace
     assert all([e["kind"] for e in t["events"]] == ["wrote"] for t in comms)                                             # each job keeps its own record, and only its own
     assert sum(e["kind"] == "wrote" for t in comms for e in t["events"]) == 2                                           # nothing is counted twice or lost
+
+
+def test_a_sibling_product_is_never_taken_for_a_typo():
+    """Real Grok corrected 'GadgetY' to 'GadgetX' (similarity 0.86). One changed last character or digit is how a different product differs, not a typo."""
+    from acme_ap.agents.resolver import is_other_variant
+    assert is_other_variant("GadgetY", "GadgetX") and is_other_variant("Part-17", "Part-18") and is_other_variant("WidgetA", "WidgetB")
+    for written, correct in (("Wdgt B", "WidgetB"), ("Widgit B", "WidgetB"), ("widgetb", "WidgetB"), ("Widget  B", "WidgetB"), ("GadgetXX", "GadgetX"), ("Gadgte X", "GadgetX")):
+        assert not is_other_variant(written, correct), (written, correct)
