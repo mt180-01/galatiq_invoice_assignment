@@ -25,6 +25,7 @@ from .approvals import ApprovalService
 from .approvals.tokens import TokenError
 from .erp import MockNetSuite
 from .models import Outcome
+from .nextsteps import next_steps
 from .payments import MockBank, PaymentService
 from .store import OutcomeStore
 
@@ -244,6 +245,9 @@ class App:
             kinds = {"error": "bad", "hold": "wait", "warn": "muted"}
             body.append("<h2>What the checks found</h2><div class='card'><ul class='f'>" + "".join(
                 f'<li>{pill(f.severity.value, kinds[f.severity.value])} {e(f.message)}</li>' for f in o.findings) + "</ul></div>")
+        if steps := next_steps(o):
+            body.append("<h2>What would get this paid</h2><div class='card'><ul class='f'>" + "".join(
+                f'<li><b>{e(who)}</b>: {e(what)}</li>' for who, what in steps) + "</ul></div>")
         if inv.line_items:
             trs = "".join(f'<tr><td>{e(li.item)}{" <span class=ev>(" + e(li.note) + ")</span>" if li.note else ""}</td><td class="num">{li.quantity}</td>'
                           f'<td class="num">{e(money(li.unit_price)) if li.unit_price is not None else "-"}</td></tr>' for li in inv.line_items)

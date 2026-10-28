@@ -11,6 +11,7 @@ from rich.table import Table
 from .erp import MockNetSuite
 from .metrics import kpis, llm_usage
 from .models import Outcome
+from .nextsteps import next_steps
 from .payments import MockBank, PaymentService
 
 console = Console()
@@ -33,6 +34,13 @@ def show(outcomes: list[Outcome]) -> None:
                       (inv.vendor if inv else "-") or "-", f"{inv.currency} {inv.total}" if inv and inv.total is not None else "-",
                       f"[{STYLE.get(o.status, 'white')}]{o.status}[/]", why[:110] + ("…" if len(why) > 110 else ""))
     console.print(table)
+    todo = [(o, next_steps(o)) for o in outcomes]
+    if any(steps for _, steps in todo):
+        console.print("[bold]What would get them paid[/]")
+        for o, steps in todo:
+            if steps:
+                name = o.invoice.invoice_number if o.invoice and o.invoice.invoice_number else os.path.basename(o.source_path)
+                console.print(f"  {name}: " + "; ".join(f"{who}: {what}" for who, what in steps[:2]) + (f" (+{len(steps) - 2} more)" if len(steps) > 2 else ""), highlight=False)
     counts: dict[str, int] = {}
     for o in outcomes:
         counts[o.status] = counts.get(o.status, 0) + 1

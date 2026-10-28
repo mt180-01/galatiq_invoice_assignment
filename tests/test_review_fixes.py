@@ -13,6 +13,7 @@ import pytest
 
 from acme_ap import runner
 from acme_ap.erp import MockNetSuite
+from acme_ap.erp.mock_netsuite import SEED_VENDORS
 from acme_ap.llm import OfflineLLM
 from acme_ap.pipeline import Pipeline
 
@@ -207,8 +208,8 @@ def test_a_pdf_and_a_json_of_the_same_invoice_have_the_same_content_hash():
 
 
 # ---- 2. stock: per-invoice by default (the brief's table), cumulative on request -------------------------------
-def widget(tmp_path, name, number, qty=2, item="WidgetA", price=250):
-    return invoice_file(tmp_path, name, invoice_number=number, line_items=[{"item": item, "quantity": qty, "unit_price": price, "amount": qty * price}],
+def widget(tmp_path, name, number, qty=2, item="WidgetA", price=250, vendor=None):
+    return invoice_file(tmp_path, name, invoice_number=number, **({"vendor": vendor} if vendor else {}), line_items=[{"item": item, "quantity": qty, "unit_price": price, "amount": qty * price}],
                         subtotal=qty * price, total=qty * price)
 
 
@@ -234,7 +235,8 @@ def test_under_the_reserve_policy_earlier_approvals_use_up_stock(tmp_path):
 def test_racing_invoices_cannot_both_take_the_last_units(tmp_path):
     """12 invoices want 2 WidgetA each (24) from 15 on hand, all at once. Exactly 7 can be approved, whatever the timing."""
     erp = MockNetSuite(tmp_path / "s.db", stock_policy="reserve")
-    files = [widget(tmp_path, f"w{i}.json", f"INV-9{i:03d}") for i in range(12)]
+    vendors = [v[0] for v in SEED_VENDORS]                                      # twelve different vendors: one vendor billing the same order twelve times is held as a repeat
+    files = [widget(tmp_path, f"w{i}.json", f"INV-9{i:03d}", vendor=vendors[i]) for i in range(12)]
     outs = asyncio.run(Pipeline(erp, OfflineLLM(), workers=1, llm_concurrency=12, bank_concurrency=12).run([str(f) for f in files]))
     assert sum(o.status == "PAID" for o in outs) == 7 and sum(o.status == "REJECT" for o in outs) == 5
     assert erp._conn().execute("SELECT SUM(qty) FROM stock_reservations").fetchone()[0] == 14                 # never more than on hand

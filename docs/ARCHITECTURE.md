@@ -286,6 +286,26 @@ when grounded in the document text (`_disagreements`), and a bank account is nev
 with Grok 25/30 ($0.024). OCR is adaptive: 200 dpi first, retried at 300/400 when Tesseract's mean confidence is under 85, best result kept (this took rules from 37% to 63%). Both are replayed from
 recordings (`--check`, under a second, no key) and tested. Also here: model-written plain-English note and vendor email run concurrently, and the outcome store batches writes (about +18% throughput).
 
+## 4n. Attacking our own system
+
+`acme_ap/redteam.py` is a catalogue of 13 attacks and 3 clean controls, each modelled on a known accounts-payable fraud or failure: a look-alike vendor name, a name with a
+look-alike Cyrillic letter, a padded total, prices three times the catalogue, an absurd tax line, one purchase split into invoices that each stay under the 10,000 review
+limit, the same order re-numbered, a future-dated invoice, a note telling an AI reader to approve, payment pressure, a negative line, a foreign currency, and a product that
+does not exist. "Stopped" means nothing was approved for automatic payment (for a repeat, the first copy is the real bill). The controls must still be approved, so blocking
+everything does not score. `python scripts/red_team.py` runs it with rules only and again against a recording of live Grok; `docs/RED_TEAM.md` is the scoreboard and a test
+fails if it is stale or anything gets through.
+
+What it found, in order: the first run stopped 7 of 13. Six became rules: `price_variance` above 25% is a hold (was a note), `implausible_tax` (over 25% of the subtotal),
+`split_invoices` and `repeat_order` (the ledger now stores an order fingerprint and looks at the same vendor's bills in the last 7 days), `future_dated` (more than 30 days
+ahead), and `embedded_instructions` (text addressed to an automated reader is held and never obeyed). Then the live-model run found something rules-only could not: shown a
+document whose lines add up to 2,000 and whose total says 2,600, Grok reported a 600.00 shipping charge that is printed nowhere, which made the sum work, and the invoice was
+approved. A model repairing a bad document is the same failure as a model obeying one. The reconciliation step now takes a shipping, tax or subtotal figure from the model only if
+the regex reading also sees it or the amount appears in the text. Limits: the catalogue is the developer's own, so it measures known attacks; the new cross-invoice rules look back
+7 days and are tuned for review, not certainty (a vendor really billing the same order twice in a week is held for a person, which is the intent).
+
+**What would get this paid.** `acme_ap/nextsteps.py` turns each blocking finding into a line addressed to whoever can act (the vendor, AP, the approver), shown on the invoice
+page and after the terminal table. It is derived from the findings, so it cannot disagree with the decision, and a test fails if a rule exists without a next step.
+
 ## 4k. The web interface
 
 `python main.py serve [--demo]` (or `make ui`) starts a local interface on `127.0.0.1:8765`: a **dashboard** (what happened, who is waiting and for how long, where the money

@@ -17,7 +17,7 @@ import time
 from .agents.team import CommsAgent, DeskAgent, IntakeAgent, PaymentAgent, ReviewerAgent, ValidationAgent, event_dict, step
 from .erp import ErpAdapter
 from .approvals.tokens import evidence_hash
-from .identity import bill_key
+from .identity import bill_key, order_fingerprint
 from .ingestion import heuristic
 from .intake import Origin
 from .llm import LLM, invoice_ledger
@@ -137,7 +137,7 @@ class Pipeline:
         out.invoice = inv
         log.info("ingested", extra={"trace": trace, "stage": "ingest", "detail": f"{inv.invoice_number} via {inv.extractor} ({inv.channel} lane)"})
         key = bill_key(inv, self.erp)
-        first = await asyncio.to_thread(self.erp.claim_bill, key, path, inv.vendor, inv.total, evidence_hash(inv))
+        first = await asyncio.to_thread(self.erp.claim_bill, key, path, inv.vendor, inv.total, evidence_hash(inv), order_fingerprint(inv, self.erp))
         if first:
             out.findings = [Finding(code="duplicate_invoice", severity=Severity.ERROR,
                                     message=f"already received from {os.path.basename(first)}; not processed twice")]

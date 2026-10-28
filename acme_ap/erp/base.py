@@ -25,12 +25,14 @@ class VendorRecord:
 class ErpAdapter(Protocol):
     def lookup_item(self, name: str) -> ItemRecord | None: ...
     def lookup_vendor(self, name: str) -> VendorRecord | None: ...
-    def claim_bill(self, key: str, source: str, vendor: str | None, total: Decimal | None, content: str | None = None) -> str | None:
+    def claim_bill(self, key: str, source: str, vendor: str | None, total: Decimal | None, content: str | None = None, fingerprint: str | None = None) -> str | None:
         """Atomically register a vendor bill. Returns None if new, else the source that claimed it first. If the earlier attempt ended without
         payment (rejected, blocked, expired) and this copy's `content` differs, the bill is claimed afresh and None is returned: a corrected
         resubmission is not a duplicate. An identical copy of a rejected bill is one, since processing it again can only repeat the rejection."""
     def similar_bills(self, number: str, total: Decimal | None, vendor: str, exclude_key: str) -> list[dict]:
         """Live bills with the same invoice number and total from a similarly named vendor but a different key: possible duplicates."""
+    def recent_bills(self, key: str, days: int = 7) -> list[dict]:
+        """Other live bills (not rejected, blocked or expired) from the same vendor as `key`, received in the last `days`: {key, total, fingerprint}."""
     def bill_status(self, key: str) -> str | None: ...
     def reserve_stock(self, key: str, lines: list[tuple[str, int]]) -> list[str]:
         """Under the `reserve` stock policy: atomically set aside what an approved bill will consume. Returns shortfall messages (and reserves

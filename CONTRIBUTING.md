@@ -4,9 +4,9 @@
 
 ```bash
 make setup      # venv + dependencies (Tesseract is only needed for scanned PDFs)
-make test       # 300 tests, about 30 s, no network, no API key
+make test       # 331 tests, about 30 s, no network, no API key
 make lint       # ruff + mypy (mypy is a smoke check, not a gate)
-make e2e        # 58 end-to-end checks, as a user would run them
+make e2e        # 59 end-to-end checks, as a user would run them
 ```
 
 ## Start reading here
@@ -24,6 +24,7 @@ Follow one invoice: `main.py` -> `acme_ap/runner.py` -> `acme_ap/pipeline.py`. T
 | `acme_ap/payments/` | `service.py` (scheduling, limits, reconciliation), `bank.py` (bank adapter + mock) |
 | `acme_ap/approvals/` | routing table, signed links, reminders |
 | `acme_ap/llm.py`, `cassette.py`, `sim_llm.py` | the Grok client, record/replay, and the free local stand-in model |
+| `acme_ap/redteam.py`, `nextsteps.py` | the attack catalogue and its runner; the "what would get this paid" to-do list for each stopped invoice |
 | `acme_ap/web.py`, `report.py`, `demo.py` | web interface, terminal output, the guided demo |
 | `data/`, `docs/` | sample invoices; architecture, evaluation and live-run evidence |
 
@@ -39,4 +40,5 @@ Follow one invoice: `main.py` -> `acme_ap/runner.py` -> `acme_ap/pipeline.py`. T
 * The model may make a decision stricter, never looser. Anything it writes is checked against the record before use.
 * Never commit a credential: a test (`tests/test_no_secrets.py`) fails the build. The xAI key lives in `~/.config/acme_ap/xai_key`.
 * If you change a prompt, the recordings in `docs/live_runs/` and `data/extraction_eval/` no longer match; the replay tests will say so. Re-record with `--record-llm` (live, costs cents).
+* New fraud rule? Add the attack to `acme_ap/redteam.py` first (it should fail), then the rule, then run `python scripts/red_team.py`. A new finding code also needs a line in `acme_ap/nextsteps.py` (a test checks).
 * Evaluation files are generated; `scripts/evaluate.py --check` (and the extraction and scan equivalents) fail when they are stale.

@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import re
 from collections import defaultdict
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from ..erp import ErpAdapter
@@ -14,6 +14,14 @@ from ..models import Finding, Invoice, Severity
 TOL = Decimal("0.01")
 PRICE_TOLERANCE = Decimal("0.01")
 APPROVAL_THRESHOLD = Decimal("10000")
+GOUGING = Decimal("0.25")             # a billed price this far above the catalogue price is held for a person, not just noted
+MAX_TAX_RATE = Decimal("0.25")        # no ordinary sales tax is this high
+FUTURE_DAYS = 30
+SPLIT_WINDOW_DAYS = 7
+_INJECTION = re.compile(
+    r"(ignore|disregard|forget)\s+(all\s+|any\s+|the\s+|your\s+)?(previous|prior|above|earlier)?\s*(instructions|rules|policy|policies|checks)"
+    r"|\bsystem\s*:|you\s+are\s+(now\s+)?(the\s+|an?\s+)?(approver|assistant|ai|model|vp)"
+    r"|(mark|set|treat)\s+(this|the)\s+invoice\s+(as\s+)?(approved|paid)|skip\s+(the\s+)?(validation|review|checks)|approve\s+this\s+invoice", re.I)
 _FRAUD_PHRASES = re.compile(r"urgent|immediately|wire transfer|penalt|asap|final notice", re.I)
 
 
@@ -67,6 +75,8 @@ def validate(inv: Invoice, erp: ErpAdapter, accounts=None) -> list[Finding]:
         for dup in erp.similar_bills(inv.invoice_number, inv.total, inv.vendor or "", bill_key(inv, erp)):
             out.append(_f("possible_duplicate", H, f"same invoice number and total as a bill already received from {dup['vendor']!r} ({dup['status']}, "
                                                     f"{os.path.basename(dup['source'])}): possibly the same bill under a different vendor spelling"))
+    if inv.invoice_number:
+        _check_related_bills(inv, erp, out)
     _check_dates(inv, out)
     _check_items(inv, erp, out)
     _check_math(inv, out)
@@ -93,10 +103,32 @@ def _check_dates(inv: Invoice, out: list[Finding]) -> None:
         out.append(_f("missing_due_date", Severity.WARN, "no due date"))
     if inv.date:
         try:
-            if date.fromisoformat(inv.date).year < 2000:
+            when = date.fromisoformat(inv.date)
+            if when.year < 2000:
                 out.append(_f("implausible_date", Severity.WARN, f"implausible invoice date {inv.date}"))
+            elif when > date.today() + timedelta(days=FUTURE_DAYS):
+                out.append(_f("future_dated", Severity.HOLD, f"invoice is dated {inv.date}, more than {FUTURE_DAYS} days ahead"))
         except ValueError:
             pass
+
+
+def _check_related_bills(inv: Invoice, erp: ErpAdapter, out: list[Finding]) -> None:
+    """Two things only visible across invoices: the same order billed again under a new number, and one large purchase cut into pieces that each
+    stay under the review limit."""
+    from ..identity import bill_key, order_fingerprint  # local import: identity needs the ERP package, validation is imported by it indirectly
+    key = bill_key(inv, erp)
+    others = erp.recent_bills(key, SPLIT_WINDOW_DAYS)
+    if not others:
+        return
+    mine = order_fingerprint(inv, erp)
+    if mine and any(o["fingerprint"] == mine for o in others):
+        out.append(_f("repeat_order", Severity.HOLD, "same vendor, total and items as another invoice received in the last "
+                                                     f"{SPLIT_WINDOW_DAYS} days under a different number: possibly the same order billed twice"))
+    floor = APPROVAL_THRESHOLD / 4
+    pieces = [o["total"] for o in others if o["total"] is not None and floor <= o["total"] <= APPROVAL_THRESHOLD]
+    if inv.total is not None and floor <= inv.total <= APPROVAL_THRESHOLD and pieces and inv.total + sum(pieces) > APPROVAL_THRESHOLD:
+        out.append(_f("split_invoices", Severity.HOLD, f"{len(pieces) + 1} invoices from this vendor in {SPLIT_WINDOW_DAYS} days, each under {APPROVAL_THRESHOLD} "
+                                                       f"but {inv.total + sum(pieces)} together: possibly one purchase split to avoid review"))
 
 
 def _check_items(inv: Invoice, erp: ErpAdapter, out: list[Finding]) -> None:
@@ -118,7 +150,7 @@ def _check_items(inv: Invoice, erp: ErpAdapter, out: list[Finding]) -> None:
         if li.unit_price is not None and rec.unit_price > 0:
             drift = abs(li.unit_price - rec.unit_price) / rec.unit_price
             if drift > PRICE_TOLERANCE:
-                out.append(_f("price_variance", W, f"{rec.name}: billed {li.unit_price} vs catalog {rec.unit_price} ({drift:.0%} off)"
+                out.append(_f("price_variance", Severity.HOLD if drift > GOUGING else W, f"{rec.name}: billed {li.unit_price} vs catalog {rec.unit_price} ({drift:.0%} off)"
                               + (f" [{li.note}]" if li.note else "")))
     for name, qty in wanted.items():
         rec = records[name]
@@ -142,6 +174,8 @@ def _check_math(inv: Invoice, out: list[Finding]) -> None:
     if inv.subtotal is not None and inv.line_items and abs(line_sum - inv.subtotal) > TOL:
         out.append(_f("subtotal_math", E, f"line items sum to {line_sum} but subtotal is {inv.subtotal}"))
     base = inv.subtotal if inv.subtotal is not None else line_sum
+    if inv.tax_amount and base > 0 and inv.tax_amount / base > MAX_TAX_RATE:
+        out.append(_f("implausible_tax", Severity.HOLD, f"tax {inv.tax_amount} is {inv.tax_amount / base:.0%} of {base}"))
     if inv.total is not None and inv.line_items:
         expected_total = base + (inv.tax_amount or 0) + (inv.shipping or 0)
         if abs(expected_total - inv.total) > TOL:
@@ -150,6 +184,9 @@ def _check_math(inv: Invoice, out: list[Finding]) -> None:
 
 def _check_fraud(inv: Invoice, vendor_unknown: bool, out: list[Finding]) -> None:
     signals = []
+    text = " ".join(filter(None, [inv.notes, inv.payment_terms, *[li.note for li in inv.line_items], *[li.item for li in inv.line_items]]))
+    if _INJECTION.search(text):
+        out.append(_f("embedded_instructions", Severity.HOLD, "the document contains text addressed to an automated reader (instructions to approve or skip checks); treated as data, never obeyed"))
     blob = " ".join(filter(None, [inv.notes, inv.payment_terms]))
     phrases = sorted({m.group(0).lower() for m in _FRAUD_PHRASES.finditer(blob)})
     if phrases:

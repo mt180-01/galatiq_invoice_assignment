@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS inventory (item TEXT PRIMARY KEY, stock INTEGER, unit
 CREATE TABLE IF NOT EXISTS vendors (name TEXT PRIMARY KEY, status TEXT, aliases TEXT DEFAULT '');
 CREATE TABLE IF NOT EXISTS vendor_bills (
     bill_key TEXT PRIMARY KEY, source TEXT, vendor TEXT, total TEXT, status TEXT DEFAULT 'received',
-    reasoning TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP, number TEXT, content TEXT);
+    reasoning TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP, number TEXT, content TEXT, fingerprint TEXT);
 CREATE TABLE IF NOT EXISTS vendor_payments (
     bill_key TEXT PRIMARY KEY, vendor TEXT, amount TEXT, reference TEXT, paid_at TEXT DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS stock_reservations (bill_key TEXT, item TEXT, qty INTEGER, PRIMARY KEY (bill_key, item));
@@ -60,6 +60,8 @@ class MockNetSuite:
                 c.execute("UPDATE vendor_bills SET number = substr(bill_key, instr(bill_key, '|') + 1, instr(substr(bill_key, instr(bill_key, '|') + 1), '|') - 1) WHERE bill_key NOT LIKE 'anon|%'")
             if "content" not in {r[1] for r in c.execute("PRAGMA table_info(vendor_bills)")}:
                 c.execute("ALTER TABLE vendor_bills ADD COLUMN content TEXT")
+            if "fingerprint" not in {r[1] for r in c.execute("PRAGMA table_info(vendor_bills)")}:
+                c.execute("ALTER TABLE vendor_bills ADD COLUMN fingerprint TEXT")
             c.execute("CREATE INDEX IF NOT EXISTS vendor_bills_number ON vendor_bills(number)")  # near-duplicate lookups must not scan the ledger
             if not keep_ledger:
                 c.executescript("DELETE FROM vendor_bills; DELETE FROM vendor_payments; DELETE FROM audit_log; DELETE FROM stock_reservations;")
@@ -139,13 +141,13 @@ class MockNetSuite:
         return self._vendors.get(norm(name))
 
     # ---- writes ------------------------------------------------------------------------
-    def claim_bill(self, key: str, source: str, vendor: str | None, total: Decimal | None, content: str | None = None) -> str | None:
+    def claim_bill(self, key: str, source: str, vendor: str | None, total: Decimal | None, content: str | None = None, fingerprint: str | None = None) -> str | None:
         with self._write:
             c = self._conn()
             parts = key.split("|")
             number = parts[1] if len(parts) >= 3 and parts[0] != "anon" else None  # keys are vendor|number|revision; anything else has no number
-            cur = c.execute("INSERT OR IGNORE INTO vendor_bills (bill_key, source, vendor, total, number, content) VALUES (?,?,?,?,?,?)",
-                            (key, source, vendor, str(total) if total is not None else None, number, content))
+            cur = c.execute("INSERT OR IGNORE INTO vendor_bills (bill_key, source, vendor, total, number, content, fingerprint) VALUES (?,?,?,?,?,?,?)",
+                            (key, source, vendor, str(total) if total is not None else None, number, content, fingerprint))
             if cur.rowcount:
                 c.commit()
                 return None
@@ -157,8 +159,8 @@ class MockNetSuite:
             if (status in FAILED or status == "abandoned") and not identical_to_a_rejected_one:
                 # The earlier attempt never paid anything. Holding the number forever would make a corrected resubmission impossible, so the bill
                 # is claimed again and judged on its own merits; the audit log keeps the history.
-                c.execute("UPDATE vendor_bills SET source=?, vendor=?, total=?, status='received', reasoning=NULL, created_at=CURRENT_TIMESTAMP, content=? WHERE bill_key=?",
-                          (source, vendor, str(total) if total is not None else None, content, key))
+                c.execute("UPDATE vendor_bills SET source=?, vendor=?, total=?, status='received', reasoning=NULL, created_at=CURRENT_TIMESTAMP, content=?, fingerprint=? WHERE bill_key=?",
+                          (source, vendor, str(total) if total is not None else None, content, fingerprint, key))
                 c.execute("INSERT INTO audit_log (bill_key, stage, detail) VALUES (?,?,?)",
                           (key, "resubmitted", f"earlier attempt ({os.path.basename(source_before)}) ended {status}; reprocessing {os.path.basename(source)}"))
                 c.commit()
@@ -178,6 +180,14 @@ class MockNetSuite:
             if score >= 0.75:
                 out.append({"key": key, "source": source, "vendor": other, "status": status, "similarity": round(score, 2)})
         return out
+
+    def recent_bills(self, key: str, days: int = 7) -> list[dict]:
+        if "|" not in key or key.startswith("anon|"):
+            return []
+        rows = self._conn().execute(
+            "SELECT bill_key, total, fingerprint FROM vendor_bills WHERE bill_key LIKE ? AND bill_key != ? AND status NOT IN (?,?,?,?) AND created_at >= datetime('now', ?)",
+            (key.split("|")[0] + "|%", key, *FAILED, f"-{days} days")).fetchall()
+        return [{"key": k, "total": Decimal(t) if t is not None else None, "fingerprint": f} for k, t, f in rows]
 
     def vendor_names(self) -> list[str]:
         return [n for vname, _, aliases in SEED_VENDORS for n in [vname, *[a for a in aliases.split(";") if a]]]

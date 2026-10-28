@@ -121,6 +121,14 @@ def _disagreements(model: Invoice, regex: Invoice, text: str = "") -> list[str]:
         diffs.append(f"total {model.total} vs {regex.total}")
     elif regex.total is None and model.total is not None and model.total not in amounts:
         diffs.append(f"total {model.total} is not in the document")
+    # charges that make the arithmetic work: a model asked to read a document whose total does not add up may "find" a shipping or tax line that
+    # reconciles it. A charge is accepted only if both readers see it or the amount is printed in the document.
+    for name in ("shipping", "tax_amount", "subtotal"):
+        a_, b_ = getattr(model, name), getattr(regex, name)
+        if a_ and b_ is not None and a_ != b_:
+            diffs.append(f"{name} {a_} vs {b_}")
+        elif a_ and b_ is None and a_ not in amounts:
+            diffs.append(f"{name} {a_} is not in the document")
     # items
     mine = sorted((_alnum(li.item), li.quantity) for li in model.line_items)
     theirs = sorted((_alnum(li.item), li.quantity) for li in regex.line_items)
