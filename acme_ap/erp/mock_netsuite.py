@@ -233,7 +233,9 @@ class MockNetSuite:
         return sorted(out, key=lambda r: -r["similarity"])[:limit]
 
     def search_vendors(self, query: str, limit: int = 3) -> list[dict]:
-        want, seen, out = norm(query), {}, []
+        want = norm(query)
+        seen: dict[str, float] = {}
+        out: list[dict] = []
         for key, rec in self._vendors.items():
             score = difflib.SequenceMatcher(None, want, key).ratio()
             if score >= 0.5 and seen.get(rec.name, 0) < score:
@@ -248,7 +250,7 @@ class MockNetSuite:
         totals = [Decimal(r[0]) for r in rows]
         if not totals:
             return {"bills": 0}
-        return {"bills": len(totals), "avg_total": str((sum(totals) / len(totals)).quantize(Decimal("0.01"))), "max_total": str(max(totals))}
+        return {"bills": len(totals), "avg_total": str((sum(totals, Decimal(0)) / len(totals)).quantize(Decimal("0.01"))), "max_total": str(max(totals))}
 
     def bill_status(self, key: str) -> str | None:
         row = self._conn().execute("SELECT status FROM vendor_bills WHERE bill_key=?", (key,)).fetchone()

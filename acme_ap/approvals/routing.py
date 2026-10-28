@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Any
 
 from ..models import Outcome, Severity
 
@@ -10,7 +11,7 @@ VP_THRESHOLD = Decimal("10000")   # above this a person must sign off, however c
 CFO_THRESHOLD = Decimal("50000")
 
 # Role mailboxes, each with the delegate who gets it if the owner does not respond (fictional addresses).
-DIRECTORY = {
+DIRECTORY: dict[str, dict[str, Any]] = {
     "VP Finance":  {"email": "vp-finance@acmecorp.example",  "delegate": "CFO"},
     "CFO":         {"email": "cfo@acmecorp.example",         "delegate": "CEO"},
     "CEO":         {"email": "ceo@acmecorp.example",         "delegate": None},
@@ -22,12 +23,13 @@ DIRECTORY = {
 def authorized(role: str, escalated_from: str | None = None) -> set[str]:
     """Mailboxes allowed to decide a request: whoever it is with now, anyone senior to them (the delegate chain),
     and the original owner if it was escalated. A forwarded or leaked token is useless to anyone else."""
-    allowed, current = set(), role
+    allowed: set[str] = set()
+    current: str | None = role
     while current:
-        allowed.add(DIRECTORY[current]["email"])
+        allowed.add(str(DIRECTORY[current]["email"]))
         current = DIRECTORY[current]["delegate"]
     if escalated_from:
-        allowed.add(DIRECTORY[escalated_from]["email"])
+        allowed.add(str(DIRECTORY[escalated_from]["email"]))
     return allowed
 
 

@@ -66,7 +66,7 @@ def digest(outcomes: list[Outcome], waiting: list[dict], payments: list | None =
         lines.append("  nothing")
     lines += ["", "STOPPED BEFORE PAYMENT"]
     stopped = [o for o in outcomes if o.status == "REJECT" and o.invoice]
-    lines += [f"  - {o.invoice.invoice_number} {o.invoice.vendor}: {o.approval.reasoning[:110]}" for o in stopped] or ["  nothing"]
+    lines += [f"  - {inv.invoice_number} {inv.vendor}: {(o.approval.reasoning if o.approval else '')[:110]}" for o in stopped if (inv := o.invoice)] or ["  nothing"]
     if k.reasons:
         lines.append("  most common reasons: " + ", ".join(f"{c} x{n}" for c, n in k.reasons.most_common(4)))
     if payments is not None:

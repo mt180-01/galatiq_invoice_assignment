@@ -143,7 +143,7 @@ def scorecard(outcomes: list[Outcome]) -> None:
     if not real:
         return
     n = len(real)
-    lanes = {k: sum(o.invoice.lane == k for o in real) for k in ("structured", "embedded", "ai-extracted")}
+    lanes = {k: sum(bool(o.invoice and o.invoice.lane == k) for o in real) for k in ("structured", "embedded", "ai-extracted")}
     asked = sum(bool(o.followup) for o in real)
     pct = lambda k: f"{k / n:.0%}"  # noqa: E731
     console.print(f"[bold]Vendor effort[/] ({n} invoices)")

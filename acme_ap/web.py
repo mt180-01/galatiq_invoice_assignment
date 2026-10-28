@@ -37,12 +37,13 @@ MAX_FILES = 20
 def parse_multipart(content_type: str, body: bytes) -> tuple[dict[str, str], list[tuple[str, bytes]]]:
     """(text fields, [(filename, bytes)]) from a multipart/form-data body, using the standard library's mail parser (the `cgi` module is gone from Python 3.13)."""
     msg = BytesParser(policy=policy.HTTP).parsebytes(b"Content-Type: " + content_type.encode() + b"\r\nMIME-Version: 1.0\r\n\r\n" + body)
-    fields, files = {}, []
+    fields: dict[str, str] = {}
+    files: list[tuple[str, bytes]] = []
     if not msg.is_multipart():
         return fields, files
     for part in msg.iter_parts():
         name, filename = part.get_param("name", header="content-disposition"), part.get_filename()
-        data = part.get_payload(decode=True) or b""
+        data = bytes(part.get_payload(decode=True) or b"")
         if filename is not None:
             files.append((filename, data))
         elif name:
@@ -237,7 +238,7 @@ class App:
         body.append(f'<p class="sub">{e(str(inv.vendor or "unknown vendor"))} &middot; {e(money(inv.total, inv.currency) if inv.total is not None else "no total")} '
                     f'&middot; read from {e(Path(o.source_path).name)} by {e(inv.extractor)}</p>')
         if o.explanation or (o.approval and o.approval.reasoning):
-            body.append(f'<div class="card"><b>In short</b><br>{e(o.explanation or o.approval.reasoning)}</div>')
+            body.append(f'<div class="card"><b>In short</b><br>{e(o.explanation or (o.approval.reasoning if o.approval else ""))}</div>')
         if o.approval:
             body.append(f'<div class="card"><b>Decision</b>: {e(o.approval.decision.value)} after {o.approval.rounds} round(s)'
                         + ("".join(f'<div class="ev">critique: {e(c)}</div>' for c in o.approval.critiques)) + f'<div class="ev">{e(o.approval.reasoning)}</div></div>')

@@ -19,6 +19,11 @@ from .runner import ledger_view, run_batch
 DATA = Path(__file__).resolve().parent.parent / "data"
 
 
+def _fixed(day: date):
+    """A clock that always says `day`."""
+    return lambda: day
+
+
 def demo() -> None:
     """Invoices -> follow-up -> VP approval -> timed payment -> reconcile."""
     root = Path(tempfile.mkdtemp(prefix="acme_demo_"))
@@ -53,12 +58,12 @@ def demo() -> None:
 
         step(3, "INV-3001 is over the 10,000 limit, so the VP gets a decision card instead of an email chain:")
         vp = by_no["INV-3001"]
-        console.print("[dim]" + "\n".join("  | " + line for line in vp.approval_card.splitlines()[:14]) + "\n  | ...[/]")
+        console.print("[dim]" + "\n".join("  | " + line for line in (vp.approval_card or "").splitlines()[:14]) + "\n  | ...[/]")
 
         step(4, "The VP clicks Approve. The invoice is re-checked first, then paid (its due date has passed).")
         erp = MockNetSuite(db, keep_ledger=True)
         svc = ApprovalService(db, erp, reset=False)
-        res = svc.respond(svc.tokens_for(vp.approval_request)["approve"], "vp-finance@acmecorp.example", "ok")
+        res = svc.respond(svc.tokens_for(vp.approval_request or 0)["approve"], "vp-finance@acmecorp.example", "ok")
         console.print(f"  {res.message}")
 
         step(5, "Payments are timed, not instant: INV-3003 took its 2% early-pay discount now, INV-3002 waits for its due date.")
@@ -68,15 +73,15 @@ def demo() -> None:
         later = min(scheduled) if scheduled else today + timedelta(days=44)
         step(6, f"Time passes to {later}: due payments are released, then reconciled with the bank a few days after.")
         for day, label in ((later, "release"), (later + timedelta(days=5), "reconcile")):
-            svc = PaymentService(db, erp, MockBank(db + ".bank"), reset=False, today=lambda d=day: d)
+            pay = PaymentService(db, erp, MockBank(db + ".bank"), reset=False, today=_fixed(day))
             if label == "release":
-                sent = [r for r in svc.release_due() if r.submitted]
-                console.print(f"  {day}: sent {len(sent)} payment(s) ({', '.join(r.ref for r in sent)})")
+                sent = [r for r in pay.release_due() if r.submitted]
+                console.print(f"  {day}: sent {len(sent)} payment(s) ({', '.join(r.ref or '' for r in sent)})")
             else:
-                rec = svc.reconcile()
+                rec = pay.reconcile()
                 console.print(f"  {day}: settled {rec.settled}, returned {rec.returned}, still in flight {rec.pending}; issues: {rec.issues or 'none'}")
         step(7, "Nobody has to chase. Vendors get a remittance notice; the AP manager gets a digest of what is stuck and why.")
-        console.print("[dim]" + "\n".join("  | " + line for line in draft_notice(by_no["INV-3003"]).splitlines()[:6]) + "[/]")
+        console.print("[dim]" + "\n".join("  | " + line for line in (draft_notice(by_no["INV-3003"]) or "").splitlines()[:6]) + "[/]")
         waiting, rows = ledger_view(db)
         console.print("[dim]" + "\n".join("  | " + line for line in digest(outcomes, waiting, rows).splitlines()[:8]) + "\n  | ...[/]")
         step(8, "How the agents actually worked: each model call, tool call and conclusion on two invoices (free local model; use --grok for the real one).")

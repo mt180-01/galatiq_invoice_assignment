@@ -9,6 +9,7 @@ well Grok itself reasons.
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import httpx
 
@@ -71,7 +72,7 @@ def _key(s: str) -> str:
     return "".join(c for c in s.lower() if c.isalnum())
 
 
-def _tool_results(messages: list[dict]) -> list[tuple[str, dict, object]]:
+def _tool_results(messages: list[dict]) -> list[tuple[str, dict, Any]]:
     """[(tool name, arguments, result)] for every tool call already answered in this conversation."""
     calls = {c["id"]: c["function"] for m in messages if m["role"] == "assistant" for c in m.get("tool_calls") or []}
     out = []

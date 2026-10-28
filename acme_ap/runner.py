@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 from .approvals import ApprovalService
 from .approvals.routing import DIRECTORY
@@ -18,7 +19,11 @@ from .store import OutcomeStore
 try:  # Unix only. Without it (Windows) CPU time is this process's alone and worker processes are not counted.
     import resource
 except ImportError:  # pragma: no cover - exercised by a test that hides the module
-    resource = None
+    resource = None  # type: ignore[assignment]
+
+
+def _number(o: Outcome) -> str | None:
+    return o.invoice.invoice_number if o.invoice else None
 
 
 def cpu_seconds() -> float:
@@ -29,7 +34,7 @@ def cpu_seconds() -> float:
     return own.ru_utime + own.ru_stime + kids.ru_utime + kids.ru_stime
 
 
-async def run_batch(paths: list[str], args: argparse.Namespace, workers: int | None, origins=None) -> tuple[list[Outcome], float, float]:
+async def run_batch(paths: list[str], args: argparse.Namespace | SimpleNamespace, workers: int | None, origins=None) -> tuple[list[Outcome], float, float]:
     keep = getattr(args, "keep_ledger", True)  # a caller that says nothing keeps the ledger
     erp = MockNetSuite(args.db, keep_ledger=keep, stock_policy=getattr(args, "stock_policy", None))
     payments = PaymentService(args.db, erp, MockBank(args.db + ".bank", reset=not keep), reset=not keep)
@@ -59,7 +64,7 @@ def write_outbox(outcomes: list[Outcome], outbox: Path) -> int:
     count = 0
     for o in outcomes:
         if o.followup:
-            (outbox / f"{(o.invoice.invoice_number or 'unknown')}_{Path(o.source_path).stem}.txt").write_text(o.followup + "\n")
+            (outbox / f"{(_number(o) or 'unknown')}_{Path(o.source_path).stem}.txt").write_text(o.followup + "\n")
             count += 1
     return count
 
@@ -72,7 +77,7 @@ def write_cards(outcomes: list[Outcome], outbox: Path) -> int:
     n = 0
     for o in outcomes:
         if o.approval_card:
-            (folder / f"request_{o.approval_request:03d}_{o.invoice.invoice_number}.txt").write_text(o.approval_card + "\n")
+            (folder / f"request_{o.approval_request:03d}_{_number(o)}.txt").write_text(o.approval_card + "\n")
             n += 1
     return n
 
@@ -92,7 +97,7 @@ def write_notices(outcomes: list[Outcome], outbox: Path, waiting: list[dict], pa
     n = 0
     for o in outcomes:
         if text := draft_notice(o):
-            (folder / f"{o.invoice.invoice_number}_{Path(o.source_path).stem}.txt").write_text(text + "\n")
+            (folder / f"{_number(o)}_{Path(o.source_path).stem}.txt").write_text(text + "\n")
             n += 1
     (outbox / "daily_digest.txt").write_text(digest(outcomes, waiting, payments) + "\n")
     return n
@@ -107,7 +112,7 @@ def auto_vp(args: argparse.Namespace, outcomes: list[Outcome]) -> list[str]:
     for o in outcomes:
         if o.approval_request and o.awaiting == "VP Finance" and not any(f.severity.value == "hold" for f in o.findings):
             res = svc.respond(svc.tokens_for(o.approval_request)["approve"], DIRECTORY["VP Finance"]["email"], "demo auto-approval (simulated)")
-            log.append(f"request #{o.approval_request} ({o.invoice.invoice_number}): {res.message}")
+            log.append(f"request #{o.approval_request} ({_number(o)}): {res.message}")
             if res.paid:
                 o.paid, o.payment_ref, o.payment_amount, o.awaiting = True, res.payment_ref, res.amount, None
     return log

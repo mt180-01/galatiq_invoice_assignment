@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import tempfile
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from pathlib import Path
@@ -20,7 +21,7 @@ from .pipeline import Pipeline
 PRICES = {"WidgetA": "250.00", "WidgetB": "500.00", "GadgetX": "750.00"}
 
 
-def invoice(number: str, vendor: str = "Widgets Inc.", lines: list[tuple[str, int, str | None]] | None = None, *, total: str | None = None,
+def invoice(number: str, vendor: str = "Widgets Inc.", lines: Sequence[tuple[str, int, str | None]] | None = None, *, total: str | None = None,
             tax: str = "0.00", shipping: str | None = None, when: str | None = None, due: str | None = None, notes: str | None = None, terms: str = "Net 30",
             currency: str | None = None) -> str:
     """Plain-text invoice in the layout of the provided samples. Prices default to the catalogue price."""

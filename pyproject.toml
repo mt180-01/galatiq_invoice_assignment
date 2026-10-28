@@ -19,4 +19,4 @@ ignore = [
 ignore_missing_imports = true
 check_untyped_defs = false
 warn_unused_ignores = false
-# The code is typed where it helps readers; mypy runs as a smoke check, not a gate.
+# `make lint` runs mypy over acme_ap and it is clean: keep it that way (lenient settings, but zero errors).

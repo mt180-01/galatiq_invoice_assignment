@@ -65,6 +65,8 @@ class Pipeline:
     async def _write_together(self, out: Outcome) -> tuple[str | None, str | None]:
         """Run the plain-English note and the vendor email at the same time. Each job keeps its own record of model use (a task's context is its own),
         merged in a fixed order afterwards, so the trace shows exactly whose calls were whose and a replay is unaffected by which finished first."""
+        assert out.approval is not None
+
         async def job(action: str, write):
             mine: list = []
             invoice_ledger.set(mine)
@@ -147,6 +149,7 @@ class Pipeline:
 
     async def _validate_and_decide(self, out: Outcome, trace: str, clock: _Lap) -> None:
         inv = out.invoice
+        assert inv is not None
         # Local ERP reads take microseconds; a real (network) ERP adapter would be awaited here instead.
         async with step(out, "Validation", "checked against ERP and policy"):
             out.findings = await self.validator.check(inv)
@@ -162,8 +165,8 @@ class Pipeline:
 
     async def _pay(self, out: Outcome, key: str) -> tuple[tuple | None, str | None]:
         """Reserve stock (opt-in policy), then schedule or send the payment. Returns the ledger row to record and the ERP status, if any."""
-        inv = out.invoice
-        payment_row, pay_status = None, None
+        inv, payment_row, pay_status = out.invoice, None, None
+        assert inv is not None and out.approval is not None
         if out.approval.decision is Decision.APPROVE and getattr(self.erp, "tracks_stock", False):
             # Cumulative stock control (opt-in): the units this invoice consumes are set aside atomically before payment, so two invoices that each
             # fit in stock cannot both be approved when together they do not.
@@ -181,6 +184,7 @@ class Pipeline:
         return payment_row, pay_status
 
     async def _notify_and_settle(self, out: Outcome, key: str, payment_row, pay_status: str | None, clock: _Lap) -> None:
+        assert out.approval is not None
         if self.llm.available:
             # The note for the people who must act and the email to the vendor depend only on the decision, so they are written together.
             out.explanation, out.followup = await self._write_together(out)

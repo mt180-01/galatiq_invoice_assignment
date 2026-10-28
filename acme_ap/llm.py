@@ -21,11 +21,14 @@ from collections import Counter
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 from collections.abc import Callable
 
 import httpx
 from pydantic import BaseModel, ValidationError
+
+if TYPE_CHECKING:
+    from .cassette import RecordingTransport, ReplayTransport
 
 _agent = contextvars.ContextVar("agent", default="unassigned")
 invoice_ledger: contextvars.ContextVar[list | None] = contextvars.ContextVar("invoice_ledger", default=None)  # per-invoice usage sink
@@ -143,8 +146,12 @@ class Meter:
     def __init__(self, price_in: float | None = None, price_out: float | None = None):
         self.price_in = price_in if price_in is not None else _env_float("XAI_PRICE_IN")
         self.price_out = price_out if price_out is not None else _env_float("XAI_PRICE_OUT")
-        self.calls, self.cached, self.skipped, self.tool_calls = Counter(), Counter(), Counter(), Counter()
-        self.tokens_in, self.tokens_out = Counter(), Counter()
+        self.calls: Counter[str] = Counter()
+        self.cached: Counter[str] = Counter()
+        self.skipped: Counter[str] = Counter()
+        self.tool_calls: Counter[str] = Counter()
+        self.tokens_in: Counter[str] = Counter()
+        self.tokens_out: Counter[str] = Counter()
         self.reported_ticks = 0  # cost as reported by the API itself (1 USD = 10,000,000,000 ticks), the exact figure
 
     def record(self, agent: str, tin: int, tout: int, cached: bool = False, ticks: int = 0, model: str = "") -> None:
@@ -238,6 +245,9 @@ class OfflineLLM(LLM):
 
 class GrokClient(LLM):
     available = True
+    meter: Meter  # always present on a real client (the base class allows None for the offline one)
+    replay: ReplayTransport  # set only on a replaying client: callers test hasattr(client, "replay")
+    recording: RecordingTransport  # set only on a recording client
 
     def __init__(self, api_key: str, model: str = "grok-3", base_url: str = "https://api.x.ai/v1",
                  transport: httpx.AsyncBaseTransport | None = None, timeout: float = 30.0,
@@ -270,7 +280,7 @@ class GrokClient(LLM):
         delays = () if agent in AGENT_TIMEOUT else self.retry_delays  # optional work is not retried
         for attempt in range(len(delays) + 1):
             try:
-                resp = await self._client.post("/chat/completions", json=payload, **({"timeout": AGENT_TIMEOUT[agent]} if agent in AGENT_TIMEOUT else {}))
+                resp = await self._client.post("/chat/completions", json=payload, timeout=AGENT_TIMEOUT.get(agent, httpx.USE_CLIENT_DEFAULT))
             except httpx.TransportError:
                 if attempt == len(delays):
                     raise
@@ -432,31 +442,31 @@ def make_llm(offline: bool = False, cache_path: str | Path | None = None, simula
         return OfflineLLM()
     if replay_from:  # a recorded live run, answered from the file: no network, no key, no cost
         from .cassette import ReplayTransport
-        transport = ReplayTransport(replay_from)
+        replayer = ReplayTransport(replay_from)
         GrokClient._format_mode, GrokClient._model_checked = "json_schema", False  # start from the same state a fresh live run did
-        client = GrokClient("replay", transport=transport, retry_delays=(0, 0), budget_usd=None)  # recorded 429s are replayed, so retries follow the same path, instantly
-        client.label, client.replay = f"Grok (replayed from {Path(replay_from).name})", transport
+        client = GrokClient("replay", transport=replayer, retry_delays=(0, 0), budget_usd=None)  # recorded 429s are replayed, so retries follow the same path, instantly
+        client.label, client.replay = f"Grok (replayed from {Path(replay_from).name})", replayer
         return client
     live = live or bool(record_to) or os.environ.get("ACME_USE_GROK") == "1"
     key = read_api_key() if live else None
     if key and not simulate:
         budget = _env_float("XAI_BUDGET_USD")
-        transport = None
+        recorder: RecordingTransport | None = None
         if record_to:  # recording must see every request, so the answer cache is off
             from .cassette import RecordingTransport
-            transport = RecordingTransport(record_to, note=f"recorded {__import__('datetime').date.today()} against model {os.environ.get('XAI_MODEL', 'grok-3')}")
+            recorder = RecordingTransport(record_to, note=f"recorded {__import__('datetime').date.today()} against model {os.environ.get('XAI_MODEL', 'grok-3')}")
         chosen = os.environ.get("XAI_MODEL")
-        client = GrokClient(key, model=chosen or "grok-3", auto_model=not chosen, transport=transport, cache=None if record_to else (LLMCache(cache_path) if cache_path else None),
+        client = GrokClient(key, model=chosen or "grok-3", auto_model=not chosen, transport=recorder, cache=None if record_to else (LLMCache(cache_path) if cache_path else None),
                             budget_usd=DEFAULT_BUDGET_USD if budget is None else budget)
-        if record_to:
-            client.label, client.recording = "Grok (recording)", transport
+        if recorder:
+            client.label, client.recording = "Grok (recording)", recorder
         return client
     from .cassette import ReplayTransport, bundled_recordings
     if not simulate and (bundled := bundled_recordings()) and not live:
-        transport = ReplayTransport(bundled)
+        replayer = ReplayTransport(list(bundled))
         GrokClient._format_mode, GrokClient._model_checked = "json_schema", False
-        client = GrokClient("replay", transport=transport, retry_delays=(0, 0), budget_usd=None)
-        client.label, client.replay = "Grok (recorded responses, replayed offline; --grok for live)", transport
+        client = GrokClient("replay", transport=replayer, retry_delays=(0, 0), budget_usd=None)
+        client.label, client.replay = "Grok (recorded responses, replayed offline; --grok for live)", replayer
         return client
     from . import sim_llm
     client = GrokClient("local-simulation", transport=sim_llm.transport())

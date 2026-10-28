@@ -224,7 +224,7 @@ class PaymentService:
             res = self._result(self._row(key))
             if res.submitted:
                 row = self._row(key)
-                self.erp.settle_bill(key, "paid", f"payment released: {res.message}", (row["vendor"], Decimal(row["amount"]), res.ref))
+                self.erp.settle_bill(key, "paid", f"payment released: {res.message}", (row["vendor"], Decimal(row["amount"]), res.ref or ""))
             out.append(res)
         return out
 

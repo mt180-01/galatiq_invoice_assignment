@@ -5,7 +5,7 @@
 ```bash
 make setup      # venv + dependencies (Tesseract is only needed for scanned PDFs)
 make test       # 353 tests, about 30 s, no network, no API key
-make lint       # ruff + mypy (mypy is a smoke check, not a gate)
+make lint       # ruff + mypy, both clean (zero errors); a change that breaks either should not merge
 make e2e        # 60 end-to-end checks, as a user would run them
 ```
 

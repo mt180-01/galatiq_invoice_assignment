@@ -100,6 +100,12 @@ class ApprovalService:
         rows = self._fetch("SELECT * FROM approval_requests WHERE id=?", (rid,))
         return rows[0] if rows else None
 
+    def _need(self, rid: int) -> sqlite3.Row:
+        row = self._row(rid)
+        if row is None:
+            raise KeyError(f"no approval request #{rid}")
+        return row
+
     def _token(self, rid: int, action: str, ev_hash: str, now: datetime, who: str) -> str:
         return make_token(self._secret, rid, action, ev_hash, now + EXPIRE_AFTER, who)
 
@@ -111,11 +117,12 @@ class ApprovalService:
             return None
         now = now or utcnow()
         inv = outcome.invoice
+        assert inv is not None, "an escalated outcome always has an invoice"
         with self._lock:
             cur = self._db.execute(
                 "INSERT INTO approval_requests (bill_key, ev_hash, invoice_json, outcome_json, role, reasons, created_at) VALUES (?,?,?,?,?,?,?)",
                 (bill_key, evidence_hash(inv), inv.model_dump_json(), outcome.model_dump_json(), r.role, json.dumps(r.reasons), now.isoformat()))
-            rid = cur.lastrowid
+            rid = cur.lastrowid or 0
             self._event(rid, now, "opened", f"routed to {r.role}")
             self._db.commit()
         return rid, r
@@ -123,7 +130,7 @@ class ApprovalService:
     # ---- the decision card -----------------------------------------------------------------
     def render_card(self, rid: int, now: datetime | None = None, note: str = "") -> str:
         now = now or utcnow()
-        row = self._row(rid)
+        row = self._need(rid)
         inv = Invoice.model_validate_json(row["invoice_json"])
         out = Outcome.model_validate_json(row["outcome_json"])
         reasons = json.loads(row["reasons"])
@@ -202,7 +209,7 @@ class ApprovalService:
             res = self.payments.pay(inv, row["bill_key"])
             self._close(rid, "approved", who, comment, now, res.ref)
             self.erp.settle_bill(row["bill_key"], res.erp_status, f"approved by {who}: {comment or 'no comment'}",
-                                 (inv.vendor or "", res.amount, res.ref) if res.submitted else None)
+                                 (inv.vendor or "", res.amount, res.ref or "") if res.submitted else None)
             return Result(True, f"approved by {who}; " + ("paid" if res.submitted else res.message), res.submitted, res.ref, res.amount)
 
     def _close(self, rid: int, status: str, who: str, comment: str, now: datetime, ref: str | None = None) -> None:
@@ -278,7 +285,7 @@ class ApprovalService:
 
     def tokens_for(self, rid: int, now: datetime | None = None, approver: str | None = None) -> dict[str, str]:
         """Links for a request, issued to `approver` (default: the mailbox the request is with now)."""
-        row = self._row(rid)
+        row = self._need(rid)
         who = approver or DIRECTORY[row["role"]]["email"]
         return {a: self._token(rid, a, row["ev_hash"], now or utcnow(), who) for a in ("approve", "reject")}
 

@@ -122,4 +122,4 @@ def read_page(page) -> list[tuple]:
             best = (words, conf)
         if best[1] >= LOW_CONFIDENCE:
             break
-    return best[0]
+    return best[0] if best else []

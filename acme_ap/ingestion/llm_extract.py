@@ -32,7 +32,7 @@ MAX_CHARS = 6000  # an invoice is a page or two; anything longer is not worth pa
 
 def compact(text: str) -> str:
     """Same content, fewer tokens: collapse runs of spaces, drop pure rule lines (-----, =====), squeeze blank lines."""
-    lines = []
+    lines: list[str] = []
     for raw in text.splitlines():
         line = re.sub(r"[ \t]{2,}", "  ", raw).strip()
         if not line or re.fullmatch(r"[-_=*~.\s]{3,}", line):
@@ -60,7 +60,8 @@ def doubt(baseline: Invoice) -> str | None:
 
 
 def _build(data: dict) -> Invoice:
-    items, shipping = [], parse_money(data.get("shipping"))
+    items: list[LineItem] = []
+    shipping: Decimal | int | None = parse_money(data.get("shipping"))
     for li in data.get("line_items", []):
         if NON_ITEM.match(str(li["item"])):  # a charge listed among the items: it is shipping (or tax), not stock
             if shipping is None and re.match(r"\s*(?:shipping|freight|delivery|handling|postage|carriage)", str(li["item"]), re.I):
@@ -73,7 +74,7 @@ def _build(data: dict) -> Invoice:
         invoice_number=normalize_invoice_number(data.get("invoice_number")), vendor=data.get("vendor") or None,
         date=parse_date(data.get("date")), due_date=parse_date(data.get("due_date")),
         currency=data.get("currency") or "USD", line_items=items, subtotal=parse_money(data.get("subtotal")),
-        tax_amount=parse_money(data.get("tax_amount")), shipping=shipping,
+        tax_amount=parse_money(data.get("tax_amount")), shipping=None if shipping is None else Decimal(shipping),
         total=parse_money(data.get("total")), payment_terms=data.get("payment_terms") or None,
         bank_account=normalize_account(data.get("bank_account")),
         notes=data.get("notes") or None, channel="unstructured", extractor="grok")
