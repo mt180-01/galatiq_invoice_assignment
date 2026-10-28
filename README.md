@@ -5,6 +5,10 @@ reads invoices in any format, checks them against the ERP, gets the right person
 happened. Six agents with distinct jobs: Intake, Validation, Reviewer and Comms use Grok where reasoning helps (with tools and self-checks); Desk and Payment are deliberately rules-only, because a mistake there costs money. The order of the stages is fixed; the agents do not plan or delegate to each other. Built for the case in
 [docs/ASSIGNMENT.md](docs/ASSIGNMENT.md).
 
+> **Which model runs?** By default, **Grok**, replayed: its answers come from real runs recorded on 2026-10-27 and 2026-10-28 against `grok-4.20-0309-non-reasoning`, shipped in this repository, so a run
+> needs no key, no network and no money (the cost shown is what xAI reported when recorded). `--grok` calls xAI live (needs `XAI_API_KEY`, capped at $0.25 a run); `--simulate` is a local stand-in that is
+> *not* Grok; `--offline` uses no model. An invoice of your own is not in the recordings, so the rules read it (the report says "N not recorded"): use `--grok` to put Grok on it.
+
 <p align="center"><img src="docs/img/dashboard.png" alt="Dashboard: invoices, who is waiting, payments" width="720"></p>
 
 <table><tr>
@@ -28,7 +32,7 @@ The command line is first-class too: [`docs/img/demo.svg`](docs/img/demo.svg) is
 | Robustness to garbage | 2,000 randomly corrupted invoices: **0 approved with a wrong value** (a stray "see invoice 31337" once got through; found and fixed) | `scripts/stress_extraction.py` |
 | Speed | a clean invoice spends about 10-15 ms in the system, against "5 days" in the brief; about 2,200 documents/s on 14 cores | `main.py --bench`, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §4 |
 | Waiting on a person | never silent: reminder at 24 h, escalation at 48 h, expiry at 5 days | `approve.py tick`, `make e2e` |
-| Tests | **347 tests** plus a **60-check end-to-end run** from a fresh clone; a test fails the build if a credential is ever committed | `make test`, `make e2e` |
+| Tests | **349 tests** plus a **60-check end-to-end run** from a fresh clone; a test fails the build if a credential is ever committed | `make test`, `make e2e` |
 
 ## Business impact
 
@@ -51,7 +55,7 @@ the cost side is measured.
    safer system that looks less "AI-heavy"; asking about everything is ~2.5x the calls (`scripts/measure_llm_cost.py`).
 3. **A custom orchestrator, not LangGraph/CrewAI.** CPU-bound PDF work and I/O-bound model and bank calls need different scheduling, and six agents with charters did not need a framework. *Trade-off:* more code of our own.
 4. **Grok by default, replayed; live on request, capped.** Out of the box the model is Grok: its answers come from recordings of real runs that ship in the repository (the provided invoices, the red-team documents, the extraction corpus, the self-correction samples), so a reviewer needs no key, no network and no money, and sees Grok's own wording, tool calls and corrections. A document the recordings do not cover (your own invoice) is read by the rules, and the report says how many questions were not recorded. `--grok` asks live Grok (opt-in, per-run budget); `--simulate` is the old local stand-in; `--offline` is no model; the default model is a plain one, not a reasoning one, because a
-   reasoning model was ~3x the cost and several times slower for this work (measured).
+   reasoning model was ~3x the cost and several times slower for this work (measured). *Which name:* the client asks for `grok-3` by default, but on the account used here that name was served by a slower, dearer reasoning model (`grok-4.3`), so with no `XAI_MODEL` set it asks the API what the key can use and picks a non-reasoning model; every recording was made with `grok-4.20-0309-non-reasoning`. Set `XAI_MODEL` to force one.
 5. **The ledger is the system's memory and every way in keeps it** (the command line, the web page, the demo, and the classes' own defaults; only `--reset` or a scratch database made for one run starts empty), so nothing is ever paid twice, with idempotency keys on every payment. Duplicates use the vendor's master name; a changed resubmission of a rejected invoice is allowed.
 6. **Stock is a per-invoice cap by default** (the brief's own table lists three invoices as "within stock" that together exceed it); `--stock-policy reserve` is the cumulative alternative, and `--stock-policy decrement` takes the units off the shelf for good when an invoice is paid (kept between runs; `main.py stock` shows what is left).
 7. **Payments are scheduled, not instant**: due date minus bank lead time (business days), early-pay discounts captured, an account on the invoice that differs from the one on file is held, new accounts need two people.
@@ -112,7 +116,7 @@ Contributing and a map of the code: [CONTRIBUTING.md](CONTRIBUTING.md). More: `a
 | Criterion | Where to look |
 |---|---|
 | **Functionality** | 17/17 end to end, offline and on live Grok; `make e2e` (60 checks from a fresh clone) |
-| **Code quality** | typed models, one responsibility per module, error handling at every boundary (a failing model step never fails an invoice), structured logs, 248 tests |
+| **Code quality** | typed models, one responsibility per module, error handling at every boundary (a failing model step never fails an invoice), structured logs, 349 tests |
 | **Agentic sophistication** | the table above: tool use, strict structured output, five self-correction loops, six agents with charters, guards; recorded, replayable live runs and a per-invoice evaluation |
 | **Shipping mindset** | simulated what must be (bank, ERP, email) behind adapters; cut what doesn't earn its keep (no framework, no database server, no auth system); limits stated in §5 of the architecture doc |
 | **Presentation** | this page; measured results with evidence; business impact, cost and ROI; design decisions; screenshots from a real run |
