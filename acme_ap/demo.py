@@ -33,11 +33,16 @@ def demo() -> None:
         shutil.copytree(DATA / "invoices", src)
         base = json.loads((DATA / "approvals_demo" / "invoice_3001.json").read_text())
         (src / "invoice_3001.json").write_text(json.dumps(base))                       # over the 10,000 sign-off limit
-        one = dict(base, invoice_number="INV-3002", date=today.isoformat(), due_date=(today + timedelta(days=45)).isoformat(),
-                   line_items=base["line_items"][:1], subtotal=3750, total=3750, payment_terms="Net 45")
-        (src / "invoice_3002.json").write_text(json.dumps(one))                        # due in 45 days: should wait
-        (src / "invoice_3003.json").write_text(json.dumps(dict(one, invoice_number="INV-3003", payment_terms="2/10 Net 30",
-                                                               due_date=(today + timedelta(days=30)).isoformat())))  # discount
+        # Two ordinary orders from two different approved vendors (the same vendor billing the same thing twice in a week is, rightly, held as a
+        # repeat order, which would hide the timing story): one due in 45 days, one with an early-payment discount.
+        slow = dict(base, invoice_number="INV-3002", vendor={"name": "Gadgets Co.", "address": "1 Gadget Way"}, date=today.isoformat(),
+                    due_date=(today + timedelta(days=45)).isoformat(), line_items=[{"item": "GadgetX", "quantity": 2, "unit_price": 750.00, "amount": 1500.00}],
+                    subtotal=1500, total=1500, payment_terms="Net 45")
+        (src / "invoice_3002.json").write_text(json.dumps(slow))                       # due in 45 days: should wait
+        (src / "invoice_3003.json").write_text(json.dumps(dict(
+            slow, invoice_number="INV-3003", vendor={"name": "Global Supply Chain Partners", "address": "2 Supply Rd"},
+            line_items=[{"item": "WidgetA", "quantity": 3, "unit_price": 250.00, "amount": 750.00}], subtotal=750, total=750,
+            payment_terms="2/10 Net 30", due_date=(today + timedelta(days=30)).isoformat())))  # discount
         db = str(root / "demo.db")
         args = SimpleNamespace(db=db, keep_ledger=True, llm_concurrency=8, offline=False, simulate=True)  # a new temporary folder: empty by construction, so nothing needs wiping
         step = lambda n, text: console.print(f"\n[bold cyan]Step {n}.[/] {text}")  # noqa: E731

@@ -20,6 +20,9 @@ def test_demo_runs_the_whole_story():
         assert f"Step {n}." in out
     assert "approved by vp-finance@acmecorp.example; paid" in out
     assert re.search(r"settled \d+, returned 0, still in flight 0; issues: none", out)
+    # the claims the narration makes in steps 5 and 6 must be what actually happened (a fraud rule once held the two timed invoices and nothing noticed)
+    assert re.search(r"scheduled for later : 1 \(1,500\.00\)", out) and "early-payment discounts captured : 15.00" in out
+    assert re.search(r"gadgetsco\|INV-3002\|: release \d{4}-\d{2}-\d{2} via ACH", out) and re.search(r": sent 1 payment\(s\) \(ACH-", out)
 
 
 def test_main_approver_and_treasury_commands_work_together(tmp_path):
