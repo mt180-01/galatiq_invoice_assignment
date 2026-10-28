@@ -348,6 +348,8 @@ response; forged, empty, replayed and expired links are refused; a stranger's id
 Identity on the page comes from the link, which was issued to one mailbox (no pick-list, no typing). That is a stand-in for single sign-on: a real deployment must deliver
 links by email and authenticate the person before showing the page. Screenshots in `docs/img/` are generated from a real run by `scripts/make_screens.py`.
 
+**Accessibility (4k.1).** Every page has a skip link, `nav`/`main` landmarks, scoped table headers with captions, a visible focus ring and 44 px targets; status is a word plus a symbol, never colour alone. Display settings (text size to 150%, high contrast that also follows `prefers-contrast`, a readable-font mode, reset) and Read-aloud buttons (the browser's offline speech) are driven by one small script, kept under the strict content-security-policy by allowing exactly that script by its SHA-256 hash (no `unsafe-inline` for scripts, nothing else can run). The command line has `--plain` / `ACME_PLAIN=1`: no colour, no tables, one sentence per invoice. Limits: tested by markup assertions and a JavaScript syntax check, not with a screen reader on every platform; speech depends on the voices the browser has.
+
 ## 4i. Verified against the live Grok API
 
 Recorded transcripts and results are in [`docs/live_runs/`](live_runs/). Run on 2026-10-27 with a real xAI key (kept in a private file outside the repo; `scripts/live_smoke.py` reads it and never prints it).

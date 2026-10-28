@@ -18,7 +18,7 @@ from acme_ap.demo import demo
 from acme_ap.ingestion import SUPPORTED
 from acme_ap.intake import expand
 from acme_ap.llm import make_llm
-from acme_ap.report import ai_usage, console, impact, payment_summary, scorecard, show, show_trace
+from acme_ap.report import ai_usage, console, impact, payment_summary, scorecard, set_plain, show, show_trace
 from acme_ap.runner import auto_vp, ledger_view, run_batch, write_cards, write_notices, write_outbox
 
 warnings.filterwarnings("ignore")
@@ -144,8 +144,11 @@ def main() -> None:
     ap.add_argument("--grok", action="store_true", help="use the real Grok API: billed per token by xAI, capped per run by XAI_BUDGET_USD (default $0.25)")
     ap.add_argument("--json", metavar="FILE", help="write full results as JSON")
     ap.add_argument("--bench", type=int, metavar="N", help="throughput benchmark over N generated documents, serial vs parallel")
+    ap.add_argument("--plain", action="store_true", help="accessible output for screen readers and low vision: no colour or tables, one plain sentence per invoice (also ACME_PLAIN=1)")
     ap.add_argument("-v", "--verbose", action="store_true", help="show per-stage structured logs")
     args = ap.parse_args()
+    if args.plain:
+        set_plain(True)
     args.keep_ledger = not args.reset
     if args.bench and not (args.grok or args.simulate or args.replay_llm):
         args.offline = True  # a benchmark measures the pipeline, not a model

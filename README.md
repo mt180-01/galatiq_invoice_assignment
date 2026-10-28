@@ -55,7 +55,21 @@ The command line is first-class too: [`docs/img/demo.svg`](docs/img/demo.svg) is
 | Robustness to garbage | rules only | 2,000 randomly corrupted invoices: **0 approved with a wrong value** (a stray "see invoice 31337" once got through; found and fixed) | `scripts/stress_extraction.py` |
 | Speed | no model (`--offline`) | a clean invoice spends about 10-15 ms in the system, against "5 days" in the brief; about 2,200 documents/s on 14 cores | `main.py --bench`, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §4 |
 | Waiting on a person | no model | never silent: reminder at 24 h, escalation at 48 h, expiry at 5 days | `approve.py tick`, `make e2e` |
-| Tests | no model | **353 tests** plus a **60-check end-to-end run** from a fresh clone; a test fails the build if a credential is ever committed | `make test`, `make e2e` |
+| Tests | no model | **359 tests** plus a **60-check end-to-end run** from a fresh clone; a test fails the build if a credential is ever committed | `make test`, `make e2e` |
+
+## Accessibility
+
+Built so people who use a screen reader, a keyboard only, magnification, high contrast or speech can run and review invoices without help:
+
+| Where | What |
+|---|---|
+| Web, every page | skip-to-content link, landmarks (`nav`, `main`), `lang`, a visible keyboard focus ring, controls at least 44 px tall, tables with captions and scoped headers, announcements for setting changes |
+| Web, display settings | **A- / A+ text size** (up to 150%), **high contrast** (also follows the system's contrast setting), **readable font** (wider spacing, for dyslexia), **reset**; remembered in the browser |
+| Web, status | every status is a word *and* a symbol (✓ ✗ ! i), never colour alone; motion is off when the system asks; works in Windows forced-colours mode |
+| Web, speech | **Read aloud** buttons (dashboard summary, an invoice's plain-English note) use the browser's own offline speech; nothing is sent anywhere |
+| Command line | `--plain` (or `ACME_PLAIN=1`): no colour, no tables or box-drawing, one sentence per invoice, in the order a person would hear it |
+
+The page's content-security-policy stays strict: the one script that powers these controls is allowed by its hash, nothing else may run. Tests: `tests/test_accessibility.py`.
 
 ## Business impact
 
@@ -139,12 +153,12 @@ Contributing and a map of the code: [CONTRIBUTING.md](CONTRIBUTING.md). More: `a
 | Criterion | Where to look |
 |---|---|
 | **Functionality** | 17/17 end to end, offline and on live Grok; `make e2e` (60 checks from a fresh clone) |
-| **Code quality** | typed models, one responsibility per module, error handling at every boundary (a failing model step never fails an invoice), structured logs, 353 tests |
+| **Code quality** | typed models, one responsibility per module, error handling at every boundary (a failing model step never fails an invoice), structured logs, 359 tests |
 | **Agentic sophistication** | the table above: tool use, strict structured output, five self-correction loops, six agents with charters, guards; recorded, replayable live runs and a per-invoice evaluation |
 | **Shipping mindset** | simulated what must be (bank, ERP, email) behind adapters; cut what doesn't earn its keep (no framework, no database server, no auth system); limits stated in §5 of the architecture doc |
 | **Presentation** | this page; measured results with evidence; business impact, cost and ROI; design decisions; screenshots from a real run |
 | **Above and beyond** | a red-team suite that attacks the system (and found real holes), "what would get this paid" to-do lists on every stopped invoice, email and e-invoice intake, OCR, signed one-click approvals with escalation, scheduled payments with discounts and bank holidays, bank-account fraud check with dual control, reconciliation, adversarial and stress tests, a cost guard, record/replay |
-| **UI/UX** | the web interface (dashboard, **upload**, review queue, approval page, per-invoice agent trace), a guided demo, readable CLI output, links that actually open |
+| **UI/UX** | the web interface (dashboard, **upload**, review queue, approval page, per-invoice agent trace), a guided demo, readable CLI output, links that actually open, and [accessibility](#accessibility): display settings, read-aloud, `--plain` output |
 
 ## Where things live
 

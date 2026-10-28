@@ -15,11 +15,49 @@ from .nextsteps import next_steps
 from .payments import MockBank, PaymentService
 
 console = Console()
+PLAIN = False
+
+
+def set_plain(on: bool = True) -> None:
+    """Output for screen readers, braille displays and low vision: no colour, no table or box-drawing characters,
+    one plain sentence per invoice. The same information as the table, in the order a person would read it aloud."""
+    global PLAIN
+    PLAIN = on
+    console.no_color = on
+
+
+set_plain(bool(os.environ.get("ACME_PLAIN")))
 STYLE = {"AWAITING": "cyan", "PAID": "green", "APPROVE": "green", "REJECT": "red", "ESCALATE": "yellow", "DUPLICATE": "dim", "FAILED": "bold red",
          "SCHEDULED": "blue", "PAYMENT_HELD": "magenta", "PAYMENT_FAILED": "bold red"}
 
 
+def _name(o: Outcome) -> str:
+    return Path(o.source_path).parent.name + "/body" if Path(o.source_path).name == "body.txt" else os.path.basename(o.source_path)
+
+
+def _show_plain(outcomes: list[Outcome]) -> None:
+    console.print(f"Results for {len(outcomes)} invoice(s).", markup=False)
+    for o in outcomes:
+        inv = o.invoice
+        why = o.error or (o.approval.reasoning if o.approval else "")
+        if o.awaiting:
+            why = f"Waiting for {o.awaiting} (request {o.approval_request}). {why}"
+        total = f"{inv.currency} {inv.total}" if inv and inv.total is not None else "no total"
+        console.print(f"Invoice file {_name(o)}, vendor {(inv.vendor if inv else None) or 'unknown'}, total {total}: {o.status}. {why}".rstrip(), markup=False, soft_wrap=True)
+    for o in outcomes:
+        steps = next_steps(o)
+        if steps:
+            name = o.invoice.invoice_number if o.invoice and o.invoice.invoice_number else _name(o)
+            console.print(f"To get {name} paid: " + "; ".join(f"{who}: {what}" for who, what in steps[:2]) + (f" (and {len(steps) - 2} more)" if len(steps) > 2 else ""), markup=False, soft_wrap=True)
+    counts: dict[str, int] = {}
+    for o in outcomes:
+        counts[o.status] = counts.get(o.status, 0) + 1
+    console.print("Totals: " + ", ".join(f"{v} {k}" for k, v in sorted(counts.items())) + ".", markup=False)
+
+
 def show(outcomes: list[Outcome]) -> None:
+    if PLAIN:
+        return _show_plain(outcomes)
     table = Table(title="Invoice results", show_lines=False)
     for col in ("File", "Vendor", "Total", "Status", "Why"):
         table.add_column(col, overflow="fold")
